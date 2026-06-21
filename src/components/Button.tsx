@@ -8,9 +8,10 @@ type Props = {
     containerStyle?: any;
     onPress?: () => void;
     title?: string;
+    leading?: React.ReactNode;
 };
 
-const Button: React.FC<Props> = ({ title, onPress, containerStyle }) => {
+const Button: React.FC<Props> = ({ title, onPress, containerStyle, leading }) => {
     return (
         <View style={{ ...containerStyle, width: "100%" }}>
             <TouchableOpacity onPress={onPress}>
@@ -22,10 +23,13 @@ const Button: React.FC<Props> = ({ title, onPress, containerStyle }) => {
                         justifyContent: "center",
                         alignItems: "center",
                         borderRadius: 10,
+                        flexDirection: "row",
+                        gap: 10,
                     }}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                 >
+                    {leading}
                     <Text
                         style={{
                             color: theme.COLORS.white,

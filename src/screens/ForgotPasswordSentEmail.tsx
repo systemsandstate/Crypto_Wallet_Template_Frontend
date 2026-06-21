@@ -1,41 +1,25 @@
-import {
-    View,
-    TouchableOpacity,
-    ScrollView,
-    Image,
-    ImageBackground,
-    Text,
-} from "react-native";
-import React, { useState } from "react";
+import { View, Text, ScrollView, Image } from "react-native";
+import React from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
-import { svg } from "../svg";
 import { theme } from "../constants";
 import { components } from "../components";
 
-const ForgotPasswordSentEmail: React.FC = ({ navigation }: any) => {
-    const renderContent = () => {
-        return (
+const ForgotPasswordSentEmail: React.FC = ({ navigation, route }: any) => {
+    const mode: "email_sent" | "success" = route.params?.mode || "success";
+    const isEmailSent = mode === "email_sent";
+
+    return (
+        <SafeAreaView style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
             <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
                 <Image
                     source={require("../assets/bg-02.png")}
                     style={{ width: "100%", height: 530, position: "absolute" }}
                 />
-                <View
-                    style={{
-                        paddingTop: theme.SIZES.height * 0.2,
-                        paddingHorizontal: 20,
-                    }}
-                >
+                <View style={{ paddingTop: theme.SIZES.height * 0.2, paddingHorizontal: 20 }}>
                     <Image
                         source={require("../assets/reset.png")}
-                        style={{
-                            width: 161,
-                            height: 111,
-                            alignSelf: "center",
-                            marginBottom: 30,
-                        }}
+                        style={{ width: 161, height: 111, alignSelf: "center", marginBottom: 30 }}
                     />
                     <Text
                         style={{
@@ -45,7 +29,7 @@ const ForgotPasswordSentEmail: React.FC = ({ navigation }: any) => {
                             marginBottom: 20,
                         }}
                     >
-                        Your password{"\n"}has been reset!
+                        {isEmailSent ? "Check your email" : "Your password\nhas been reset!"}
                     </Text>
                     <Text
                         style={{
@@ -57,23 +41,16 @@ const ForgotPasswordSentEmail: React.FC = ({ navigation }: any) => {
                             marginBottom: theme.SIZES.height * 0.2,
                         }}
                     >
-                        Qui ex aute ipsum duis. Incididunt{"\n"}adipisicing
-                        voluptate laborum
+                        {isEmailSent
+                            ? "If an account exists for that email, we sent a link to reset your password."
+                            : "You can now sign in with your new password."}
                     </Text>
                     <components.Button
-                        title="Done"
+                        title={isEmailSent ? "Back to sign in" : "Done"}
                         onPress={() => navigation.navigate("SignIn")}
                     />
                 </View>
             </ScrollView>
-        );
-    };
-
-    return (
-        <SafeAreaView
-            style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}
-        >
-            {renderContent()}
         </SafeAreaView>
     );
 };

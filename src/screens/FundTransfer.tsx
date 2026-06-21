@@ -4,379 +4,282 @@ import {
     View,
     TouchableOpacity,
     Image,
+    Alert,
+    ActivityIndicator,
     TextInput,
 } from "react-native";
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { useFocusEffect } from "@react-navigation/native";
+import { useSelector } from "react-redux";
 
 import { components } from "../components";
 import { theme } from "../constants";
+import { TAB_BAR_HEIGHT } from "../navigation/BottomTabBar";
 import { svg } from "../svg";
+import { api, PaymentRequest } from "../services/api";
+import { RootState } from "../store/store";
+import {
+    NETWORK_LABELS,
+    USDT_NETWORKS,
+    UsdtNetwork,
+    formatUsdtNetwork,
+} from "../constants/usdtNetworks";
 
-const latestFundTransfers = [
-    {
-        id: "1",
-        name: `Krystal Meyers`,
-        icon: require("../assets/users/02.png"),
-    },
-    {
-        id: "2",
-        name: `Krystal Meyers`,
-        icon: require("../assets/users/03.png"),
-    },
-    {
-        id: "3",
-        name: `Krystal Meyers`,
-        icon: require("../assets/users/04.png"),
-    },
-    {
-        id: "4",
-        name: `Krystal Meyers`,
-        icon: require("../assets/users/05.png"),
-    },
-    {
-        id: "5",
-        name: `Krystal Meyers`,
-        icon: require("../assets/users/06.png"),
-    },
+const userAvatars = [
+    require("../assets/users/02.png"),
+    require("../assets/users/03.png"),
+    require("../assets/users/04.png"),
+    require("../assets/users/05.png"),
+    require("../assets/users/06.png"),
 ];
 
-const cards = [
-    {
-        id: "1",
-        icon: require("../assets/cards/06.png"),
-        number: "**** **** **** 7895",
-        balance: "4 863.27",
-    },
-    {
-        id: "2",
-        icon: require("../assets/cards/06.png"),
-        number: "**** **** **** 7895",
-        balance: "4 863.27",
-    },
-    {
-        id: "3",
-        icon: require("../assets/cards/06.png"),
-        number: "**** **** **** 7895",
-        balance: "4 863.27",
-    },
-];
+const formatAmount = (value: number) =>
+    Number.isFinite(value) ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00";
 
 const FundTransfer: React.FC = () => {
-    const [selectedCard, setSelectedCard] = useState("1");
-    const [sendTo, setSendTo] = useState("1");
+    const merchant = useSelector((state: RootState) => state.auth.merchant);
+    const [network, setNetwork] = useState<UsdtNetwork>("TRC20");
+    const [selectedWallet, setSelectedWallet] = useState<UsdtNetwork>("TRC20");
+    const [address, setAddress] = useState("");
+    const [amount, setAmount] = useState("");
+    const [comment, setComment] = useState("");
+    const [balance, setBalance] = useState(0);
+    const [recentTransfers, setRecentTransfers] = useState<PaymentRequest[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const renderHeader = () => {
-        return <components.Header title="Fund transfer" goBack={true} />;
-    };
+    const loadData = useCallback(() => {
+        setLoading(true);
+        api.listPayments({ limit: 20 })
+            .then((res) => {
+                const items = res.data.items;
+                const paid = items.filter((p) => p.status === "PAID");
+                setBalance(paid.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0));
+                setRecentTransfers(paid.slice(0, 5));
+            })
+            .catch(() => {
+                setBalance(0);
+                setRecentTransfers([]);
+            })
+            .finally(() => setLoading(false));
+    }, []);
 
-    const renderLatestFundTransfers = () => {
-        return (
-            <View
-                style={{
-                    borderBottomWidth: 1,
-                    paddingBottom: 17,
-                    borderBottomColor: "#CED6E1",
-                    marginBottom: 14,
-                }}
-            >
-                <View
-                    style={{ marginBottom: 14, marginLeft: 20, marginTop: 14 }}
-                >
-                    <Text
-                        style={{
-                            ...theme.FONTS.H5,
-                            color: theme.COLORS.mainDark,
-                        }}
-                    >
-                        Latest fund transfers
-                    </Text>
-                </View>
+    useFocusEffect(
+        useCallback(() => {
+            loadData();
+        }, [loadData])
+    );
 
-                <ScrollView
-                    horizontal={true}
-                    contentContainerStyle={{ paddingLeft: 20 }}
-                    showsHorizontalScrollIndicator={false}
-                >
-                    {latestFundTransfers.map((item, index) => {
-                        return (
-                            <TouchableOpacity
-                                key={index}
-                                style={{ width: 60, marginRight: 20 }}
-                            >
-                                <Image
-                                    source={item.icon}
-                                    style={{
-                                        width: 60,
-                                        height: 60,
-                                        marginBottom: 4,
-                                    }}
-                                />
-                                <Text
-                                    numberOfLines={2}
-                                    style={{
-                                        textAlign: "center",
-                                        ...theme.FONTS.Mulish_400Regular,
-                                        fontSize: 12,
-                                        lineHeight: 12 * 1.2,
-                                        color: theme.COLORS.bodyTextColor,
-                                    }}
-                                >
-                                    {item.name}
-                                </Text>
-                            </TouchableOpacity>
-                        );
-                    })}
-                </ScrollView>
-            </View>
+    const handleSend = () => {
+        const num = parseFloat(amount);
+        if (!num || num <= 0) {
+            Alert.alert("Error", "Enter a valid amount");
+            return;
+        }
+        if (!address.trim()) {
+            Alert.alert("Error", "Enter a wallet address");
+            return;
+        }
+        Alert.alert(
+            "Transfer request",
+            `USDT transfers will be processed once payout is enabled for your merchant account.\n\nAmount: ${num} USDT\nNetwork: ${network}\nTo: ${address.trim()}${comment.trim() ? `\nNote: ${comment.trim()}` : ""}`
         );
     };
 
-    const renderUseCard = () => {
-        return (
-            <View style={{ marginBottom: 14 }}>
-                <components.SmallHeader
-                    title="Use card"
-                    containerStyle={{ marginBottom: 6, marginLeft: 20 }}
-                />
-                <ScrollView
-                    horizontal={true}
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ paddingLeft: 20 }}
-                >
-                    {cards.map((item, index) => {
-                        return (
-                            <TouchableOpacity
-                                style={{
-                                    padding: 12,
-                                    width: 315,
-                                    backgroundColor: theme.COLORS.white,
-                                    borderRadius: 10,
-                                    flexDirection: "row",
-                                    alignItems: "center",
-                                    marginRight: 14,
-                                    borderWidth: 1,
-                                    borderColor:
-                                        selectedCard === item.id
-                                            ? "#CED6E1"
-                                            : theme.COLORS.white,
-                                }}
-                                key={index}
-                                onPress={() => setSelectedCard(item.id)}
-                            >
-                                <Image
-                                    source={require("../assets/cards/04.png")}
-                                    style={{
-                                        width: 72,
-                                        height: 46,
-                                        marginRight: 14,
-                                    }}
-                                />
-                                <View>
-                                    <Text
-                                        style={{
-                                            ...theme.FONTS.Mulish_400Regular,
-                                            color: theme.COLORS.bodyTextColor,
-                                            lineHeight: 12 * 1.6,
-                                            fontSize: 12,
-                                        }}
-                                    >
-                                        {item.number}
-                                    </Text>
-                                    <Text
-                                        style={{
-                                            ...theme.FONTS.H6,
-                                            color: theme.COLORS.mainDark,
-                                        }}
-                                    >
-                                        {item.balance} USD
-                                    </Text>
-                                </View>
-                            </TouchableOpacity>
-                        );
-                    })}
-                </ScrollView>
+    const renderLatestFundTransfers = () => (
+        <View
+            style={{
+                borderBottomWidth: 1,
+                paddingBottom: 17,
+                borderBottomColor: "#CED6E1",
+                marginBottom: 14,
+            }}
+        >
+            <View style={{ marginBottom: 14, marginLeft: 20, marginTop: 14 }}>
+                <Text style={{ ...theme.FONTS.H5, color: theme.COLORS.mainDark }}>Latest fund transfers</Text>
             </View>
-        );
-    };
-
-    const renderSendMoney = () => {
-        return (
-            <View>
-                <components.SmallHeader
-                    title="Send money to:"
-                    containerStyle={{ marginBottom: 6, marginLeft: 20 }}
-                />
-                <ScrollView
-                    horizontal={true}
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{
-                        paddingLeft: 20,
-                        marginBottom: 14,
+            {loading ? (
+                <ActivityIndicator color={theme.COLORS.mainDark} style={{ marginBottom: 16 }} />
+            ) : recentTransfers.length === 0 ? (
+                <Text
+                    style={{
+                        marginLeft: 20,
+                        marginBottom: 12,
+                        color: theme.COLORS.bodyTextColor,
+                        fontSize: 13,
                     }}
                 >
-                    <View
-                        style={{
-                            paddingHorizontal: 20,
-                            paddingVertical: 23,
-                            backgroundColor: theme.COLORS.white,
-                            marginRight: 14,
-                            borderRadius: 10,
-                            flexDirection: "row",
-                            alignItems: "center",
-                            width: 315,
-                        }}
-                    >
-                        <Image
-                            source={require("../assets/other-icons/01.png")}
-                            style={{ width: 16, height: 16, marginRight: 14 }}
-                        />
-                        <TextInput
-                            placeholder="Enter card number"
-                            style={{ flex: 1 }}
-                        />
-                        <TouchableOpacity style={{ marginLeft: "auto" }}>
+                    Paid transfers will appear here.
+                </Text>
+            ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 20 }}>
+                    {recentTransfers.map((item, index) => (
+                        <TouchableOpacity key={item.id} style={{ width: 72, marginRight: 16 }}>
                             <Image
-                                source={require("../assets/other-icons/02.png")}
-                                style={{
-                                    width: 16,
-                                    height: 16,
-                                    marginLeft: 14,
-                                }}
+                                source={userAvatars[index % userAvatars.length]}
+                                style={{ width: 60, height: 60, borderRadius: 30, marginBottom: 4 }}
                             />
-                        </TouchableOpacity>
-                    </View>
-                    {cards.map((item, index) => {
-                        return (
-                            <TouchableOpacity
+                            <Text
+                                numberOfLines={2}
                                 style={{
-                                    padding: 12,
-                                    width: 315,
-                                    backgroundColor: theme.COLORS.white,
-                                    borderRadius: 10,
-                                    flexDirection: "row",
-                                    alignItems: "center",
-                                    marginRight: 14,
-                                    borderWidth: 1,
-                                    borderColor:
-                                        sendTo === item.id
-                                            ? "#CED6E1"
-                                            : theme.COLORS.white,
+                                    textAlign: "center",
+                                    ...theme.FONTS.Mulish_400Regular,
+                                    fontSize: 11,
+                                    lineHeight: 13,
+                                    color: theme.COLORS.bodyTextColor,
                                 }}
-                                key={index}
-                                onPress={() => setSendTo(item.id)}
                             >
-                                <Image
-                                    source={require("../assets/cards/04.png")}
-                                    style={{
-                                        width: 72,
-                                        height: 46,
-                                        marginRight: 14,
-                                    }}
-                                />
-                                <View>
-                                    <Text
-                                        style={{
-                                            ...theme.FONTS.Mulish_400Regular,
-                                            color: theme.COLORS.bodyTextColor,
-                                            lineHeight: 12 * 1.6,
-                                            fontSize: 12,
-                                        }}
-                                    >
-                                        {item.number}
+                                {item.reference || `${formatAmount(parseFloat(item.amount))} USDT`}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+            )}
+        </View>
+    );
+
+    const renderUseWallet = () => (
+        <View style={{ marginBottom: 14 }}>
+            <components.SmallHeader title="Use wallet" containerStyle={{ marginBottom: 6, marginLeft: 20 }} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 20 }}>
+                {USDT_NETWORKS.map((item) => {
+                    const selected = selectedWallet === item;
+                    return (
+                        <TouchableOpacity
+                            key={item}
+                            onPress={() => {
+                                setSelectedWallet(item);
+                                setNetwork(item);
+                            }}
+                            style={{
+                                padding: 14,
+                                width: 300,
+                                backgroundColor: theme.COLORS.white,
+                                borderRadius: 10,
+                                marginRight: 14,
+                                borderWidth: 1,
+                                borderColor: selected ? theme.COLORS.mainDark : "#E8ECF0",
+                            }}
+                        >
+                            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+                                <components.NetworkLogo network={item} size={36} />
+                                <View style={{ marginLeft: 12, flex: 1 }}>
+                                    <Text style={{ ...theme.FONTS.Mulish_600SemiBold, color: theme.COLORS.mainDark }}>
+                                        USDT · {item}
                                     </Text>
-                                    <Text
-                                        style={{
-                                            ...theme.FONTS.H6,
-                                            color: theme.COLORS.mainDark,
-                                        }}
-                                    >
-                                        {item.balance} USD
+                                    <Text style={{ ...theme.FONTS.Mulish_400Regular, fontSize: 12, color: theme.COLORS.bodyTextColor }}>
+                                        {NETWORK_LABELS[item]}
                                     </Text>
                                 </View>
-                            </TouchableOpacity>
-                        );
-                    })}
-                </ScrollView>
-                <View style={{ paddingHorizontal: 20 }}>
-                    <View
+                                <svg.UsdtMarkSvg size={22} />
+                            </View>
+                            <Text style={{ ...theme.FONTS.Mulish_400Regular, fontSize: 12, color: theme.COLORS.bodyTextColor }}>
+                                {merchant?.businessName || "Merchant wallet"}
+                            </Text>
+                            <Text style={{ ...theme.FONTS.H6, color: theme.COLORS.mainDark, marginTop: 4 }}>
+                                {formatAmount(balance)} USDT
+                            </Text>
+                        </TouchableOpacity>
+                    );
+                })}
+            </ScrollView>
+        </View>
+    );
+
+    const renderSendMoney = () => (
+        <View>
+            <components.SmallHeader title="Send money to:" containerStyle={{ marginBottom: 6, marginLeft: 20 }} />
+            <View style={{ paddingHorizontal: 20 }}>
+                <components.NetworkSelector value={network} onChange={setNetwork} />
+                <View
+                    style={{
+                        backgroundColor: theme.COLORS.white,
+                        width: "100%",
+                        borderRadius: 10,
+                        paddingHorizontal: 20,
+                        paddingVertical: 14,
+                        marginBottom: 14,
+                        flexDirection: "row",
+                        alignItems: "center",
+                    }}
+                >
+                    <components.NetworkLogo network={network} size={18} />
+                    <TextInput
+                        placeholder="Enter wallet address"
+                        value={address}
+                        onChangeText={setAddress}
+                        placeholderTextColor="#868698"
                         style={{
-                            backgroundColor: theme.COLORS.white,
-                            width: "100%",
-                            borderRadius: 10,
-                            paddingHorizontal: 20,
-                            paddingVertical: 13,
-                            marginBottom: 14,
-                            flexDirection: "row",
-                            alignItems: "center",
+                            flex: 1,
+                            marginLeft: 12,
+                            fontSize: 14,
+                            color: theme.COLORS.mainDark,
+                            ...theme.FONTS.Mulish_400Regular,
                         }}
-                    >
-                        <Image
-                            source={require("../assets/other-icons/03.png")}
-                            style={{ width: 16, height: 16, marginRight: 14 }}
-                        />
-                        <TextInput placeholder="Amount" style={{ flex: 1 }} />
-                    </View>
-                    <View
+                    />
+                    <TouchableOpacity style={{ marginLeft: 8 }}>
+                        <svg.QrCodeSvg size={18} color={theme.COLORS.mainDark} />
+                    </TouchableOpacity>
+                </View>
+                <components.InputField
+                    placeholder="Amount (USDT)"
+                    value={amount}
+                    onChangeText={setAmount}
+                    keyboardType="numeric"
+                    containerStyle={{ marginBottom: 14 }}
+                />
+                <View
+                    style={{
+                        backgroundColor: theme.COLORS.white,
+                        width: "100%",
+                        borderRadius: 10,
+                        paddingHorizontal: 20,
+                        paddingVertical: 14,
+                        marginBottom: 6,
+                    }}
+                >
+                    <TextInput
+                        placeholder="Comment"
+                        value={comment}
+                        onChangeText={setComment}
+                        placeholderTextColor="#868698"
+                        multiline
+                        numberOfLines={4}
+                        textAlignVertical="top"
                         style={{
-                            backgroundColor: theme.COLORS.white,
-                            width: "100%",
-                            borderRadius: 10,
-                            paddingHorizontal: 20,
-                            paddingVertical: 14,
-                            marginBottom: 6,
+                            height: 100,
+                            fontSize: 14,
+                            color: theme.COLORS.mainDark,
+                            ...theme.FONTS.Mulish_400Regular,
                         }}
-                    >
-                        <TextInput
-                            placeholder="Comment"
-                            multiline={true}
-                            numberOfLines={7}
-                            style={{ flex: 1, height: 120 }}
-                            textAlignVertical="top"
-                        />
-                    </View>
-                    <components.SmallHeader
-                        title="Bank fee: $ 0.20"
-                        containerStyle={{ marginBottom: 18 }}
                     />
                 </View>
+                <components.SmallHeader
+                    title={`${formatUsdtNetwork(network)} · Network fee varies`}
+                    containerStyle={{ marginBottom: 18 }}
+                />
             </View>
-        );
-    };
+        </View>
+    );
 
-    const renderButtons = () => {
-        return (
-            <components.Button
-                title="Send"
-                containerStyle={{ paddingHorizontal: 20, marginBottom: 20 }}
-            />
-        );
-    };
-
-    const renderContent = () => {
-        return (
+    return (
+        <SafeAreaView style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
+            <components.Header title="Fund transfer" goBack={true} />
             <KeyboardAwareScrollView
-                contentContainerStyle={{
-                    flexGrow: 1,
-                }}
-                enableOnAndroid={true}
+                contentContainerStyle={{ flexGrow: 1, paddingBottom: TAB_BAR_HEIGHT + 16 }}
+                enableOnAndroid
                 showsVerticalScrollIndicator={false}
             >
                 {renderLatestFundTransfers()}
-                {renderUseCard()}
+                {renderUseWallet()}
                 {renderSendMoney()}
-                {renderButtons()}
+                <components.Button
+                    title="Send"
+                    onPress={handleSend}
+                    containerStyle={{ paddingHorizontal: 20, marginBottom: 20 }}
+                />
             </KeyboardAwareScrollView>
-        );
-    };
-
-    return (
-        <SafeAreaView
-            style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}
-        >
-            {renderHeader()}
-            {renderContent()}
         </SafeAreaView>
     );
 };

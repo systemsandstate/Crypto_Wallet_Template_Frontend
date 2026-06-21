@@ -1,77 +1,206 @@
-import {
-    View,
-    TouchableOpacity,
-    ScrollView,
-    Image,
-    ImageBackground,
-    Text,
-} from "react-native";
-import React, { useState } from "react";
+import { View, Text, Image, ActivityIndicator, ScrollView, Alert } from "react-native";
+import React, { useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
-import { svg } from "../svg";
 import { theme } from "../constants";
 import { components } from "../components";
+import { TAB_BAR_HEIGHT } from "../navigation/BottomTabBar";
+import { NETWORK_LABELS } from "../constants/usdtNetworks";
+import { api, PaymentRequest } from "../services/api";
 
-const InvoiceSent: React.FC = () => {
-    const renderContent = () => {
-        return (
-            <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-                <Image
-                    source={require("../assets/bg-02.png")}
-                    style={{ width: "100%", height: 530, position: "absolute" }}
-                />
-                <View
-                    style={{
-                        paddingTop: theme.SIZES.height * 0.2,
-                        paddingHorizontal: 20,
-                    }}
-                >
-                    <Image
-                        source={require("../assets/mail.png")}
-                        style={{
-                            width: 161,
-                            height: 111,
-                            alignSelf: "center",
-                            marginBottom: 30,
-                        }}
-                    />
-                    <Text
-                        style={{
-                            textAlign: "center",
-                            ...theme.FONTS.H2,
-                            color: theme.COLORS.mainDark,
-                            marginBottom: 20,
-                        }}
-                    >
-                        Your invoice {"\n"}has been sent!
-                    </Text>
-                    <Text
-                        style={{
-                            textAlign: "center",
-                            ...theme.FONTS.Mulish_400Regular,
-                            fontSize: 16,
-                            color: theme.COLORS.bodyTextColor,
-                            lineHeight: 16 * 1.6,
-                            marginBottom: theme.SIZES.height * 0.2,
-                        }}
-                    >
-                        Qui ex aute ipsum duis. Incididunt{"\n"}adipisicing
-                        voluptate laborum
-                    </Text>
-                    <components.Button title="Done" />
-                </View>
-            </ScrollView>
-        );
+const InvoiceSent: React.FC = ({ navigation, route }: any) => {
+    const initial: PaymentRequest = route.params?.payment;
+    const [payment, setPayment] = useState<PaymentRequest | null>(initial || null);
+    const [cancelling, setCancelling] = useState(false);
+
+    useEffect(() => {
+        if (!payment || !["PENDING"].includes(payment.status)) return;
+
+        const interval = setInterval(async () => {
+            try {
+                const res = await api.getPayment(payment.id);
+                setPayment(res.data);
+                if (res.data.status !== "PENDING") {
+                    clearInterval(interval);
+                }
+            } catch {
+                // ignore poll errors
+            }
+        }, 4000);
+
+        return () => clearInterval(interval);
+    }, [payment?.id, payment?.status]);
+
+    const handleCancel = () => {
+        if (!payment) return;
+        Alert.alert("Cancel payment", "Cancel this pending payment request?", [
+            { text: "No", style: "cancel" },
+            {
+                text: "Yes, cancel",
+                style: "destructive",
+                onPress: async () => {
+                    setCancelling(true);
+                    try {
+                        const res = await api.cancelPayment(payment.id);
+                        setPayment(res.data);
+                    } catch (err: any) {
+                        Alert.alert("Error", err.message || "Could not cancel payment");
+                    } finally {
+                        setCancelling(false);
+                    }
+                },
+            },
+        ]);
     };
 
+    if (!payment) {
+        return (
+            <SafeAreaView style={{ flex: 1, backgroundColor: theme.COLORS.bgColor, justifyContent: "center", alignItems: "center" }}>
+                <Text>No payment data</Text>
+            </SafeAreaView>
+        );
+    }
+
+    const isPaid = payment.status === "PAID";
+    const isPending = payment.status === "PENDING";
+
     return (
-        <SafeAreaView
-            style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}
-        >
-            {renderContent()}
-        </SafeAreaView>
+        <View style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
+            <Image
+                source={require("../assets/bg/05.png")}
+                style={{ width: "100%", height: 530, position: "absolute", top: 90 }}
+            />
+            <SafeAreaView style={{ flex: 1 }}>
+                <components.Header goBack={true} />
+                <ScrollView
+                    contentContainerStyle={{ flexGrow: 1, paddingBottom: TAB_BAR_HEIGHT + 16 }}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <View style={{ marginTop: 120, alignItems: "center", paddingHorizontal: 20 }}>
+                        <Image
+                            source={
+                                isPaid
+                                    ? require("../assets/other-icons/21.png")
+                                    : require("../assets/icons/26.png")
+                            }
+                            style={{
+                                width: isPaid ? 161 : 100,
+                                height: isPaid ? 150 : 100,
+                                alignSelf: "center",
+                                marginBottom: 20,
+                            }}
+                        />
+                        <Text
+                            style={{
+                                textAlign: "center",
+                                ...theme.FONTS.H2,
+                                color: isPaid ? theme.COLORS.green : theme.COLORS.mainDark,
+                                marginBottom: 12,
+                            }}
+                        >
+                            {isPaid
+                                ? "Success!"
+                                : isPending
+                                ? "Waiting for payment"
+                                : payment.status === "CANCELLED"
+                                ? "Cancelled"
+                                : payment.status === "EXPIRED"
+                                ? "Expired"
+                                : "Payment failed"}
+                        </Text>
+                        <Text
+                            style={{
+                                textAlign: "center",
+                                ...theme.FONTS.Mulish_700Bold,
+                                fontSize: 22,
+                                color: theme.COLORS.mainDark,
+                                marginBottom: 8,
+                            }}
+                        >
+                            {payment.amount} {payment.currency}
+                        </Text>
+                        <Text
+                            style={{
+                                textAlign: "center",
+                                ...theme.FONTS.Mulish_400Regular,
+                                fontSize: 14,
+                                color: theme.COLORS.bodyTextColor,
+                                marginBottom: 8,
+                            }}
+                        >
+                            Network:{" "}
+                            {NETWORK_LABELS[payment.network as keyof typeof NETWORK_LABELS] || payment.network}
+                            {payment.network ? ` (${payment.network})` : ""}
+                        </Text>
+                        {payment.reference && (
+                            <Text
+                                style={{
+                                    textAlign: "center",
+                                    ...theme.FONTS.Mulish_400Regular,
+                                    fontSize: 16,
+                                    color: theme.COLORS.bodyTextColor,
+                                    marginBottom: 16,
+                                }}
+                            >
+                                Ref: {payment.reference}
+                            </Text>
+                        )}
+                        {payment.failureReason && (
+                            <Text
+                                style={{
+                                    textAlign: "center",
+                                    ...theme.FONTS.Mulish_400Regular,
+                                    fontSize: 14,
+                                    color: "#FF8A71",
+                                    marginBottom: 16,
+                                    paddingHorizontal: 12,
+                                }}
+                            >
+                                {payment.failureReason}
+                            </Text>
+                        )}
+
+                        {isPending && payment.qrCodeDataUrl && (
+                            <Image
+                                source={{ uri: payment.qrCodeDataUrl }}
+                                style={{ width: 220, height: 220, marginBottom: 16, backgroundColor: "#fff", borderRadius: 8 }}
+                            />
+                        )}
+
+                        {isPending && (
+                            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 24 }}>
+                                <ActivityIndicator size="small" color={theme.COLORS.mainDark} style={{ marginRight: 8 }} />
+                                <Text style={{ color: theme.COLORS.bodyTextColor }}>
+                                    Checking payment status…
+                                </Text>
+                            </View>
+                        )}
+
+                        {isPaid && (
+                            <components.Button
+                                title="View details"
+                                onPress={() => navigation.navigate("TransactionDetails", { payment })}
+                                containerStyle={{ width: "100%", marginBottom: 12 }}
+                            />
+                        )}
+
+                        {isPending && (
+                            <components.Button
+                                title={cancelling ? "Cancelling…" : "Cancel payment"}
+                                onPress={handleCancel}
+                                containerStyle={{ width: "100%", marginBottom: 12 }}
+                            />
+                        )}
+
+                        <components.Button
+                            title={isPaid ? "Back to dashboard" : "Done"}
+                            onPress={() => navigation.navigate("Dashboard")}
+                            containerStyle={{ width: "100%", marginBottom: 20 }}
+                        />
+                    </View>
+                </ScrollView>
+            </SafeAreaView>
+        </View>
     );
 };
 

@@ -1,21 +1,26 @@
 import React from "react";
-import { createStackNavigator } from "@react-navigation/stack";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import { screens } from "../screens";
 
 import TabNavigator from "./TabNavigator";
+import MerchantTabRedirect from "./MerchantTabRedirect";
 
-const Stack = createStackNavigator();
+const Stack = createNativeStackNavigator();
 
-const StackNavigator: React.FC = () => {
-    const initialScreen = "Onboarding";
+const redirect = (tab: "Dashboard" | "History" | "Profile") => (props: any) => (
+    <MerchantTabRedirect {...props} route={{ ...props.route, params: { ...props.route?.params, tab } }} />
+);
 
+const StackNavigator: React.FC<{ initialRoute?: "SignIn" | "TabNavigator" }> = ({
+    initialRoute = "SignIn",
+}) => {
     return (
         <Stack.Navigator
-            initialRouteName={initialScreen}
+            initialRouteName={initialRoute}
             screenOptions={{
                 gestureEnabled: false,
-                cardStyle: { backgroundColor: "white" },
+                contentStyle: { backgroundColor: "white" },
             }}
         >
             <Stack.Screen
@@ -30,12 +35,12 @@ const StackNavigator: React.FC = () => {
             />
             <Stack.Screen
                 name="Profile"
-                component={screens.Profile}
+                component={redirect("Profile")}
                 options={{ headerShown: false }}
             />
             <Stack.Screen
                 name="EditPersonalInfo"
-                component={screens.EditPersonalInfo}
+                component={redirect("Profile")}
                 options={{ headerShown: false }}
             />
             <Stack.Screen
@@ -69,6 +74,11 @@ const StackNavigator: React.FC = () => {
                 options={{ headerShown: false }}
             />
             <Stack.Screen
+                name="ChangePassword"
+                component={redirect("Profile")}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
                 name="ChangePinCode"
                 component={screens.ChangePinCode}
                 options={{ headerShown: false }}
@@ -95,12 +105,12 @@ const StackNavigator: React.FC = () => {
             />
             <Stack.Screen
                 name="TransactionDetails"
-                component={screens.TransactionDetails}
+                component={redirect("History")}
                 options={{ headerShown: false }}
             />
             <Stack.Screen
                 name="TransactionHistory"
-                component={screens.TransactionHistory}
+                component={redirect("History")}
                 options={{ headerShown: false }}
             />
             <Stack.Screen
@@ -115,12 +125,12 @@ const StackNavigator: React.FC = () => {
             />
             <Stack.Screen
                 name="CreateInvoice"
-                component={screens.CreateInvoice}
+                component={redirect("Dashboard")}
                 options={{ headerShown: false }}
             />
             <Stack.Screen
                 name="FAQ"
-                component={screens.FAQ}
+                component={redirect("Profile")}
                 options={{ headerShown: false }}
             />
             <Stack.Screen
@@ -145,7 +155,7 @@ const StackNavigator: React.FC = () => {
             />
             <Stack.Screen
                 name="InvoiceSent"
-                component={screens.InvoiceSent}
+                component={redirect("Dashboard")}
                 options={{ headerShown: false }}
             />
             <Stack.Screen
@@ -185,7 +195,7 @@ const StackNavigator: React.FC = () => {
             />
             <Stack.Screen
                 name="PrivacyPolicy"
-                component={screens.PrivacyPolicy}
+                component={redirect("Profile")}
                 options={{ headerShown: false }}
             />
         </Stack.Navigator>

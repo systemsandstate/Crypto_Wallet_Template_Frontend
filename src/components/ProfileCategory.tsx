@@ -1,13 +1,14 @@
-import { View, Text, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity, Platform, Pressable } from "react-native";
 import React, { useState } from "react";
 import { Shadow } from "react-native-shadow-2";
 import { theme } from "../constants";
 
 type Props = {
     onPress?: () => void;
-    icon?: JSX.Element;
+    icon?: React.ReactElement;
     title?: string;
-    rightElement?: JSX.Element;
+    titleStyle?: object;
+    rightElement?: React.ReactElement;
     toggleButton?: boolean;
 };
 
@@ -15,10 +16,21 @@ const ProfileCategory: React.FC<Props> = ({
     onPress,
     icon,
     title,
+    titleStyle,
     rightElement,
     toggleButton,
 }) => {
     const [toggle, setToggle] = useState(false);
+
+    const rowStyle = {
+        flex: 1,
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        paddingHorizontal: 20,
+        ...(Platform.OS === "web" ? { cursor: "pointer" as const } : {}),
+    };
+
+    const RowButton = Platform.OS === "web" ? Pressable : TouchableOpacity;
 
     return (
         <View style={{ width: "100%", height: 62, marginBottom: 6 }}>
@@ -40,14 +52,10 @@ const ProfileCategory: React.FC<Props> = ({
                 startColor={"rgba(6, 38, 100, 0.02)"}
                 endColor={"rgba(6, 38, 100, 0.0)"}
             >
-                <TouchableOpacity
-                    style={{
-                        flex: 1,
-                        flexDirection: "row",
-                        alignItems: "center",
-                        paddingHorizontal: 20,
-                    }}
+                <RowButton
+                    style={rowStyle}
                     onPress={onPress}
+                    accessibilityRole="button"
                 >
                     <View
                         style={{ flexDirection: "row", alignItems: "center" }}
@@ -58,6 +66,7 @@ const ProfileCategory: React.FC<Props> = ({
                                 marginLeft: 10,
                                 ...theme.FONTS.H5,
                                 color: theme.COLORS.mainDark,
+                                ...titleStyle,
                             }}
                             numberOfLines={1}
                         >
@@ -98,7 +107,7 @@ const ProfileCategory: React.FC<Props> = ({
                             />
                         </TouchableOpacity>
                     )}
-                </TouchableOpacity>
+                </RowButton>
             </Shadow>
         </View>
     );

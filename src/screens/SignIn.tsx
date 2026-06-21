@@ -1,193 +1,178 @@
-import { View, TouchableOpacity, Text } from "react-native";
-import React, { useState } from "react";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { View, TouchableOpacity, Text, ActivityIndicator, Alert, Platform } from "react-native";
+import React, { useState, useEffect } from "react";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { useDispatch } from "react-redux";
 
-import { svg } from "../svg";
 import { theme } from "../constants";
 import { components } from "../components";
+import { api } from "../services/api";
+import { setCredentials } from "../store/authSlice";
 
-const SignIn: React.FC = ({ navigation }: any) => {
+const SignIn: React.FC = ({ navigation, route }: any) => {
+    const dispatch = useDispatch();
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
     const [rememberMe, setRememberMe] = useState(false);
+    const [loading, setLoading] = useState(false);
 
-    const renderHeader = () => {
-        return <components.Header title="Sign in" goBack={true} />;
-    };
+    useEffect(() => {
+        if (Platform.OS === "web" && typeof sessionStorage !== "undefined") {
+            const message = sessionStorage.getItem("sessionExpired");
+            if (message) {
+                sessionStorage.removeItem("sessionExpired");
+                window.alert(message);
+                return;
+            }
+        }
+        if (route.params?.sessionExpired) {
+            Alert.alert("Session expired", route.params.sessionExpired);
+            navigation.setParams({ sessionExpired: undefined });
+        }
+    }, [route.params?.sessionExpired, navigation]);
 
-    const renderContent = () => {
-        return (
-            <KeyboardAwareScrollView
-                contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20 }}
-            >
-                <View style={{ paddingTop: theme.SIZES.height * 0.05 }}>
-                    <Text
-                        style={{
-                            textAlign: "center",
-                            ...theme.FONTS.H1,
-                            color: theme.COLORS.mainDark,
-                            marginBottom: 30,
-                        }}
-                    >
-                        Welcome to{"\n"}Teofin!
-                    </Text>
-                    <components.InputField
-                        placeholder="cristinawolf@mail.com"
-                        containerStyle={{ marginBottom: 14 }}
-                        icon={<svg.CheckSvg />}
-                    />
-                    <components.InputField
-                        placeholder="••••••"
-                        icon={
-                            <TouchableOpacity>
-                                <svg.EyeOffSvg />
-                            </TouchableOpacity>
-                        }
-                        secureTextEntry={true}
-                        containerStyle={{ marginBottom: 20 }}
-                    />
-                    <View
-                        style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            marginBottom: 30,
-                        }}
-                    >
-                        <TouchableOpacity
-                            style={{
-                                flexDirection: "row",
-                                alignItems: "center",
-                            }}
-                            onPress={() => setRememberMe(!rememberMe)}
-                        >
-                            <View
-                                style={{
-                                    width: 16,
-                                    height: 16,
-                                    borderWidth: 1,
-                                    borderColor: "#868698",
-                                    borderRadius: 4,
-                                    backgroundColor: theme.COLORS.white,
-                                    marginRight: 10,
-                                    justifyContent: "center",
-                                    alignItems: "center",
-                                }}
-                            >
-                                {rememberMe && (
-                                    <View
-                                        style={{
-                                            width: 8,
-                                            height: 8,
-                                            borderRadius: 2,
-                                            backgroundColor: "#868698",
-                                        }}
-                                    />
-                                )}
-                            </View>
-                            <Text
-                                style={{
-                                    color: theme.COLORS.bodyTextColor,
-                                    ...theme.FONTS.Mulish_400Regular,
-                                    fontSize: 16,
-                                    lineHeight: 16 * 1.2,
-                                }}
-                            >
-                                Remember me
-                            </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            onPress={() =>
-                                navigation.navigate("ForgotPassword")
-                            }
-                        >
-                            <Text
-                                style={{
-                                    ...theme.FONTS.Mulish_400Regular,
-                                    fontSize: 16,
-                                    color: theme.COLORS.linkColor,
-                                    lineHeight: 16 * 1.2,
-                                }}
-                            >
-                                Lost your password?
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                    <components.Button
-                        title="Sign in"
-                        onPress={() => navigation.navigate("TabNavigator")}
-                        containerStyle={{ marginBottom: 30 }}
-                    />
-                    <View
-                        style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            marginBottom: 50,
-                        }}
-                    >
-                        <Text
-                            style={{
-                                ...theme.FONTS.Mulish_400Regular,
-                                color: theme.COLORS.bodyTextColor,
-                                lineHeight: 16 * 1.6,
-                                fontSize: 16,
-                            }}
-                        >
-                            No account?{" "}
-                        </Text>
-                        <TouchableOpacity
-                            onPress={() => navigation.navigate("SignUp")}
-                        >
-                            <Text
-                                style={{
-                                    ...theme.FONTS.Mulish_400Regular,
-                                    color: theme.COLORS.linkColor,
-                                    lineHeight: 16 * 1.6,
-                                    fontSize: 16,
-                                }}
-                            >
-                                Register now
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                    <View
-                        style={{
-                            flexDirection: "row",
-                            justifyContent: "center",
-                            alignItems: "center",
-                        }}
-                    >
-                        <TouchableOpacity
-                            style={{ marginHorizontal: 7 }}
-                            onPress={() => {}}
-                        >
-                            <svg.FacebookSvg />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={{ marginHorizontal: 7 }}
-                            onPress={() => {}}
-                        >
-                            <svg.TwitterSvg />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={{ marginHorizontal: 7 }}
-                            onPress={() => {}}
-                        >
-                            <svg.GoogleSvg />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </KeyboardAwareScrollView>
-        );
+    const handleSignIn = async () => {
+        if (!email || !password) {
+            Alert.alert("Error", "Please enter email and password");
+            return;
+        }
+        setLoading(true);
+        try {
+            const res = await api.login({ email: email.trim(), password });
+            dispatch(setCredentials({
+                merchant: res.data.merchant,
+                accessToken: res.data.accessToken,
+            }));
+            navigation.reset({ index: 0, routes: [{ name: "TabNavigator" }] });
+        } catch (err: any) {
+            Alert.alert("Sign in failed", err.message || "Invalid credentials");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
-        <SafeAreaView
-            style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}
+        <components.AuthScreenLayout
+            header={<components.Header title="Sign in" goBack={true} />}
         >
-            {renderHeader()}
-            {renderContent()}
-        </SafeAreaView>
+            <KeyboardAwareScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+            >
+                <Text
+                    style={{
+                        textAlign: "center",
+                        ...theme.FONTS.H1,
+                        color: theme.COLORS.mainDark,
+                        marginBottom: 8,
+                    }}
+                >
+                    Merchant{"\n"}Payments
+                </Text>
+                <Text
+                    style={{
+                        textAlign: "center",
+                        ...theme.FONTS.Mulish_400Regular,
+                        fontSize: 14,
+                        color: theme.COLORS.bodyTextColor,
+                        marginBottom: 24,
+                    }}
+                >
+                    Sign in to manage your USDT invoices
+                </Text>
+                <components.InputField
+                    placeholder="your@email.com"
+                    value={email}
+                    onChangeText={setEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    containerStyle={{ marginBottom: 14 }}
+                />
+                <components.InputField
+                    placeholder="Password"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={true}
+                    containerStyle={{ marginBottom: 20 }}
+                />
+                <View
+                    style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        marginBottom: 24,
+                    }}
+                >
+                    <TouchableOpacity
+                        style={{ flexDirection: "row", alignItems: "center" }}
+                        onPress={() => setRememberMe(!rememberMe)}
+                    >
+                        <View
+                            style={{
+                                width: 16,
+                                height: 16,
+                                borderWidth: 1,
+                                borderColor: "#868698",
+                                borderRadius: 4,
+                                backgroundColor: theme.COLORS.white,
+                                marginRight: 10,
+                                justifyContent: "center",
+                                alignItems: "center",
+                            }}
+                        >
+                            {rememberMe && (
+                                <View
+                                    style={{
+                                        width: 8,
+                                        height: 8,
+                                        borderRadius: 2,
+                                        backgroundColor: "#868698",
+                                    }}
+                                />
+                            )}
+                        </View>
+                        <Text
+                            style={{
+                                color: theme.COLORS.bodyTextColor,
+                                ...theme.FONTS.Mulish_400Regular,
+                                fontSize: 16,
+                            }}
+                        >
+                            Remember me
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => navigation.navigate("ForgotPassword")}>
+                        <Text
+                            style={{
+                                color: theme.COLORS.linkColor,
+                                ...theme.FONTS.Mulish_400Regular,
+                                fontSize: 16,
+                            }}
+                        >
+                            Forgot password?
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+                {loading ? (
+                    <ActivityIndicator size="large" color={theme.COLORS.mainDark} style={{ marginBottom: 24 }} />
+                ) : (
+                    <components.Button
+                        title="Sign in"
+                        onPress={handleSignIn}
+                        containerStyle={{ marginBottom: 24 }}
+                    />
+                )}
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+                    <Text style={{ ...theme.FONTS.Mulish_400Regular, color: theme.COLORS.bodyTextColor, fontSize: 16 }}>
+                        No account?{" "}
+                    </Text>
+                    <TouchableOpacity onPress={() => navigation.navigate("SignUp")}>
+                        <Text style={{ ...theme.FONTS.Mulish_400Regular, color: theme.COLORS.linkColor, fontSize: 16 }}>
+                            Register now
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </KeyboardAwareScrollView>
+        </components.AuthScreenLayout>
     );
 };
 

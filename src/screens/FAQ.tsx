@@ -14,37 +14,38 @@ import { svg } from "../svg";
 import { theme } from "../constants";
 import { components } from "../components";
 import { Shadow } from "react-native-shadow-2";
+import { TAB_BAR_HEIGHT } from "../navigation/BottomTabBar";
 
 const frequentlyQuestions = [
     {
         id: "1",
-        question: "What's included with a free plan ?",
-        answer: "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
+        question: "Service description",
+        answer: "Merchant Payments is a non-custodial merchant tool. The App creates USDT payment invoices on TRON, Ethereum, BNB Chain, Solana, or Polygon via OxaPay and records when payments are confirmed. We do not store or control customer cryptocurrency.",
     },
     {
         id: "2",
-        question: "What content will my app have ?",
-        answer: "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
+        question: "Merchant responsibilities",
+        answer: "You are responsible for accurate invoice amounts, communicating payment instructions to customers, and complying with applicable laws in your jurisdiction. You must keep your login credentials secure.",
     },
     {
         id: "3",
-        question: "Can I change my icon ?",
-        answer: "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
+        question: "Payment confirmation",
+        answer: "Payments are marked PAID when OxaPay confirms settlement via webhook or status polling. Underpayments are not auto-confirmed and are flagged as failed with an amount-mismatch note.",
     },
     {
         id: "4",
-        question: "What is a hybrid app ?",
-        answer: "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
+        question: "Cancellations & expiry",
+        answer: "Pending invoices can be cancelled before payment or expiry. Expired invoices cannot be paid through the original QR code. Create a new invoice for additional payment attempts.",
     },
     {
         id: "5",
-        question: "How do Push Alerts work ?",
-        answer: "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
+        question: "Fees & settlement",
+        answer: "Network and processor fees are determined by OxaPay and the blockchain. Settlement timing depends on OxaPay and your merchant configuration with them.",
     },
     {
         id: "6",
-        question: "Why can’t the app upload files ?",
-        answer: "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
+        question: "Account & support",
+        answer: "You may update business profile and password in the App. For OxaPay account or payout issues, contact OxaPay support. For App access issues, contact your platform administrator.",
     },
 ];
 
@@ -63,6 +64,11 @@ const FAQ: React.FC = () => {
                         goBack={true}
                         containerStyle={{ marginBottom: 20 }}
                     />
+                    <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
+                        <Text style={{ ...theme.FONTS.H2, color: theme.COLORS.mainDark }}>
+                            Terms of service
+                        </Text>
+                    </View>
                 </SafeAreaView>
                 <Image
                     source={require("../assets/bg-01.png")}
@@ -135,6 +141,7 @@ const FAQ: React.FC = () => {
                 contentContainerStyle={{
                     flexGrow: 1,
                     paddingTop: 20,
+                    paddingBottom: TAB_BAR_HEIGHT + 24,
                 }}
             >
                 <Accordion

@@ -9,6 +9,8 @@ import EditPhotoSvg from "./EditPhotoSvg";
 import CalendarSvg from "./CalendarSvg";
 import FileTextSvg from "./FileTextSvg";
 import LogoSvg from "./LogoSvg";
+import UsdtMarkSvg from "./UsdtMarkSvg";
+import QrCodeSvg from "./QrCodeSvg";
 import CheckSvg from "./CheckSvg";
 import EyeOffSvg from "./EyeOffSvg";
 import FacebookSvg from "./FacebookSvg";
@@ -26,6 +28,7 @@ import AmazonSvg from "./AmazonSvg";
 import TypeCardSvg from "./TypeCardSvg";
 import PiggyBankSvg from "./PiggyBankSvg";
 import InfoSvg from "./InfoSvg";
+import AnalyticsSvg from "./AnalyticsSvg";
 import LoanWalletSvg from "./LoanWalletSvg";
 import QuestionOpenSvg from "./QuestionOpenSvg";
 import QuestionCloseSvg from "./QuestionCloseSvg";
@@ -42,6 +45,8 @@ const svg = {
     CalendarSvg,
     FileTextSvg,
     LogoSvg,
+    UsdtMarkSvg,
+    QrCodeSvg,
     CheckSvg,
     EyeOffSvg,
     FacebookSvg,
@@ -59,6 +64,7 @@ const svg = {
     TypeCardSvg,
     PiggyBankSvg,
     InfoSvg,
+    AnalyticsSvg,
     LoanWalletSvg,
     QuestionOpenSvg,
     QuestionCloseSvg,

@@ -1,41 +1,22 @@
-import {
-    View,
-    TouchableOpacity,
-    ScrollView,
-    Image,
-    ImageBackground,
-    Text,
-} from "react-native";
-import React, { useState } from "react";
+import { View, ScrollView, Image, Text } from "react-native";
+import React from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
-import { svg } from "../svg";
 import { theme } from "../constants";
 import { components } from "../components";
 
 const SignUpAccountCreated: React.FC = ({ navigation }: any) => {
-    const renderContent = () => {
-        return (
+    return (
+        <SafeAreaView style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
             <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
                 <Image
                     source={require("../assets/bg-02.png")}
                     style={{ width: "100%", height: 530, position: "absolute" }}
                 />
-                <View
-                    style={{
-                        paddingTop: theme.SIZES.height * 0.2,
-                        paddingHorizontal: 20,
-                    }}
-                >
+                <View style={{ paddingTop: theme.SIZES.height * 0.2, paddingHorizontal: 20 }}>
                     <Image
                         source={require("../assets/account.png")}
-                        style={{
-                            width: 161,
-                            height: 111,
-                            alignSelf: "center",
-                            marginBottom: 30,
-                        }}
+                        style={{ width: 161, height: 111, alignSelf: "center", marginBottom: 30 }}
                     />
                     <Text
                         style={{
@@ -57,23 +38,14 @@ const SignUpAccountCreated: React.FC = ({ navigation }: any) => {
                             marginBottom: theme.SIZES.height * 0.2,
                         }}
                     >
-                        Qui ex aute ipsum duis. Incididunt{"\n"}adipisicing
-                        voluptate laborum
+                        Your merchant account is ready.{"\n"}Start accepting USDT payments.
                     </Text>
                     <components.Button
-                        title="Done"
-                        onPress={() => navigation.navigate("TabNavigator")}
+                        title="Go to dashboard"
+                        onPress={() => navigation.reset({ index: 0, routes: [{ name: "TabNavigator" }] })}
                     />
                 </View>
             </ScrollView>
-        );
-    };
-
-    return (
-        <SafeAreaView
-            style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}
-        >
-            {renderContent()}
         </SafeAreaView>
     );
 };

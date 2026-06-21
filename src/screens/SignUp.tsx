@@ -1,146 +1,120 @@
-import {
-    View,
-    TouchableOpacity,
-    ScrollView,
-    Image,
-    ImageBackground,
-    Text,
-} from "react-native";
+import { View, TouchableOpacity, Text, ActivityIndicator, Alert } from "react-native";
 import React, { useState } from "react";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { useDispatch } from "react-redux";
 
-import { svg } from "../svg";
 import { theme } from "../constants";
 import { components } from "../components";
+import { api } from "../services/api";
+import { setCredentials } from "../store/authSlice";
 
 const SignUp: React.FC = ({ navigation }: any) => {
-    const renderHeader = () => {
-        return <components.Header title="Sign up" goBack={true} />;
-    };
+    const dispatch = useDispatch();
+    const [businessName, setBusinessName] = useState("");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [loading, setLoading] = useState(false);
 
-    const renderContent = () => {
-        return (
-            <KeyboardAwareScrollView
-                contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20 }}
-            >
-                <View style={{ paddingTop: theme.SIZES.height * 0.05 }}>
-                    <Text
-                        style={{
-                            textAlign: "center",
-                            ...theme.FONTS.H1,
-                            color: theme.COLORS.mainDark,
-                            marginBottom: 30,
-                        }}
-                    >
-                        Sign up!
-                    </Text>
-                    <components.InputField
-                        placeholder="Cristina Wolf"
-                        containerStyle={{ marginBottom: 14 }}
-                    />
-                    <components.InputField
-                        placeholder="Enter your email"
-                        containerStyle={{ marginBottom: 14 }}
-                    />
-                    <components.InputField
-                        placeholder="Enter your password"
-                        secureTextEntry={true}
-                        containerStyle={{ marginBottom: 14 }}
-                        icon={
-                            <TouchableOpacity>
-                                <svg.EyeOffSvg />
-                            </TouchableOpacity>
-                        }
-                    />
-                    <components.InputField
-                        placeholder="Enter your password"
-                        secureTextEntry={true}
-                        containerStyle={{ marginBottom: 14 }}
-                        icon={
-                            <TouchableOpacity>
-                                <svg.EyeOffSvg />
-                            </TouchableOpacity>
-                        }
-                    />
-                    <components.Button
-                        title="Sign up"
-                        onPress={() =>
-                            navigation.navigate("VerifyYourPhoneNumber")
-                        }
-                        containerStyle={{ marginBottom: 30 }}
-                    />
-
-                    <View
-                        style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            marginBottom: 50,
-                        }}
-                    >
-                        <Text
-                            style={{
-                                ...theme.FONTS.Mulish_400Regular,
-                                color: theme.COLORS.bodyTextColor,
-                                lineHeight: 16 * 1.6,
-                                fontSize: 16,
-                            }}
-                        >
-                            Already have an account?{" "}
-                        </Text>
-                        <TouchableOpacity
-                            onPress={() => navigation.navigate("SignIn")}
-                        >
-                            <Text
-                                style={{
-                                    ...theme.FONTS.Mulish_400Regular,
-                                    color: theme.COLORS.linkColor,
-                                    lineHeight: 16 * 1.6,
-                                    fontSize: 16,
-                                }}
-                            >
-                                Sign in.
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                    <View
-                        style={{
-                            flexDirection: "row",
-                            justifyContent: "center",
-                            alignItems: "center",
-                        }}
-                    >
-                        <TouchableOpacity
-                            style={{ marginHorizontal: 7 }}
-                            onPress={() => {}}
-                        >
-                            <svg.FacebookSvg />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={{ marginHorizontal: 7 }}
-                            onPress={() => {}}
-                        >
-                            <svg.TwitterSvg />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={{ marginHorizontal: 7 }}
-                            onPress={() => {}}
-                        >
-                            <svg.GoogleSvg />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </KeyboardAwareScrollView>
-        );
+    const handleSignUp = async () => {
+        if (!businessName || !email || !password) {
+            Alert.alert("Error", "Please fill in all fields");
+            return;
+        }
+        if (password.length < 8) {
+            Alert.alert("Error", "Password must be at least 8 characters with a number and uppercase letter");
+            return;
+        }
+        setLoading(true);
+        try {
+            const res = await api.register({
+                email: email.trim(),
+                password,
+                businessName: businessName.trim(),
+            });
+            dispatch(setCredentials({
+                merchant: res.data.merchant,
+                accessToken: res.data.accessToken,
+            }));
+            navigation.navigate("SignUpAccountCreated");
+        } catch (err: any) {
+            Alert.alert("Registration failed", err.message || "Could not create account");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
-        <SafeAreaView
-            style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}
+        <components.AuthScreenLayout
+            header={<components.Header title="Sign up" goBack={true} />}
         >
-            {renderHeader()}
-            {renderContent()}
-        </SafeAreaView>
+            <KeyboardAwareScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+            >
+                <Text
+                    style={{
+                        textAlign: "center",
+                        ...theme.FONTS.H2,
+                        color: theme.COLORS.mainDark,
+                        marginBottom: 8,
+                    }}
+                >
+                    Create account
+                </Text>
+                <Text
+                    style={{
+                        textAlign: "center",
+                        ...theme.FONTS.Mulish_400Regular,
+                        fontSize: 14,
+                        color: theme.COLORS.bodyTextColor,
+                        marginBottom: 24,
+                        lineHeight: 14 * 1.6,
+                    }}
+                >
+                    Start accepting USDT payments for your business
+                </Text>
+                <components.InputField
+                    placeholder="Business name"
+                    value={businessName}
+                    onChangeText={setBusinessName}
+                    containerStyle={{ marginBottom: 14 }}
+                />
+                <components.InputField
+                    placeholder="Email"
+                    value={email}
+                    onChangeText={setEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    containerStyle={{ marginBottom: 14 }}
+                />
+                <components.InputField
+                    placeholder="Password (8+ chars, 1 uppercase, 1 number)"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={true}
+                    containerStyle={{ marginBottom: 20 }}
+                />
+                {loading ? (
+                    <ActivityIndicator size="large" color={theme.COLORS.mainDark} style={{ marginBottom: 20 }} />
+                ) : (
+                    <components.Button
+                        title="Sign up"
+                        onPress={handleSignUp}
+                        containerStyle={{ marginBottom: 20 }}
+                    />
+                )}
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+                    <Text style={{ ...theme.FONTS.Mulish_400Regular, color: theme.COLORS.bodyTextColor, fontSize: 16 }}>
+                        Already have an account?{" "}
+                    </Text>
+                    <TouchableOpacity onPress={() => navigation.navigate("SignIn")}>
+                        <Text style={{ ...theme.FONTS.Mulish_400Regular, color: theme.COLORS.linkColor, fontSize: 16 }}>
+                            Sign in
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </KeyboardAwareScrollView>
+        </components.AuthScreenLayout>
     );
 };
 

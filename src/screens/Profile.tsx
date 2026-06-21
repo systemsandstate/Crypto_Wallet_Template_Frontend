@@ -1,130 +1,140 @@
-import { View, Text, ScrollView, Image } from "react-native";
-import React from "react";
+import { View, Text, ScrollView } from "react-native";
+import React, { useEffect } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigation } from "@react-navigation/native";
 
 import { svg } from "../svg";
 import { theme } from "../constants";
 import { components } from "../components";
+import { RootState } from "../store/store";
+import { logoutAndNavigateToSignIn } from "../navigation/logoutAndNavigateToSignIn";
+import { setAvatarUrl } from "../store/authSlice";
+import { TAB_BAR_HEIGHT } from "../navigation/BottomTabBar";
+import { getStoredAvatarUrlAsync } from "../utils/avatarStorage";
+import { confirmAction } from "../utils/confirm";
 
-const Profile: React.FC = ({ navigation }: any) => {
-    const renderHeader = () => {
-        return <components.Header title="Profile" goBack={true} />;
+const Profile: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
+    const navigation: any = useNavigation();
+    const dispatch = useDispatch();
+    const merchant = useSelector((state: RootState) => state.auth.merchant);
+    const avatarUrl = useSelector((state: RootState) => state.auth.avatarUrl);
+
+    useEffect(() => {
+        if (!merchant?.id || avatarUrl) return;
+        getStoredAvatarUrlAsync(merchant.id).then((stored) => {
+            if (stored) {
+                dispatch(setAvatarUrl({ merchantId: merchant.id, avatarUrl: stored }));
+            }
+        });
+    }, [merchant?.id, avatarUrl, dispatch]);
+
+    const handleLogout = () => {
+        confirmAction({
+            title: "Log out",
+            message: "Are you sure you want to log out?",
+            confirmLabel: "Log out",
+            destructive: true,
+            onConfirm: () => logoutAndNavigateToSignIn(dispatch),
+        });
     };
 
-    const renderUserInfo = () => {
-        return (
-            <View
-                style={{
-                    paddingHorizontal: 20,
-                    paddingVertical: 20,
-                    borderBottomWidth: 1,
-                    borderBottomColor: "#CED6E1",
-                    flexDirection: "row",
-                    alignItems: "center",
-                }}
-            >
-                <Image
-                    source={{
-                        uri: "https://dl.dropbox.com/s/g61a6dbx2t5adiv/01.jpg?dl=0",
-                    }}
+    const menu = (
+        <View style={{ paddingHorizontal: 20, paddingVertical: 20 }}>
+            <components.ProfileCategory
+                title="Edit business info"
+                icon={<svg.UserOneSvg />}
+                rightElement={<svg.ArrowOneSvg />}
+                onPress={() => navigation.navigate("EditPersonalInfo")}
+            />
+            <components.ProfileCategory
+                title="Change password"
+                icon={<svg.FaceIdSvg />}
+                rightElement={<svg.ArrowOneSvg />}
+                onPress={() => navigation.navigate("ChangePassword")}
+            />
+            <components.ProfileCategory
+                title="Privacy policy"
+                icon={<svg.FileTextSvg />}
+                rightElement={<svg.ArrowOneSvg />}
+                onPress={() => navigation.navigate("PrivacyPolicy")}
+            />
+            <components.ProfileCategory
+                title="Terms of service"
+                icon={<svg.FileTextSvg />}
+                rightElement={<svg.ArrowOneSvg />}
+                onPress={() => navigation.navigate("FAQ")}
+            />
+            <components.ProfileCategory
+                title="Log out"
+                icon={<svg.LogOutSvg />}
+                titleStyle={{ color: "#FF5887" }}
+                onPress={handleLogout}
+            />
+        </View>
+    );
+
+    const avatarSection = (
+        <View style={{ alignItems: "center", paddingTop: 20, paddingBottom: 8 }}>
+            <components.ProfileAvatar />
+            {merchant?.phone ? (
+                <Text
                     style={{
-                        width: 70,
-                        height: 70,
-                        borderRadius: 35,
-                        marginRight: 16,
+                        ...theme.FONTS.Mulish_400Regular,
+                        color: theme.COLORS.bodyTextColor,
+                        fontSize: 14,
+                        marginTop: 12,
                     }}
+                >
+                    {merchant.phone}
+                </Text>
+            ) : null}
+        </View>
+    );
+
+    if (embedded) {
+        return (
+            <View style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
+                <components.MerchantTabHeader
+                    eyebrow="Your account"
+                    title={merchant?.businessName || "Merchant"}
+                    subtitle={merchant?.email}
                 />
-                <View>
-                    <Text
-                        numberOfLines={1}
-                        style={{
-                            ...theme.FONTS.H4,
-                            color: theme.COLORS.mainDark,
-                            marginBottom: 2,
-                        }}
-                    >
-                        Cristina Wolf
-                    </Text>
-                    <Text
-                        numberOfLines={1}
-                        style={{
-                            ...theme.FONTS.Mulish_400Regular,
-                            color: theme.COLORS.bodyTextColor,
-                            fontSize: 16,
-                            lineHeight: 16 * 1.6,
-                        }}
-                    >
-                        +1 954 621 7845
-                    </Text>
-                </View>
+                <ScrollView
+                    contentContainerStyle={{ flexGrow: 1, paddingBottom: TAB_BAR_HEIGHT + 16 }}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {avatarSection}
+                    {menu}
+                </ScrollView>
             </View>
         );
-    };
-
-    const renderProfileCategory = () => {
-        return (
-            <View style={{ paddingHorizontal: 20, paddingVertical: 20 }}>
-                <components.ProfileCategory
-                    title="Personal Info"
-                    icon={<svg.UserOneSvg />}
-                    rightElement={<svg.ArrowOneSvg />}
-                    onPress={() => navigation.navigate("EditPersonalInfo")}
-                />
-                <components.ProfileCategory
-                    title="Notifications"
-                    icon={<svg.MessageSvg />}
-                    toggleButton={true}
-                />
-                <components.ProfileCategory
-                    title="Face ID"
-                    icon={<svg.FaceIdSvg />}
-                    toggleButton={true}
-                />
-                <components.ProfileCategory
-                    title="Language"
-                    icon={<svg.LanguageSvg />}
-                    rightElement={
-                        <View
-                            style={{
-                                flexDirection: "row",
-                                alignItems: "center",
-                            }}
-                        >
-                            <Text
-                                style={{
-                                    ...theme.FONTS.Mulish_400Regular,
-                                    fontSize: 12,
-                                    color: theme.COLORS.mainDark,
-                                    lineHeight: 12 * 1.6,
-                                    marginRight: 11,
-                                }}
-                            >
-                                Eng
-                            </Text>
-                            <svg.ArrowOneSvg />
-                        </View>
-                    }
-                />
-                <components.ProfileCategory icon={<svg.LogOutSvg />} />
-            </View>
-        );
-    };
-
-    const renderContent = () => {
-        return (
-            <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-                {renderUserInfo()}
-                {renderProfileCategory()}
-            </ScrollView>
-        );
-    };
+    }
 
     return (
-        <SafeAreaView
-            style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}
-        >
-            {renderHeader()}
-            {renderContent()}
+        <SafeAreaView style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
+            <components.Header title="Profile" goBack={true} />
+            <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+                <View
+                    style={{
+                        paddingHorizontal: 20,
+                        paddingTop: 24,
+                        paddingBottom: 8,
+                        borderBottomWidth: 1,
+                        borderBottomColor: "#CED6E1",
+                        alignItems: "center",
+                    }}
+                >
+                    <components.ProfileAvatar />
+                    <Text style={{ ...theme.FONTS.H3, color: theme.COLORS.mainDark, marginTop: 16, marginBottom: 4 }}>
+                        {merchant?.businessName || "—"}
+                    </Text>
+                    <Text style={{ ...theme.FONTS.Mulish_400Regular, color: theme.COLORS.bodyTextColor, fontSize: 16 }}>
+                        {merchant?.email}
+                    </Text>
+                </View>
+                {menu}
+            </ScrollView>
         </SafeAreaView>
     );
 };

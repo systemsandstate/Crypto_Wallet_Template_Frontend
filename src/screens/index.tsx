@@ -1,3 +1,4 @@
+import SplashScreen from "./SplashScreen";
 import Onboarding from "./Onboarding";
 import Profile from "./Profile";
 import EditPersonalInfo from "./EditPersonalInfo";
@@ -6,6 +7,8 @@ import CardMenu from "./CardMenu";
 import CardDetails from "./CardDetails";
 import SignIn from "./SignIn";
 import Dashboard from "./Dashboard";
+import Analytics from "./Analytics";
+import Withdraw from "./Withdraw";
 import Deposits from "./Deposits";
 import Loans from "./Loans";
 import Notification from "./Notification";
@@ -27,6 +30,7 @@ import Statistics from "./Statistics";
 import StatisticsChooseCard from "./StatisticsChooseCard";
 import FAQ from "./FAQ";
 import PrivacyPolicy from "./PrivacyPolicy";
+import ChangePassword from "./ChangePassword";
 import ChangePinCode from "./ChangePinCode";
 import Payments from "./Payments";
 import TopUpPayment from "./TopUpPayment";
@@ -39,6 +43,7 @@ import PaymentSuccess from "./PaymentSuccess";
 import PaymentFailed from "./PaymentFailed";
 
 const screens = {
+    SplashScreen,
     Onboarding,
     Profile,
     EditPersonalInfo,
@@ -47,6 +52,8 @@ const screens = {
     CardDetails,
     SignIn,
     Dashboard,
+    Analytics,
+    Withdraw,
     Deposits,
     Loans,
     Notification,
@@ -68,6 +75,7 @@ const screens = {
     StatisticsChooseCard,
     FAQ,
     PrivacyPolicy,
+    ChangePassword,
     ChangePinCode,
     Payments,
     TopUpPayment,

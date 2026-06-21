@@ -1,311 +1,195 @@
-import {
-    View,
-    TouchableOpacity,
-    ScrollView,
-    Image,
-    ImageBackground,
-    Text,
-    FlatList,
-} from "react-native";
-import React, { useState } from "react";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView } from "react-native";
+import React, { useState, useCallback } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import { useNavigation } from "@react-navigation/native";
+import { useDispatch, useSelector } from "react-redux";
 
 import { svg } from "../svg";
 import { theme } from "../constants";
 import { components } from "../components";
+import { api, PaymentRequest } from "../services/api";
+import { RootState } from "../store/store";
+import { setScreen } from "../store/tabSlice";
+import { TAB_BAR_HEIGHT } from "../navigation/BottomTabBar";
 
-const cards = [
-    {
-        id: "1",
-        card: require("../assets/cards/01.png"),
-    },
-    {
-        id: "2",
-        card: require("../assets/cards/02.png"),
-    },
-    {
-        id: "3",
-        card: require("../assets/cards/03.png"),
-    },
-];
-
-const paymentTypes = [
-    {
-        id: "1",
-        type: "Top-Up\nPayment",
-        bgColor: "#3EB290",
-        icon: <svg.TypeCardSvg />,
-    },
-    {
-        id: "2",
-        type: "Mobile\nPayment",
-        bgColor: "#FF8A71",
-        icon: <svg.TypeCardSvg />,
-    },
-    {
-        id: "3",
-        type: "Money\nTransfer",
-        bgColor: "#55ACEE",
-        icon: <svg.TypeCardSvg />,
-    },
-    {
-        id: "4",
-        type: `Make a\nPayment`,
-        bgColor: "#EECC55",
-        icon: <svg.TypeCardSvg />,
-    },
-];
+const sumAmounts = (items: PaymentRequest[]) =>
+    items.reduce((total, item) => total + (parseFloat(item.amount) || 0), 0);
 
 const Dashboard: React.FC = () => {
     const navigation: any = useNavigation();
-    const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+    const dispatch = useDispatch();
+    const merchant = useSelector((state: RootState) => state.auth.merchant);
+    const [payments, setPayments] = useState<PaymentRequest[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState({
+        pending: 0,
+        paid: 0,
+        pendingAmount: 0,
+        totalReceived: 0,
+    });
 
-    function updateCurrentSlideIndex(e: any) {
-        const contentOffsetX = e.nativeEvent.contentOffset.x;
-        const currentIndex = Math.round(contentOffsetX / theme.SIZES.width);
-        setCurrentSlideIndex(currentIndex);
-    }
+    const loadPayments = useCallback(() => {
+        setLoading(true);
+        api.listPayments({ limit: 100 })
+            .then((res) => {
+                const items = res.data.items;
+                const recent = items.slice(0, 5);
+                const pendingItems = items.filter((p) => p.status === "PENDING");
+                const paidItems = items.filter((p) => p.status === "PAID");
 
-    const renderHeader = () => {
-        return (
-            <ImageBackground
-                source={require("../assets/bg-03.png")}
-                imageStyle={{
-                    borderBottomLeftRadius: 20,
-                    borderBottomRightRadius: 20,
-                }}
-            >
-                <SafeAreaView style={{ paddingTop: 12 }}>
-                    <View
-                        style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            paddingBottom: 14,
-                            borderBottomWidth: 0.5,
-                            paddingHorizontal: 20,
-                            borderBottomColor: "#CED6E1",
-                            marginBottom: 20,
-                        }}
-                    >
-                        <TouchableOpacity
-                            onPress={() => navigation.navigate("Profile")}
-                        >
-                            <Image
-                                source={require("../assets/users/01.png")}
-                                style={{ width: 22, height: 22 }}
-                            />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => navigation.navigate("ExchangeRates")}
-                        >
-                            <Text
-                                style={{
-                                    ...theme.FONTS.Mulish_400Regular,
-                                    fontSize: 16,
-                                    color: theme.COLORS.white,
-                                    lineHeight: 16 * 1.6,
-                                }}
-                            >
-                                € 1.08 / 1.12
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => navigation.navigate("CardMenu")}
-                        >
-                            <svg.CreditCardSvg />
-                        </TouchableOpacity>
-                    </View>
-                </SafeAreaView>
-                <FlatList
-                    data={cards}
-                    horizontal={true}
-                    contentContainerStyle={{
-                        paddingLeft: 20,
-                        marginBottom: 20,
-                    }}
-                    onMomentumScrollEnd={updateCurrentSlideIndex}
-                    showsHorizontalScrollIndicator={false}
-                    renderItem={({ item, index }) => {
-                        return (
-                            <TouchableOpacity
-                                key={index}
-                                style={{ marginRight: 20 }}
-                                activeOpacity={0.9}
-                            >
-                                <Image
-                                    source={item.card}
-                                    style={{ width: 290, height: 176 }}
-                                />
-                            </TouchableOpacity>
-                        );
-                    }}
-                />
-                <View
-                    style={{
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexDirection: "row",
-                        marginBottom: 51,
-                    }}
-                >
-                    {cards.map((_, index) => {
-                        return (
-                            <View
-                                key={index}
-                                style={[
-                                    {
-                                        width: 8,
-                                        height: 8,
-                                        marginHorizontal: 5,
-                                        borderRadius: 50,
-                                        borderWidth: 3,
-                                        borderColor: "#D1D2DB",
-                                    },
-                                    // currentSlideIndex == index && {
-                                    //     borderColor: theme.COLORS.mainDark,
-                                    // },
-                                ]}
-                            />
-                        );
-                    })}
-                </View>
-            </ImageBackground>
-        );
-    };
+                setPayments(recent);
+                setStats({
+                    pending: pendingItems.length,
+                    paid: paidItems.length,
+                    pendingAmount: sumAmounts(pendingItems),
+                    totalReceived: sumAmounts(paidItems),
+                });
+            })
+            .catch(() => {
+                setPayments([]);
+                setStats({ pending: 0, paid: 0, pendingAmount: 0, totalReceived: 0 });
+            })
+            .finally(() => setLoading(false));
+    }, []);
 
-    const renderCategories = () => {
-        return (
-            <View
-                style={{
-                    top: -30,
-                    paddingHorizontal: 33,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                }}
-            >
-                {paymentTypes.map((item, index) => {
-                    return (
-                        <TouchableOpacity key={index} activeOpacity={0.8}>
-                            <View
-                                style={{
-                                    width: 60,
-                                    height: 60,
-                                    backgroundColor: item.bgColor,
-                                    borderRadius: 60 / 2,
-                                    justifyContent: "center",
-                                    alignItems: "center",
-                                    marginBottom: 8,
-                                }}
-                            >
-                                {item.icon}
-                            </View>
-                            <Text
-                                style={{
-                                    textAlign: "center",
-                                    ...theme.FONTS.Mulish_600SemiBold,
-                                    fontSize: 10,
-                                    lineHeight: 10 * 1.2,
-                                    color: theme.COLORS.bodyTextColor,
-                                }}
-                            >
-                                {item.type}
-                            </Text>
-                        </TouchableOpacity>
-                    );
-                })}
-            </View>
-        );
-    };
+    useFocusEffect(
+        useCallback(() => {
+            loadPayments();
+        }, [loadPayments])
+    );
 
-    const renderContent = () => {
-        return (
-            <View style={{ paddingHorizontal: 20 }}>
-                <View
-                    style={{
-                        borderTopWidth: 1,
-                        borderTopColor: "#CED6E1",
-                        top: -16,
-                    }}
-                />
-                <View
-                    style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        marginBottom: 14,
-                        paddingTop: 20,
-                    }}
-                >
-                    <Text
-                        style={{
-                            ...theme.FONTS.H4,
-                            color: theme.COLORS.mainDark,
-                        }}
-                    >
-                        Latest transactions
-                    </Text>
-                    <TouchableOpacity
-                        onPress={() =>
-                            navigation.navigate("TransactionHistory")
-                        }
-                    >
-                        <Text
-                            style={{
-                                ...theme.FONTS.Mulish_500Medium,
-                                fontSize: 16,
-                                color: theme.COLORS.linkColor,
-                                lineHeight: 16 * 1.3,
-                            }}
-                        >
-                            View all
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-                <components.Transaction
-                    paymentType="Adalyn Roth"
-                    transactionType="Money transfer"
-                    amount="- 140.00"
-                    containerStyle={{ marginBottom: 6 }}
-                    transfer={true}
-                    onPress={() => navigation.navigate("TransactionDetails")}
-                />
-                <components.Transaction
-                    paymentType="Amazon"
-                    transactionType="Online payments"
-                    amount="- 239.57"
-                    containerStyle={{ marginBottom: 6 }}
-                    amazon={true}
-                    onPress={() => navigation.navigate("TransactionDetails")}
-                />
-                <components.Transaction
-                    paymentType="Paypal"
-                    transactionType="Deposits"
-                    amount="+ 700.00"
-                    deposit={true}
-                    payPal={true}
-                    onPress={() => navigation.navigate("TransactionDetails")}
-                    containerStyle={{ marginBottom: 25 }}
-                />
-            </View>
-        );
-    };
+    const accountLabel = merchant?.email
+        ? `ACCT · ${merchant.email.split("@")[0].slice(0, 4).toUpperCase()} ****`
+        : "MERCHANT ACCOUNT";
 
     return (
         <ScrollView
-            contentContainerStyle={{
-                flexGrow: 1,
-            }}
+            contentContainerStyle={{ flexGrow: 1, paddingBottom: TAB_BAR_HEIGHT + 16 }}
             showsVerticalScrollIndicator={false}
-            bounces={false}
+            style={{ backgroundColor: theme.COLORS.bgColor }}
         >
-            {renderHeader()}
-            {renderCategories()}
-            {renderContent()}
+            <components.MerchantTabHeader
+                eyebrow="Welcome back"
+                title={merchant?.businessName || "Merchant"}
+                subtitle="USDT payments · Multi-chain"
+                paddingBottom={72}
+            />
+            <View style={{ paddingHorizontal: 20, marginTop: -56, marginBottom: 20 }}>
+                <components.MerchantBalanceCard
+                    businessName={merchant?.businessName || "Merchant"}
+                    totalReceived={stats.totalReceived}
+                    pendingCount={stats.pending}
+                    pendingAmount={stats.pendingAmount}
+                    paidCount={stats.paid}
+                    accountLabel={accountLabel}
+                />
+            </View>
+
+            <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
+                <View style={{ flexDirection: "row", gap: 12, marginBottom: 12 }}>
+                    <TouchableOpacity
+                        onPress={() => navigation.navigate("CreateInvoice")}
+                        style={actionCardStyle}
+                    >
+                        <View style={[actionIconStyle, { backgroundColor: "#EECC55" }]}>
+                            <svg.SafeDepositSvg color={theme.COLORS.white} />
+                        </View>
+                        <Text style={actionLabelStyle}>Deposit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => navigation.navigate("FundTransfer")}
+                        style={actionCardStyle}
+                    >
+                        <View style={actionIconPlain}>
+                            <svg.TransferSvg />
+                        </View>
+                        <Text style={actionLabelStyle}>Make transfer</Text>
+                    </TouchableOpacity>
+                </View>
+                <View style={{ flexDirection: "row", gap: 12 }}>
+                    <TouchableOpacity
+                        onPress={() => navigation.navigate("Withdraw")}
+                        style={actionCardStyle}
+                    >
+                        <View style={[actionIconStyle, { backgroundColor: "#3EB290" }]}>
+                            <svg.WalletSvg color={theme.COLORS.white} />
+                        </View>
+                        <Text style={actionLabelStyle}>Withdraw</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => dispatch(setScreen("History"))}
+                        style={actionCardStyle}
+                    >
+                        <View style={[actionIconStyle, { backgroundColor: "#8B7FD4" }]}>
+                            <svg.ReportSvg color={theme.COLORS.white} />
+                        </View>
+                        <Text style={actionLabelStyle}>View history</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+
+            <View style={{ paddingHorizontal: 20 }}>
+                <Text style={{ ...theme.FONTS.H4, color: theme.COLORS.mainDark, marginBottom: 12 }}>
+                    Recent payments
+                </Text>
+                {loading ? (
+                    <ActivityIndicator color={theme.COLORS.mainDark} />
+                ) : payments.length === 0 ? (
+                    <Text style={{ color: theme.COLORS.bodyTextColor, textAlign: "center", paddingVertical: 24 }}>
+                        No payments yet. Tap Deposit to receive your first USDT payment.
+                    </Text>
+                ) : (
+                    payments.map((item) => (
+                        <components.PaymentListItem
+                            key={item.id}
+                            item={item}
+                            onPress={() =>
+                                navigation.navigate("TransactionDetails", { payment: item, paymentId: item.id })
+                            }
+                        />
+                    ))
+                )}
+            </View>
         </ScrollView>
     );
 };
 
 export default Dashboard;
+
+const actionCardStyle = {
+    flex: 1,
+    alignItems: "center" as const,
+    backgroundColor: theme.COLORS.white,
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 10,
+    elevation: 4,
+    shadowColor: "#062664",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+};
+
+const actionIconStyle = {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    marginBottom: 10,
+};
+
+const actionIconPlain = {
+    width: 48,
+    height: 48,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    marginBottom: 10,
+};
+
+const actionLabelStyle = {
+    ...theme.FONTS.Mulish_600SemiBold,
+    fontSize: 12,
+    color: theme.COLORS.mainDark,
+    textAlign: "center" as const,
+};

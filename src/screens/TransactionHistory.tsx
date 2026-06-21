@@ -1,244 +1,160 @@
-import { Text, ScrollView, View, TouchableOpacity, Image } from "react-native";
-import React from "react";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { Text, TouchableOpacity, ActivityIndicator, ScrollView, View } from "react-native";
+import React, { useState, useCallback } from "react";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useSelector } from "react-redux";
 
 import { components } from "../components";
 import { theme } from "../constants";
-import { svg } from "../svg";
+import { api, PaymentRequest } from "../services/api";
+import { TAB_BAR_HEIGHT } from "../navigation/BottomTabBar";
+import { RootState } from "../store/store";
 
-const payments = [
-    {
-        id: "1",
-        type: "Adalyn Roth",
-        typeDescription: "Money transfer",
-        amount: "- 140.00",
-        date: "Today",
-        topUp: false,
-        sendTo: "Adalyn Roth",
-        icon: require("../assets/icons/09.png"),
-    },
-    {
-        id: "2",
-        type: "Amazon",
-        typeDescription: "Online payments",
-        amount: "- 239.57",
-        date: "Today",
-        topUp: false,
-        sendTo: "Amazon",
-        icon: require("../assets/icons/23.png"),
-    },
-    {
-        id: "3",
-        type: "Paypal",
-        typeDescription: "Deposits",
-        amount: "+ 700.00",
-        date: "Sep 10, 2022",
-        topUp: true,
-        sendTo: "Paypal",
-        icon: require("../assets/icons/21.png"),
-    },
-    {
-        id: "4",
-        type: "ATM",
-        typeDescription: "Cash withdrawal",
-        amount: "- 1200.00",
-        date: "Sep 10, 2022",
-        topUp: false,
-        sendTo: "ATM",
-        icon: require("../assets/icons/24.png"),
-    },
-    {
-        id: "5",
-        type: "eBay",
-        typeDescription: "Online payments",
-        amount: "- 287.84",
-        date: "Sep 10, 2022",
-        topUp: false,
-        sendTo: "eBay",
-        icon: require("../assets/icons/25.png"),
-    },
-    {
-        id: "6",
-        type: "+17869871235",
-        typeDescription: "Mobile payment",
-        amount: "- 10.00",
-        date: "Sep 5, 2022",
-        topUp: false,
-        sendTo: "+17869871235",
-        icon: require("../assets/icons/10.png"),
-    },
-    {
-        id: "7",
-        type: "Maribel Farrell",
-        typeDescription: "Money transfer",
-        amount: "+ 568.00",
-        date: "Sep 5, 2022",
-        topUp: false,
-        sendTo: "Maribel Farrell",
-        icon: require("../assets/icons/09.png"),
-    },
-    {
-        id: "8",
-        type: "Electricity",
-        typeDescription: "Utility bills",
-        amount: "- 198.27",
-        date: "Sep 5, 2022",
-        topUp: false,
-        icon: require("../assets/icons/12.png"),
-    },
+const FILTERS = [
+    { label: "All", value: "" },
+    { label: "Pending", value: "PENDING" },
+    { label: "Paid", value: "PAID" },
+    { label: "Expired", value: "EXPIRED" },
+    { label: "Failed", value: "FAILED" },
+    { label: "Cancelled", value: "CANCELLED" },
 ];
 
-const date01 = payments.filter((item) => item.date === "Today");
-const date02 = payments.filter((item) => item.date === "Sep 10, 2022");
-const date03 = payments.filter((item) => item.date === "Sep 5, 2022");
+const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
+    const navigation: any = useNavigation();
+    const merchant = useSelector((state: RootState) => state.auth.merchant);
+    const [payments, setPayments] = useState<PaymentRequest[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [filter, setFilter] = useState("");
 
-const TransactionHistory: React.FC = ({ item, navigation }: any) => {
-    const TransactionItem = ({ item, array, index }: any) => {
-        return (
-            <TouchableOpacity
-                style={{
-                    width: "100%",
-                    height: 60,
-                    backgroundColor: theme.COLORS.white,
-                    borderRadius: 10,
-                    marginBottom: array.length - 1 === index ? 14 : 6,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    padding: 10,
-                }}
-                onPress={() => navigation.navigate("TransactionDetails")}
-            >
-                <Image
-                    source={item.icon}
+    const load = useCallback(() => {
+        setLoading(true);
+        api.listPayments({ status: filter || undefined, limit: 50 })
+            .then((res) => setPayments(res.data.items))
+            .catch(() => setPayments([]))
+            .finally(() => setLoading(false));
+    }, [filter]);
+
+    useFocusEffect(
+        useCallback(() => {
+            load();
+        }, [load])
+    );
+
+    const filterChips = (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 8 }}>
+            {FILTERS.map((f) => (
+                <TouchableOpacity
+                    key={f.value || "all"}
+                    onPress={() => setFilter(f.value)}
                     style={{
-                        width: 40,
-                        height: 40,
-                        marginRight: 14,
-                    }}
-                />
-                <View style={{ marginRight: "auto" }}>
-                    <Text
-                        style={{
-                            ...theme.FONTS.H6,
-                            color: theme.COLORS.mainDark,
-                        }}
-                    >
-                        {item.type}
-                    </Text>
-                    <Text
-                        style={{
-                            ...theme.FONTS.Mulish_400Regular,
-                            fontSize: 12,
-                            color: theme.COLORS.bodyTextColor,
-                        }}
-                    >
-                        {item.typeDescription}
-                    </Text>
-                </View>
-                <Text
-                    style={{
-                        ...theme.FONTS.H6,
-                        color: item.topUp
-                            ? theme.COLORS.green
-                            : theme.COLORS.mainDark,
+                        paddingHorizontal: 16,
+                        paddingVertical: 8,
+                        borderRadius: 20,
+                        marginRight: 8,
+                        backgroundColor: filter === f.value ? theme.COLORS.white : "rgba(255,255,255,0.14)",
                     }}
                 >
-                    {item.amount}
-                </Text>
-            </TouchableOpacity>
-        );
-    };
+                    <Text
+                        style={{
+                            color: filter === f.value ? theme.COLORS.mainDark : theme.COLORS.white,
+                            fontSize: 13,
+                            ...theme.FONTS.Mulish_600SemiBold,
+                        }}
+                    >
+                        {f.label}
+                    </Text>
+                </TouchableOpacity>
+            ))}
+        </ScrollView>
+    );
 
-    const renderHeader = () => {
-        return <components.Header title="Transaction history" goBack={true} />;
-    };
+    const listBody = (
+        <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: embedded ? TAB_BAR_HEIGHT + 16 : 24 }}>
+            {loading ? (
+                <ActivityIndicator color={theme.COLORS.mainDark} style={{ marginTop: 40 }} />
+            ) : payments.length === 0 ? (
+                <View
+                    style={{
+                        backgroundColor: theme.COLORS.white,
+                        borderRadius: 14,
+                        paddingVertical: 32,
+                        paddingHorizontal: 20,
+                        alignItems: "center",
+                        shadowColor: "#062664",
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.06,
+                        shadowRadius: 12,
+                        elevation: 3,
+                    }}
+                >
+                    <Text style={{ textAlign: "center", color: theme.COLORS.bodyTextColor, fontSize: 14 }}>
+                        No payments found.
+                    </Text>
+                </View>
+            ) : (
+                payments.map((item) => (
+                    <components.PaymentListItem
+                        key={item.id}
+                        item={item}
+                        showDate
+                        onPress={() =>
+                            navigation.navigate("TransactionDetails", { payment: item, paymentId: item.id })
+                        }
+                    />
+                ))
+            )}
+        </View>
+    );
 
-    const renderSearch = () => {
+    if (embedded) {
         return (
-            <View style={{ marginBottom: 14, marginTop: 20 }}>
-                <components.InputField
-                    placeholder="Search"
-                    rightIcon={
-                        <Image
-                            source={require("../assets/other-icons/04.png")}
-                            style={{ width: 16, height: 16 }}
-                        />
-                    }
-                />
+            <View style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
+                <components.MerchantTabHeader
+                    eyebrow={merchant?.businessName || "Merchant"}
+                    title="Payment history"
+                    subtitle="USDT · Multi-chain"
+                >
+                    {filterChips}
+                </components.MerchantTabHeader>
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
+                    {listBody}
+                </ScrollView>
             </View>
         );
-    };
-
-    const renderHistory = () => {
-        return (
-            <View>
-                <components.SmallHeader
-                    title="Today"
-                    containerStyle={{ marginBottom: 6 }}
-                />
-                {date01.map((item, index, array) => {
-                    return (
-                        <TransactionItem
-                            key={index}
-                            item={item}
-                            array={array}
-                            index={index}
-                        />
-                    );
-                })}
-                <components.SmallHeader
-                    title="Sep 10, 2022"
-                    containerStyle={{ marginBottom: 6 }}
-                />
-                {date02.map((item, index, array) => {
-                    return (
-                        <TransactionItem
-                            key={index}
-                            item={item}
-                            array={array}
-                            index={index}
-                        />
-                    );
-                })}
-                <components.SmallHeader
-                    title="Sep 5, 2022"
-                    containerStyle={{ marginBottom: 6 }}
-                />
-                {date03.map((item, index, array) => {
-                    return (
-                        <TransactionItem
-                            key={index}
-                            item={item}
-                            array={array}
-                            index={index}
-                        />
-                    );
-                })}
-            </View>
-        );
-    };
-
-    const renderContent = () => {
-        return (
-            <KeyboardAwareScrollView
-                contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20 }}
-                showsVerticalScrollIndicator={false}
-                enableOnAndroid={true}
-            >
-                {renderSearch()}
-                {renderHistory()}
-            </KeyboardAwareScrollView>
-        );
-    };
+    }
 
     return (
-        <SafeAreaView
-            style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}
-        >
-            {renderHeader()}
-            {renderContent()}
-        </SafeAreaView>
+        <View style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
+            <components.Header title="Payment history" goBack={true} />
+            <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={{ paddingHorizontal: 20, paddingTop: 8 }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+                        {FILTERS.map((f) => (
+                            <TouchableOpacity
+                                key={f.value || "all"}
+                                onPress={() => setFilter(f.value)}
+                                style={{
+                                    paddingHorizontal: 16,
+                                    paddingVertical: 8,
+                                    borderRadius: 20,
+                                    marginRight: 8,
+                                    backgroundColor: filter === f.value ? theme.COLORS.mainDark : theme.COLORS.white,
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color: filter === f.value ? theme.COLORS.white : theme.COLORS.mainDark,
+                                        fontSize: 13,
+                                    }}
+                                >
+                                    {f.label}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+                {listBody}
+            </ScrollView>
+        </View>
     );
 };
 

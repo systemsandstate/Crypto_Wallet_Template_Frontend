@@ -1,31 +1,58 @@
 {
-    "expo": {
-        "name": "app",
-        "slug": "app",
-        "version": "1.0.0",
-        "orientation": "portrait",
-        "icon": "./assets/icon.png",
-        "userInterfaceStyle": "light",
-        "splash": {
-            "image": "./assets/splash.png",
-            "resizeMode": "cover",
-            "backgroundColor": "#ffffff"
-        },
-        "updates": {
-            "fallbackToCacheTimeout": 0
-        },
-        "assetBundlePatterns": ["**/*"],
-        "ios": {
-            "supportsTablet": true
-        },
-        "android": {
-            "adaptiveIcon": {
-                "foregroundImage": "./assets/adaptive-icon.png",
-                "backgroundColor": "#FFFFFF"
-            }
-        },
-        "web": {
-            "favicon": "./assets/favicon.png"
+  "expo": {
+    "name": "Merchant Payments",
+    "slug": "merchant-payments",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#1B1D4D",
+          "image": "./assets/splash.png",
+          "resizeMode": "cover",
+          "enableFullScreenImage_legacy": true
         }
+      ],
+      "expo-asset",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow access to your photos to set a profile picture."
+        }
+      ]
+    ],
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "xyz.mohsinraza.merchantpayments"
+    },
+    "android": {
+      "package": "xyz.mohsinraza.merchantpayments",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1B1D4D"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "name": "Merchant Payments",
+      "shortName": "Payments",
+      "description": "USDT QR payments for merchants",
+      "themeColor": "#1B1D4D",
+      "backgroundColor": "#EDF0F2"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+      }
     }
+  }
 }

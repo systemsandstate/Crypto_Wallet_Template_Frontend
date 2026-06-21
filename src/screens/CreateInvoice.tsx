@@ -1,180 +1,185 @@
-import {
-    Text,
-    ScrollView,
-    View,
-    TouchableOpacity,
-    Image,
-    TextInput,
-} from "react-native";
-import React, { useState } from "react";
+import { Text, View, ActivityIndicator, Alert, Image } from "react-native";
+import React, { useState, useCallback } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 
 import { components } from "../components";
-import { theme } from "../constants";
 import { svg } from "../svg";
+import { theme } from "../constants";
+import { api, PaymentRequest } from "../services/api";
+import { TAB_BAR_HEIGHT } from "../navigation/BottomTabBar";
+import { UsdtNetwork, formatUsdtNetwork } from "../constants/usdtNetworks";
 
-const CreateInvoice: React.FC = ({ navigation }: any) => {
-    const [chooseCurrency, setChooseCurrency] = useState("USD");
+const CreateInvoice: React.FC = () => {
+    const navigation: any = useNavigation();
+    const [amount, setAmount] = useState("");
+    const [reference, setReference] = useState("");
+    const [network, setNetwork] = useState<UsdtNetwork>("TRC20");
+    const [loading, setLoading] = useState(false);
+    const [recentPayments, setRecentPayments] = useState<PaymentRequest[]>([]);
+    const [loadingRecent, setLoadingRecent] = useState(true);
 
-    const renderHeader = () => {
-        return <components.Header title="Create invoice" goBack={true} />;
+    const loadRecentPayments = useCallback(() => {
+        setLoadingRecent(true);
+        api.listPayments({ limit: 5 })
+            .then((res) => setRecentPayments(res.data.items))
+            .catch(() => setRecentPayments([]))
+            .finally(() => setLoadingRecent(false));
+    }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            loadRecentPayments();
+        }, [loadRecentPayments])
+    );
+
+    const handleCreate = async () => {
+        const num = parseFloat(amount);
+        if (!num || num <= 0) {
+            Alert.alert("Error", "Enter a valid amount");
+            return;
+        }
+        setLoading(true);
+        try {
+            const res = await api.createPayment({
+                amount: num,
+                reference: reference.trim() || undefined,
+                network,
+            });
+            navigation.navigate("InvoiceSent", { payment: res.data });
+        } catch (err: any) {
+            Alert.alert("Payment failed", err.message || "Could not create payment request");
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const renderContent = () => {
-        return (
-            <KeyboardAwareScrollView
-                contentContainerStyle={{ paddingHorizontal: 20 }}
-                enableOnAndroid={true}
-            >
-                <components.InputField
-                    placeholder="Company name"
-                    containerStyle={{ marginTop: 20, marginBottom: 14 }}
+    return (
+        <View style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
+            <Image
+                source={require("../assets/bg-01.png")}
+                style={{
+                    height: 350,
+                    width: theme.SIZES.width,
+                    position: "absolute",
+                    zIndex: -1,
+                }}
+            />
+            <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+                <components.Header
+                    title="Create payment"
+                    goBack={true}
+                    goBackColor={theme.COLORS.white}
+                    titleStyle={{ color: theme.COLORS.white }}
                 />
-                <TouchableOpacity
-                    style={{
-                        width: "100%",
-                        height: 50,
-                        backgroundColor: theme.COLORS.white,
-                        borderRadius: 10,
-                        marginBottom: 14,
+                <KeyboardAwareScrollView
+                    contentContainerStyle={{
                         paddingHorizontal: 20,
-                        alignItems: "center",
-                        flexDirection: "row",
-                        justifyContent: "space-between",
+                        paddingBottom: TAB_BAR_HEIGHT + 16,
                     }}
+                    showsVerticalScrollIndicator={false}
                 >
+                    <Text
+                        style={{
+                            textAlign: "center",
+                            ...theme.FONTS.H2,
+                            color: theme.COLORS.mainDark,
+                            marginTop: 20,
+                            marginBottom: 8,
+                        }}
+                    >
+                        New payment
+                    </Text>
                     <Text
                         style={{
                             ...theme.FONTS.Mulish_400Regular,
                             fontSize: 14,
-                            color: "#868698",
+                            color: theme.COLORS.bodyTextColor,
+                            marginBottom: 24,
+                            textAlign: "center",
+                            lineHeight: 14 * 1.6,
                         }}
                     >
-                        Country
+                        Create a USDT payment request on your chosen network and show the QR code to your customer.
                     </Text>
-                    <Image
-                        source={require("../assets/other-icons/08.png")}
-                        style={{ width: 16, height: 16 }}
+                    <components.NetworkSelector value={network} onChange={setNetwork} />
+                    <components.InputField
+                        placeholder="Amount (USDT)"
+                        value={amount}
+                        onChangeText={setAmount}
+                        keyboardType="numeric"
+                        containerStyle={{ marginBottom: 14 }}
                     />
-                </TouchableOpacity>
-                <components.InputField
-                    placeholder="Company email"
-                    containerStyle={{ marginBottom: 14 }}
-                />
-                <components.InputField
-                    placeholder="Amount"
-                    containerStyle={{ marginBottom: 14 }}
-                    leftIcon={
-                        <Image
-                            source={require("../assets/other-icons/03.png")}
-                            style={{ width: 16, height: 16, marginRight: 6 }}
+                    <components.InputField
+                        placeholder="Reference (optional) e.g. ORDER-1042"
+                        value={reference}
+                        onChangeText={setReference}
+                        containerStyle={{ marginBottom: 14 }}
+                    />
+                    <Text
+                        style={{
+                            ...theme.FONTS.Mulish_400Regular,
+                            fontSize: 12,
+                            color: theme.COLORS.bodyTextColor,
+                            marginBottom: 24,
+                        }}
+                    >
+                        {formatUsdtNetwork(network)}
+                    </Text>
+                    {loading ? (
+                        <ActivityIndicator size="large" color={theme.COLORS.mainDark} />
+                    ) : (
+                        <components.Button
+                            title="Generate QR"
+                            onPress={handleCreate}
+                            containerStyle={{ marginBottom: 28 }}
+                            leading={<svg.QrCodeSvg size={20} color={theme.COLORS.white} />}
                         />
-                    }
-                />
-                <components.SmallHeader
-                    title="Choose currency:"
-                    containerStyle={{ marginBottom: 6 }}
-                />
-                <View
-                    style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        marginBottom: 14,
-                    }}
-                >
-                    <TouchableOpacity
-                        style={{
-                            paddingHorizontal: 20,
-                            backgroundColor:
-                                chooseCurrency === "USD"
-                                    ? theme.COLORS.mainDark
-                                    : theme.COLORS.white,
-                            paddingVertical: 8,
-                            borderRadius: 10,
-                            marginRight: 14,
-                        }}
-                        onPress={() => setChooseCurrency("USD")}
-                    >
-                        <Text
-                            style={{
-                                color:
-                                    chooseCurrency === "USD"
-                                        ? theme.COLORS.white
-                                        : theme.COLORS.mainDark,
-                            }}
-                        >
-                            USD
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={{
-                            paddingHorizontal: 20,
-                            backgroundColor:
-                                chooseCurrency === "EUR"
-                                    ? theme.COLORS.mainDark
-                                    : theme.COLORS.white,
-                            paddingVertical: 8,
-                            borderRadius: 10,
-                        }}
-                        onPress={() => setChooseCurrency("EUR")}
-                    >
-                        <Text
-                            style={{
-                                color:
-                                    chooseCurrency === "EUR"
-                                        ? theme.COLORS.white
-                                        : theme.COLORS.mainDark,
-                            }}
-                        >
-                            EUR
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-                <View
-                    style={{
-                        backgroundColor: theme.COLORS.white,
-                        width: "100%",
-                        borderRadius: 10,
-                        paddingHorizontal: 20,
-                        paddingVertical: 14,
-                        marginBottom: 14,
-                    }}
-                >
-                    <TextInput
-                        placeholder="Comment"
-                        multiline={true}
-                        numberOfLines={7}
-                        style={{ flex: 1, height: 120 }}
-                        textAlignVertical="top"
-                    />
-                </View>
-                <Text
-                    style={{
-                        ...theme.FONTS.Mulish_400Regular,
-                        fontSize: 12,
-                        color: theme.COLORS.bodyTextColor,
-                        marginBottom: theme.SIZES.height * 0.1,
-                    }}
-                >
-                    Bank fee is charged from the payer.
-                </Text>
-                <components.Button
-                    title="Send invoice"
-                    containerStyle={{ marginBottom: 20 }}
-                    onPress={() => navigation.navigate("InvoiceSent")}
-                />
-            </KeyboardAwareScrollView>
-        );
-    };
+                    )}
 
-    return (
-        <SafeAreaView
-            style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}
-        >
-            {renderHeader()}
-            {renderContent()}
-        </SafeAreaView>
+                    <View
+                        style={{
+                            borderTopWidth: 1,
+                            borderTopColor: "#E8ECF0",
+                            paddingTop: 20,
+                        }}
+                    >
+                        <Text style={{ ...theme.FONTS.H4, color: theme.COLORS.mainDark, marginBottom: 12 }}>
+                            Recent payments
+                        </Text>
+                        {loadingRecent ? (
+                            <ActivityIndicator color={theme.COLORS.mainDark} style={{ marginVertical: 16 }} />
+                        ) : recentPayments.length === 0 ? (
+                            <Text
+                                style={{
+                                    color: theme.COLORS.bodyTextColor,
+                                    textAlign: "center",
+                                    paddingVertical: 16,
+                                    fontSize: 14,
+                                }}
+                            >
+                                No payments yet. Your last 5 will appear here.
+                            </Text>
+                        ) : (
+                            recentPayments.map((item) => (
+                                <components.PaymentListItem
+                                    key={item.id}
+                                    item={item}
+                                    showDate
+                                    onPress={() =>
+                                        navigation.navigate("TransactionDetails", {
+                                            payment: item,
+                                            paymentId: item.id,
+                                        })
+                                    }
+                                />
+                            ))
+                        )}
+                    </View>
+                </KeyboardAwareScrollView>
+            </SafeAreaView>
+        </View>
     );
 };
 

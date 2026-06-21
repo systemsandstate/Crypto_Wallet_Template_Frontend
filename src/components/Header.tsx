@@ -124,7 +124,7 @@ const Header: React.FC<Props> = ({
                             paddingVertical: 6,
                         }}
                     >
-                        <svg.FileTextSvg />
+                        <svg.FileTextSvg color={theme.COLORS.white} />
                     </View>
                 </TouchableOpacity>
             )}

@@ -1,128 +1,72 @@
-import {
-    View,
-    TouchableOpacity,
-    ScrollView,
-    Image,
-    ImageBackground,
-} from "react-native";
-import React from "react";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Text, Alert, ActivityIndicator } from "react-native";
+import React, { useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 
-import { svg } from "../svg";
 import { theme } from "../constants";
 import { components } from "../components";
+import { api } from "../services/api";
+import { setCredentials } from "../store/authSlice";
+import { RootState } from "../store/store";
+import { TAB_BAR_HEIGHT } from "../navigation/BottomTabBar";
 
 const EditPersonalInfo: React.FC = ({ navigation }: any) => {
-    const renderHeader = () => {
-        return <components.Header title="Edit personal info" goBack={true} />;
-    };
+    const dispatch = useDispatch();
+    const merchant = useSelector((state: RootState) => state.auth.merchant);
+    const [businessName, setBusinessName] = useState(merchant?.businessName || "");
+    const [phone, setPhone] = useState(merchant?.phone || "");
+    const [loading, setLoading] = useState(false);
 
-    const renderUserPhoto = () => {
-        return (
-            <TouchableOpacity
-                style={{
-                    width: 70,
-                    height: 70,
-                    alignSelf: "center",
-                    marginVertical: 20,
-                }}
-            >
-                <ImageBackground
-                    source={{
-                        uri: "https://dl.dropbox.com/s/g61a6dbx2t5adiv/01.jpg?dl=0",
-                    }}
-                    style={{
-                        width: "100%",
-                        height: "100%",
-                        borderRadius: 35,
-                    }}
-                >
-                    <View
-                        style={{
-                            width: "100%",
-                            height: "100%",
-                            backgroundColor: "rgba(27, 29, 77, 0.5)",
-                            justifyContent: "center",
-                            alignItems: "center",
-                            borderRadius: 35,
-                        }}
-                    >
-                        <svg.EditPhotoSvg />
-                    </View>
-                </ImageBackground>
-            </TouchableOpacity>
-        );
-    };
-
-    const renderInputFields = () => {
-        return (
-            <View>
-                <components.InputField
-                    placeholder="Cristina Wolf"
-                    containerStyle={{ paddingHorizontal: 20, marginBottom: 14 }}
-                />
-                <components.InputField
-                    placeholder="+17 | xxxxxxxxxx"
-                    containerStyle={{ paddingHorizontal: 20, marginBottom: 14 }}
-                    leftIcon={
-                        <Image
-                            source={{
-                                uri: "https://dl.dropbox.com/s/ima3jsg6qhzu8v1/01.jpg?dl=0",
-                            }}
-                            style={{ width: 20.59, height: 14, marginRight: 6 }}
-                        />
-                    }
-                />
-                <components.InputField
-                    placeholder="Enter your email"
-                    containerStyle={{ paddingHorizontal: 20, marginBottom: 14 }}
-                />
-                <components.InputField
-                    placeholder="MM/DD/YYYY"
-                    containerStyle={{ paddingHorizontal: 20, marginBottom: 14 }}
-                    rightIcon={
-                        <Image
-                            source={require("../assets/other-icons/24.png")}
-                            style={{ width: 16, height: 16 }}
-                        />
-                    }
-                />
-                <components.InputField
-                    placeholder="Enter your address"
-                    containerStyle={{ paddingHorizontal: 20, marginBottom: 14 }}
-                />
-            </View>
-        );
-    };
-
-    const renderButton = () => {
-        return (
-            <components.Button
-                title="Save"
-                onPress={() => navigation.goBack()}
-            />
-        );
-    };
-
-    const renderContent = () => {
-        return (
-            <ScrollView
-                contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20 }}
-            >
-                {renderUserPhoto()}
-                {renderInputFields()}
-                {renderButton()}
-            </ScrollView>
-        );
+    const handleSave = async () => {
+        if (!businessName.trim()) {
+            Alert.alert("Error", "Business name is required");
+            return;
+        }
+        setLoading(true);
+        try {
+            const res = await api.updateProfile({
+                businessName: businessName.trim(),
+                phone: phone.trim() || null,
+            });
+            const { getAuthToken } = await import("../services/api");
+            const token = getAuthToken();
+            if (token) {
+                dispatch(setCredentials({ merchant: res.data, accessToken: token }));
+            }
+            Alert.alert("Saved", "Profile updated", [{ text: "OK", onPress: () => navigation.goBack() }]);
+        } catch (err: any) {
+            Alert.alert("Error", err.message || "Could not save");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
-        <SafeAreaView
-            style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}
+        <components.AuthScreenLayout
+            header={<components.Header title="Business info" goBack={true} />}
+            cardStyle={{ marginBottom: TAB_BAR_HEIGHT }}
         >
-            {renderHeader()}
-            {renderContent()}
-        </SafeAreaView>
+            <components.InputField
+                placeholder="Business name"
+                value={businessName}
+                onChangeText={setBusinessName}
+                containerStyle={{ marginBottom: 14 }}
+            />
+            <components.InputField
+                placeholder="Phone (optional)"
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+                containerStyle={{ marginBottom: 14 }}
+            />
+            <Text style={{ fontSize: 12, color: theme.COLORS.bodyTextColor, marginBottom: 20 }}>
+                Email: {merchant?.email} (cannot be changed here)
+            </Text>
+            {loading ? (
+                <ActivityIndicator color={theme.COLORS.mainDark} />
+            ) : (
+                <components.Button title="Save" onPress={handleSave} />
+            )}
+        </components.AuthScreenLayout>
     );
 };
 

@@ -11,7 +11,7 @@ const SignInCode: React.FC = () => {
         icon,
     }: {
         symbol?: string;
-        icon?: JSX.Element;
+        icon?: React.ReactElement;
     }) => {
         return (
             <TouchableOpacity
