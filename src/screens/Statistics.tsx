@@ -1,4 +1,4 @@
-import { View, TouchableOpacity, ScrollView, Image, Text } from "react-native";
+import { View, TouchableOpacity, ScrollView, Image, Text, StyleSheet } from "react-native";
 import React, { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -81,7 +81,8 @@ const Statistics: React.FC = () => {
                         borderTopLeftRadius: 20,
                         borderTopRightRadius: 20,
                         position: "absolute",
-                        width: theme.SIZES.width,
+                        left: 0,
+                        right: 0,
                         bottom: 0,
                         paddingHorizontal: 20,
                         paddingTop: 30,

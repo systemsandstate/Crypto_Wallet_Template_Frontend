@@ -1,11 +1,19 @@
-import { View, Text, Image, StyleSheet, ActivityIndicator } from "react-native";
+import { View, Text, Image, StyleSheet } from "react-native";
 import React from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { svg } from "../svg";
 import { theme } from "../constants";
+import { DEFAULT_LOCALE, getDictionary, type AppLocale } from "../i18n";
 
-const SplashScreen: React.FC = () => {
+type Props = {
+    locale?: AppLocale;
+    showSpinner?: boolean;
+};
+
+const SplashScreen: React.FC<Props> = ({ locale = DEFAULT_LOCALE, showSpinner = false }) => {
+    const t = getDictionary(locale);
+
     return (
         <View style={styles.root}>
             <Image
@@ -18,9 +26,11 @@ const SplashScreen: React.FC = () => {
                 <View style={styles.logoWrap}>
                     <svg.LogoSvg />
                 </View>
-                <Text style={styles.title}>Merchant Payments</Text>
-                <Text style={styles.subtitle}>Accept USDT on TRON, Ethereum, BNB, Solana & Polygon</Text>
-                <ActivityIndicator size="large" color={theme.COLORS.white} style={{ marginTop: 48 }} />
+                <Text style={styles.title}>{t.splash.title}</Text>
+                <Text style={styles.subtitle}>{t.splash.subtitle}</Text>
+                {showSpinner ? (
+                    <View style={styles.spinnerPlaceholder} />
+                ) : null}
             </SafeAreaView>
         </View>
     );
@@ -33,8 +43,6 @@ const styles = StyleSheet.create({
     },
     background: {
         ...StyleSheet.absoluteFill,
-        width: theme.SIZES.width,
-        height: theme.SIZES.height,
     },
     overlay: {
         ...StyleSheet.absoluteFill,
@@ -60,8 +68,12 @@ const styles = StyleSheet.create({
         ...theme.FONTS.Mulish_400Regular,
         fontSize: 16,
         lineHeight: 16 * 1.6,
-        color: "rgba(255,255,255,0.9)",
+        color: "rgba(255, 255, 255, 0.9)",
         textAlign: "center",
+    },
+    spinnerPlaceholder: {
+        marginTop: 48,
+        height: 36,
     },
 });
 

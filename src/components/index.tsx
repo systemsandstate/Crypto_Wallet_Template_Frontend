@@ -2,6 +2,7 @@ import Header from "./Header";
 import ProfileCategory from "./ProfileCategory";
 import Button from "./Button";
 import InputField from "./InputField";
+import FormScrollView from "./FormScrollView";
 import Transaction from "./Transaction";
 import TeofinShadow from "./TeofinShadow";
 import SmallHeader from "./SmallHeader";
@@ -12,12 +13,16 @@ import NetworkSelector from "./NetworkSelector";
 import NetworkLogo from "./NetworkLogo";
 import MerchantTabHeader from "./MerchantTabHeader";
 import ProfileAvatar from "./ProfileAvatar";
+import LanguageTrigger from "./LanguageTrigger";
+import ScreenScroll from "./ScreenScroll";
+import MerchantContent from "./MerchantContent";
 
 const components = {
     Header,
     ProfileCategory,
     Button,
     InputField,
+    FormScrollView,
     Transaction,
     TeofinShadow,
     SmallHeader,
@@ -28,6 +33,9 @@ const components = {
     NetworkLogo,
     MerchantTabHeader,
     ProfileAvatar,
+    LanguageTrigger,
+    ScreenScroll,
+    MerchantContent,
 };
 
 export { components };

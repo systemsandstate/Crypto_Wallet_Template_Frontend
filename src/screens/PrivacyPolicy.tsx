@@ -1,4 +1,4 @@
-import { View, ScrollView, Image, Text } from "react-native";
+import { View, ScrollView, Image, Text, StyleSheet } from "react-native";
 import React from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -36,8 +36,7 @@ const PrivacyPolicy: React.FC = () => {
                     source={require("../assets/bg-01.png")}
                     style={{
                         height: 350,
-                        width: theme.SIZES.width,
-                        position: "absolute",
+                        ...StyleSheet.absoluteFill,
                         zIndex: -1,
                     }}
                 />

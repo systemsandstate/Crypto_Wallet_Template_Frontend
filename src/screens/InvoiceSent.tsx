@@ -1,10 +1,9 @@
-import { View, Text, Image, ActivityIndicator, ScrollView, Alert } from "react-native";
+import { View, Text, Image, ActivityIndicator, Alert, StyleSheet } from "react-native";
 import React, { useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { theme } from "../constants";
 import { components } from "../components";
-import { TAB_BAR_HEIGHT } from "../navigation/BottomTabBar";
 import { NETWORK_LABELS } from "../constants/usdtNetworks";
 import { api, PaymentRequest } from "../services/api";
 
@@ -66,17 +65,11 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
 
     return (
         <View style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
-            <Image
-                source={require("../assets/bg/05.png")}
-                style={{ width: "100%", height: 530, position: "absolute", top: 90 }}
-            />
+            <Image source={require("../assets/bg/05.png")} style={styles.background} />
             <SafeAreaView style={{ flex: 1 }}>
                 <components.Header goBack={true} />
-                <ScrollView
-                    contentContainerStyle={{ flexGrow: 1, paddingBottom: TAB_BAR_HEIGHT + 16 }}
-                    showsVerticalScrollIndicator={false}
-                >
-                    <View style={{ marginTop: 120, alignItems: "center", paddingHorizontal: 20 }}>
+                <components.ScreenScroll withTabBarInset={false}>
+                    <components.MerchantContent style={{ marginTop: 120, alignItems: "center", paddingBottom: 20 }}>
                         <Image
                             source={
                                 isPaid
@@ -88,6 +81,8 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                                 height: isPaid ? 150 : 100,
                                 alignSelf: "center",
                                 marginBottom: 20,
+                                maxWidth: "70%",
+                                resizeMode: "contain",
                             }}
                         />
                         <Text
@@ -153,7 +148,6 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                                     fontSize: 14,
                                     color: "#FF8A71",
                                     marginBottom: 16,
-                                    paddingHorizontal: 12,
                                 }}
                             >
                                 {payment.failureReason}
@@ -163,16 +157,22 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                         {isPending && payment.qrCodeDataUrl && (
                             <Image
                                 source={{ uri: payment.qrCodeDataUrl }}
-                                style={{ width: 220, height: 220, marginBottom: 16, backgroundColor: "#fff", borderRadius: 8 }}
+                                style={{
+                                    width: "100%",
+                                    maxWidth: 220,
+                                    aspectRatio: 1,
+                                    marginBottom: 16,
+                                    backgroundColor: "#fff",
+                                    borderRadius: 8,
+                                    alignSelf: "center",
+                                }}
                             />
                         )}
 
                         {isPending && (
                             <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 24 }}>
                                 <ActivityIndicator size="small" color={theme.COLORS.mainDark} style={{ marginRight: 8 }} />
-                                <Text style={{ color: theme.COLORS.bodyTextColor }}>
-                                    Checking payment status…
-                                </Text>
+                                <Text style={{ color: theme.COLORS.bodyTextColor }}>Checking payment status…</Text>
                             </View>
                         )}
 
@@ -197,11 +197,19 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                             onPress={() => navigation.navigate("Dashboard")}
                             containerStyle={{ width: "100%", marginBottom: 20 }}
                         />
-                    </View>
-                </ScrollView>
+                    </components.MerchantContent>
+                </components.ScreenScroll>
             </SafeAreaView>
         </View>
     );
 };
+
+const styles = StyleSheet.create({
+    background: {
+        ...StyleSheet.absoluteFill,
+        height: 530,
+        top: 90,
+    },
+});
 
 export default InvoiceSent;

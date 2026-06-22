@@ -6,24 +6,25 @@ import { useSelector } from "react-redux";
 import { components } from "../components";
 import { theme } from "../constants";
 import { api, PaymentRequest } from "../services/api";
-import { TAB_BAR_HEIGHT } from "../navigation/BottomTabBar";
 import { RootState } from "../store/store";
-
-const FILTERS = [
-    { label: "All", value: "" },
-    { label: "Pending", value: "PENDING" },
-    { label: "Paid", value: "PAID" },
-    { label: "Expired", value: "EXPIRED" },
-    { label: "Failed", value: "FAILED" },
-    { label: "Cancelled", value: "CANCELLED" },
-];
+import { useTranslation } from "../hooks/useTranslation";
 
 const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
     const navigation: any = useNavigation();
+    const { t } = useTranslation();
     const merchant = useSelector((state: RootState) => state.auth.merchant);
     const [payments, setPayments] = useState<PaymentRequest[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState("");
+
+    const filters = [
+        { label: t.payment.filterAll, value: "" },
+        { label: t.payment.filterPending, value: "PENDING" },
+        { label: t.payment.filterPaid, value: "PAID" },
+        { label: t.payment.filterExpired, value: "EXPIRED" },
+        { label: t.payment.filterFailed, value: "FAILED" },
+        { label: t.payment.filterCancelled, value: "CANCELLED" },
+    ];
 
     const load = useCallback(() => {
         setLoading(true);
@@ -41,7 +42,7 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
 
     const filterChips = (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 8 }}>
-            {FILTERS.map((f) => (
+            {filters.map((f) => (
                 <TouchableOpacity
                     key={f.value || "all"}
                     onPress={() => setFilter(f.value)}
@@ -68,7 +69,7 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
     );
 
     const listBody = (
-        <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: embedded ? TAB_BAR_HEIGHT + 16 : 24 }}>
+        <components.MerchantContent style={{ paddingTop: 16, paddingBottom: embedded ? 0 : 24 }}>
             {loading ? (
                 <ActivityIndicator color={theme.COLORS.mainDark} style={{ marginTop: 40 }} />
             ) : payments.length === 0 ? (
@@ -87,7 +88,7 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                     }}
                 >
                     <Text style={{ textAlign: "center", color: theme.COLORS.bodyTextColor, fontSize: 14 }}>
-                        No payments found.
+                        {t.payment.noHistory}
                     </Text>
                 </View>
             ) : (
@@ -102,33 +103,31 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                     />
                 ))
             )}
-        </View>
+        </components.MerchantContent>
     );
 
     if (embedded) {
         return (
             <View style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
                 <components.MerchantTabHeader
-                    eyebrow={merchant?.businessName || "Merchant"}
-                    title="Payment history"
-                    subtitle="USDT · Multi-chain"
+                    eyebrow={merchant?.businessName || t.common.merchant}
+                    title={t.payment.historyTitle}
+                    subtitle={t.payment.historySubtitle}
                 >
                     {filterChips}
                 </components.MerchantTabHeader>
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
-                    {listBody}
-                </ScrollView>
+                <components.ScreenScroll>{listBody}</components.ScreenScroll>
             </View>
         );
     }
 
     return (
         <View style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
-            <components.Header title="Payment history" goBack={true} />
-            <ScrollView showsVerticalScrollIndicator={false}>
-                <View style={{ paddingHorizontal: 20, paddingTop: 8 }}>
+            <components.Header title={t.payment.historyTitle} goBack={true} />
+            <components.ScreenScroll withTabBarInset={false}>
+                <components.MerchantContent style={{ paddingTop: 8 }}>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-                        {FILTERS.map((f) => (
+                        {filters.map((f) => (
                             <TouchableOpacity
                                 key={f.value || "all"}
                                 onPress={() => setFilter(f.value)}
@@ -151,9 +150,9 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                             </TouchableOpacity>
                         ))}
                     </ScrollView>
-                </View>
+                </components.MerchantContent>
                 {listBody}
-            </ScrollView>
+            </components.ScreenScroll>
         </View>
     );
 };

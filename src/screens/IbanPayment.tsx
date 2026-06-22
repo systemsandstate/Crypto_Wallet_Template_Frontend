@@ -8,7 +8,6 @@ import {
 } from "react-native";
 import React, { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 import { components } from "../components";
 import { theme } from "../constants";
@@ -44,11 +43,10 @@ const IbanPayment: React.FC = () => {
 
     const renderContent = () => {
         return (
-            <KeyboardAwareScrollView
+            <components.FormScrollView
                 contentContainerStyle={{
                     flexGrow: 1,
                 }}
-                enableOnAndroid={true}
                 showsVerticalScrollIndicator={false}
             >
                 <components.SmallHeader
@@ -181,7 +179,7 @@ const IbanPayment: React.FC = () => {
                         containerStyle={{ marginBottom: 20 }}
                     />
                 </View>
-            </KeyboardAwareScrollView>
+            </components.FormScrollView>
         );
     };
 

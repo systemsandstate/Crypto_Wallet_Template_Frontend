@@ -1,18 +1,18 @@
-import { Text, View, ActivityIndicator, Alert, Image } from "react-native";
+import { Text, View, ActivityIndicator, Alert, Image, StyleSheet } from "react-native";
 import React, { useState, useCallback } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 
 import { components } from "../components";
 import { svg } from "../svg";
 import { theme } from "../constants";
 import { api, PaymentRequest } from "../services/api";
-import { TAB_BAR_HEIGHT } from "../navigation/BottomTabBar";
 import { UsdtNetwork, formatUsdtNetwork } from "../constants/usdtNetworks";
+import { useTranslation } from "../hooks/useTranslation";
 
 const CreateInvoice: React.FC = () => {
     const navigation: any = useNavigation();
+    const { t } = useTranslation();
     const [amount, setAmount] = useState("");
     const [reference, setReference] = useState("");
     const [network, setNetwork] = useState<UsdtNetwork>("TRC20");
@@ -37,7 +37,7 @@ const CreateInvoice: React.FC = () => {
     const handleCreate = async () => {
         const num = parseFloat(amount);
         if (!num || num <= 0) {
-            Alert.alert("Error", "Enter a valid amount");
+            Alert.alert(t.common.error, t.payment.invalidAmount);
             return;
         }
         setLoading(true);
@@ -49,7 +49,7 @@ const CreateInvoice: React.FC = () => {
             });
             navigation.navigate("InvoiceSent", { payment: res.data });
         } catch (err: any) {
-            Alert.alert("Payment failed", err.message || "Could not create payment request");
+            Alert.alert(t.payment.paymentFailed, err.message || t.payment.createFailed);
         } finally {
             setLoading(false);
         }
@@ -59,27 +59,21 @@ const CreateInvoice: React.FC = () => {
         <View style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
             <Image
                 source={require("../assets/bg-01.png")}
-                style={{
-                    height: 350,
-                    width: theme.SIZES.width,
-                    position: "absolute",
-                    zIndex: -1,
-                }}
+                style={styles.background}
             />
             <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
                 <components.Header
-                    title="Create payment"
+                    title={t.payment.createTitle}
                     goBack={true}
                     goBackColor={theme.COLORS.white}
                     titleStyle={{ color: theme.COLORS.white }}
+                    languageTone="on-dark"
                 />
-                <KeyboardAwareScrollView
-                    contentContainerStyle={{
-                        paddingHorizontal: 20,
-                        paddingBottom: TAB_BAR_HEIGHT + 16,
-                    }}
+                <components.FormScrollView
+                    contentContainerStyle={{ flexGrow: 1 }}
                     showsVerticalScrollIndicator={false}
                 >
+                    <components.MerchantContent style={{ paddingTop: 20, paddingBottom: 16 }}>
                     <Text
                         style={{
                             textAlign: "center",
@@ -89,7 +83,7 @@ const CreateInvoice: React.FC = () => {
                             marginBottom: 8,
                         }}
                     >
-                        New payment
+                        {t.payment.newPayment}
                     </Text>
                     <Text
                         style={{
@@ -101,18 +95,18 @@ const CreateInvoice: React.FC = () => {
                             lineHeight: 14 * 1.6,
                         }}
                     >
-                        Create a USDT payment request on your chosen network and show the QR code to your customer.
+                        {t.payment.createDescription}
                     </Text>
                     <components.NetworkSelector value={network} onChange={setNetwork} />
                     <components.InputField
-                        placeholder="Amount (USDT)"
+                        placeholder={t.payment.amountPlaceholder}
                         value={amount}
                         onChangeText={setAmount}
                         keyboardType="numeric"
                         containerStyle={{ marginBottom: 14 }}
                     />
                     <components.InputField
-                        placeholder="Reference (optional) e.g. ORDER-1042"
+                        placeholder={t.payment.referencePlaceholder}
                         value={reference}
                         onChangeText={setReference}
                         containerStyle={{ marginBottom: 14 }}
@@ -131,7 +125,7 @@ const CreateInvoice: React.FC = () => {
                         <ActivityIndicator size="large" color={theme.COLORS.mainDark} />
                     ) : (
                         <components.Button
-                            title="Generate QR"
+                            title={t.payment.generateQr}
                             onPress={handleCreate}
                             containerStyle={{ marginBottom: 28 }}
                             leading={<svg.QrCodeSvg size={20} color={theme.COLORS.white} />}
@@ -146,7 +140,7 @@ const CreateInvoice: React.FC = () => {
                         }}
                     >
                         <Text style={{ ...theme.FONTS.H4, color: theme.COLORS.mainDark, marginBottom: 12 }}>
-                            Recent payments
+                            {t.payment.recentPayments}
                         </Text>
                         {loadingRecent ? (
                             <ActivityIndicator color={theme.COLORS.mainDark} style={{ marginVertical: 16 }} />
@@ -159,7 +153,7 @@ const CreateInvoice: React.FC = () => {
                                     fontSize: 14,
                                 }}
                             >
-                                No payments yet. Your last 5 will appear here.
+                                {t.payment.noRecentPayments}
                             </Text>
                         ) : (
                             recentPayments.map((item) => (
@@ -177,10 +171,19 @@ const CreateInvoice: React.FC = () => {
                             ))
                         )}
                     </View>
-                </KeyboardAwareScrollView>
+                    </components.MerchantContent>
+                </components.FormScrollView>
             </SafeAreaView>
         </View>
     );
 };
+
+const styles = StyleSheet.create({
+    background: {
+        ...StyleSheet.absoluteFill,
+        height: 350,
+        zIndex: -1,
+    },
+});
 
 export default CreateInvoice;

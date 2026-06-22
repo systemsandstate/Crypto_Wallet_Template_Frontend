@@ -1,6 +1,7 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
+import { theme } from "../constants";
 import { screens } from "../screens";
 
 import TabNavigator from "./TabNavigator";
@@ -20,7 +21,7 @@ const StackNavigator: React.FC<{ initialRoute?: "SignIn" | "TabNavigator" }> = (
             initialRouteName={initialRoute}
             screenOptions={{
                 gestureEnabled: false,
-                contentStyle: { backgroundColor: "white" },
+                contentStyle: { backgroundColor: theme.COLORS.bgColor },
             }}
         >
             <Stack.Screen
@@ -61,12 +62,12 @@ const StackNavigator: React.FC<{ initialRoute?: "SignIn" | "TabNavigator" }> = (
             <Stack.Screen
                 name="SignIn"
                 component={screens.SignIn}
-                options={{ headerShown: false }}
+                options={{ headerShown: false, animation: "fade" }}
             />
             <Stack.Screen
                 name="SignUp"
                 component={screens.SignUp}
-                options={{ headerShown: false }}
+                options={{ headerShown: false, animation: "fade" }}
             />
             <Stack.Screen
                 name="SignInCode"

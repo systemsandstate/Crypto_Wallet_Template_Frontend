@@ -6,7 +6,7 @@ type Props = {
 };
 
 const FileTextSvg: React.FC<Props> = ({ color = "#4C4C60" }) => (
-    <Svg width={16} height={16} fill="none">
+    <Svg width={24} height={24} viewBox="0 0 16 16" fill="none">
         <Path
             d="M9.333 1.333H4a1.333 1.333 0 0 0-1.333 1.334v10.666A1.333 1.333 0 0 0 4 14.667h8a1.333 1.333 0 0 0 1.333-1.334v-8l-4-4ZM10.667 11.333H5.333M10.667 8.667H5.333M6.667 6H5.333"
             stroke={color}

@@ -1,24 +1,22 @@
-import { View } from "react-native";
 import React from "react";
 import { useSelector } from "react-redux";
 
 import { components } from "../components";
-import { theme } from "../constants";
-import { TAB_BAR_HEIGHT } from "../navigation/BottomTabBar";
 import { RootState } from "../store/store";
+import { useTranslation } from "../hooks/useTranslation";
 
 const Analytics: React.FC = () => {
     const merchant = useSelector((state: RootState) => state.auth.merchant);
+    const { t } = useTranslation();
 
     return (
-        <View style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
+        <components.ScreenScroll>
             <components.MerchantTabHeader
-                eyebrow={merchant?.businessName || "Merchant"}
-                title="Analytics"
-                subtitle="Reports and insights · Coming soon"
+                eyebrow={merchant?.businessName || t.common.merchant}
+                title={t.analytics.title}
+                subtitle={t.analytics.subtitle}
             />
-            <View style={{ flex: 1, paddingBottom: TAB_BAR_HEIGHT + 16 }} />
-        </View>
+        </components.ScreenScroll>
     );
 };
 

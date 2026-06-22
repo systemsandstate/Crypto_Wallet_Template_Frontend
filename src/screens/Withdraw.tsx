@@ -1,11 +1,9 @@
-import { Text, View, ScrollView, Alert } from "react-native";
+import { Text, View, Alert } from "react-native";
 import React, { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 import { components } from "../components";
 import { theme } from "../constants";
-import { TAB_BAR_HEIGHT } from "../navigation/BottomTabBar";
 import { UsdtNetwork } from "../constants/usdtNetworks";
 
 const Withdraw: React.FC = () => {
@@ -33,9 +31,8 @@ const Withdraw: React.FC = () => {
         <View style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
             <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
                 <components.Header title="Withdraw USDT" goBack={true} />
-                <KeyboardAwareScrollView
-                    contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: TAB_BAR_HEIGHT + 16 }}
-                >
+                <components.FormScrollView contentContainerStyle={{ flexGrow: 1 }}>
+                    <components.MerchantContent style={{ paddingVertical: 16 }}>
                     <Text
                         style={{
                             ...theme.FONTS.Mulish_400Regular,
@@ -62,7 +59,8 @@ const Withdraw: React.FC = () => {
                         containerStyle={{ marginBottom: 20 }}
                     />
                     <components.Button title="Request withdrawal" onPress={handleSubmit} />
-                </KeyboardAwareScrollView>
+                    </components.MerchantContent>
+                </components.FormScrollView>
             </SafeAreaView>
         </View>
     );

@@ -4,14 +4,7 @@ import React from "react";
 import { theme } from "../constants";
 import { PaymentRequest } from "../services/api";
 import { NETWORK_SHORT } from "../constants/usdtNetworks";
-
-const statusLabel: Record<string, string> = {
-    PENDING: "Waiting",
-    PAID: "Paid",
-    EXPIRED: "Expired",
-    FAILED: "Failed",
-    CANCELLED: "Cancelled",
-};
+import { useTranslation } from "../hooks/useTranslation";
 
 type Props = {
     item: PaymentRequest;
@@ -19,7 +12,18 @@ type Props = {
     showDate?: boolean;
 };
 
-const PaymentListItem: React.FC<Props> = ({ item, onPress, showDate }) => (
+const PaymentListItem: React.FC<Props> = ({ item, onPress, showDate }) => {
+    const { t, dateLocale } = useTranslation();
+
+    const statusLabel: Record<string, string> = {
+        PENDING: t.payment.statusWaiting,
+        PAID: t.payment.statusPaid,
+        EXPIRED: t.payment.statusExpired,
+        FAILED: t.payment.statusFailed,
+        CANCELLED: t.payment.statusCancelled,
+    };
+
+    return (
     <TouchableOpacity
         onPress={onPress}
         style={{
@@ -33,12 +37,12 @@ const PaymentListItem: React.FC<Props> = ({ item, onPress, showDate }) => (
     >
         <View style={{ flex: 1 }}>
             <Text style={{ ...theme.FONTS.H6, color: theme.COLORS.mainDark }}>
-                {item.reference || "USDT payment"}
+                {item.reference || t.payment.usdtPayment}
             </Text>
             <Text style={{ fontSize: 12, color: theme.COLORS.bodyTextColor }}>
                 {statusLabel[item.status] || item.status}
                 {item.network ? ` · ${NETWORK_SHORT[item.network as keyof typeof NETWORK_SHORT] || item.network}` : ""}
-                {showDate ? ` · ${new Date(item.createdAt).toLocaleDateString()}` : ""}
+                {showDate ? ` · ${new Date(item.createdAt).toLocaleDateString(dateLocale)}` : ""}
             </Text>
         </View>
         <Text
@@ -50,6 +54,7 @@ const PaymentListItem: React.FC<Props> = ({ item, onPress, showDate }) => (
             {item.amount} {item.currency}
         </Text>
     </TouchableOpacity>
-);
+    );
+};
 
 export default PaymentListItem;

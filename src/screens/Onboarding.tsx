@@ -2,10 +2,8 @@ import {
     View,
     Text,
     FlatList,
-    StyleSheet,
-    Image,
     ImageBackground,
-    TouchableOpacity,
+    useWindowDimensions,
 } from "react-native";
 import React, { useState } from "react";
 
@@ -35,11 +33,12 @@ const onboarding = [
 ];
 
 const Onboarding: React.FC = ({ navigation }: any) => {
+    const { width, height } = useWindowDimensions();
     const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
 
     function updateCurrentSlideIndex(e: any) {
         const contentOffsetX = e.nativeEvent.contentOffset.x;
-        const currentIndex = Math.round(contentOffsetX / theme.SIZES.width);
+        const currentIndex = Math.round(contentOffsetX / width);
         setCurrentSlideIndex(currentIndex);
     }
 
@@ -52,12 +51,12 @@ const Onboarding: React.FC = ({ navigation }: any) => {
                 pagingEnabled={true}
                 showsHorizontalScrollIndicator={false}
                 onMomentumScrollEnd={updateCurrentSlideIndex}
-                renderItem={({ item, index }) => {
+                renderItem={({ item }) => {
                     return (
                         <ImageBackground
                             style={{
-                                width: theme.SIZES.width,
-                                height: theme.SIZES.height,
+                                width,
+                                height,
                                 justifyContent: "flex-end",
                             }}
                             source={{ uri: item.image }}
@@ -65,8 +64,8 @@ const Onboarding: React.FC = ({ navigation }: any) => {
                             <View
                                 style={{
                                     backgroundColor: "white",
-                                    paddingTop: theme.SIZES.height * 0.08,
-                                    paddingBottom: theme.SIZES.height * 0.07,
+                                    paddingTop: height * 0.08,
+                                    paddingBottom: height * 0.07,
                                     paddingHorizontal: 20,
                                     borderTopLeftRadius: 20,
                                     borderTopRightRadius: 20,
@@ -123,11 +122,8 @@ const Onboarding: React.FC = ({ navigation }: any) => {
                                                         borderWidth: 3,
                                                         borderColor: "#D1D2DB",
                                                     },
-                                                    currentSlideIndex ==
-                                                        index && {
-                                                        borderColor:
-                                                            theme.COLORS
-                                                                .mainDark,
+                                                    currentSlideIndex == index && {
+                                                        borderColor: theme.COLORS.mainDark,
                                                     },
                                                 ]}
                                             />
@@ -136,9 +132,7 @@ const Onboarding: React.FC = ({ navigation }: any) => {
                                 </View>
                                 <components.Button
                                     title="Get Started"
-                                    onPress={() =>
-                                        navigation.navigate("SignIn")
-                                    }
+                                    onPress={() => navigation.navigate("SignIn")}
                                 />
                             </View>
                         </ImageBackground>

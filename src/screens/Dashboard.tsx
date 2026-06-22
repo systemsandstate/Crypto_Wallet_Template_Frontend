@@ -1,23 +1,22 @@
-import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import React, { useState, useCallback } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { useNavigation } from "@react-navigation/native";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector } from "react-redux";
 
 import { svg } from "../svg";
 import { theme } from "../constants";
 import { components } from "../components";
 import { api, PaymentRequest } from "../services/api";
 import { RootState } from "../store/store";
-import { setScreen } from "../store/tabSlice";
-import { TAB_BAR_HEIGHT } from "../navigation/BottomTabBar";
+import { useTranslation } from "../hooks/useTranslation";
 
 const sumAmounts = (items: PaymentRequest[]) =>
     items.reduce((total, item) => total + (parseFloat(item.amount) || 0), 0);
 
 const Dashboard: React.FC = () => {
     const navigation: any = useNavigation();
-    const dispatch = useDispatch();
+    const { t } = useTranslation();
     const merchant = useSelector((state: RootState) => state.auth.merchant);
     const [payments, setPayments] = useState<PaymentRequest[]>([]);
     const [loading, setLoading] = useState(true);
@@ -60,32 +59,28 @@ const Dashboard: React.FC = () => {
 
     const accountLabel = merchant?.email
         ? `ACCT · ${merchant.email.split("@")[0].slice(0, 4).toUpperCase()} ****`
-        : "MERCHANT ACCOUNT";
+        : t.dashboard.merchantAccount;
 
     return (
-        <ScrollView
-            contentContainerStyle={{ flexGrow: 1, paddingBottom: TAB_BAR_HEIGHT + 16 }}
-            showsVerticalScrollIndicator={false}
-            style={{ backgroundColor: theme.COLORS.bgColor }}
-        >
+        <components.ScreenScroll>
             <components.MerchantTabHeader
-                eyebrow="Welcome back"
-                title={merchant?.businessName || "Merchant"}
-                subtitle="USDT payments · Multi-chain"
+                eyebrow={t.dashboard.welcomeBack}
+                title={merchant?.businessName || t.common.merchant}
+                subtitle={t.dashboard.subtitle}
                 paddingBottom={72}
             />
-            <View style={{ paddingHorizontal: 20, marginTop: -56, marginBottom: 20 }}>
+            <components.MerchantContent style={{ marginTop: -56, marginBottom: 20 }}>
                 <components.MerchantBalanceCard
-                    businessName={merchant?.businessName || "Merchant"}
+                    businessName={merchant?.businessName || t.common.merchant}
                     totalReceived={stats.totalReceived}
                     pendingCount={stats.pending}
                     pendingAmount={stats.pendingAmount}
                     paidCount={stats.paid}
                     accountLabel={accountLabel}
                 />
-            </View>
+            </components.MerchantContent>
 
-            <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
+            <components.MerchantContent style={{ marginBottom: 24 }}>
                 <View style={{ flexDirection: "row", gap: 12, marginBottom: 12 }}>
                     <TouchableOpacity
                         onPress={() => navigation.navigate("CreateInvoice")}
@@ -94,7 +89,7 @@ const Dashboard: React.FC = () => {
                         <View style={[actionIconStyle, { backgroundColor: "#EECC55" }]}>
                             <svg.SafeDepositSvg color={theme.COLORS.white} />
                         </View>
-                        <Text style={actionLabelStyle}>Deposit</Text>
+                        <Text style={actionLabelStyle}>{t.dashboard.deposit}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         onPress={() => navigation.navigate("FundTransfer")}
@@ -103,7 +98,7 @@ const Dashboard: React.FC = () => {
                         <View style={actionIconPlain}>
                             <svg.TransferSvg />
                         </View>
-                        <Text style={actionLabelStyle}>Make transfer</Text>
+                        <Text style={actionLabelStyle}>{t.dashboard.makeTransfer}</Text>
                     </TouchableOpacity>
                 </View>
                 <View style={{ flexDirection: "row", gap: 12 }}>
@@ -114,29 +109,29 @@ const Dashboard: React.FC = () => {
                         <View style={[actionIconStyle, { backgroundColor: "#3EB290" }]}>
                             <svg.WalletSvg color={theme.COLORS.white} />
                         </View>
-                        <Text style={actionLabelStyle}>Withdraw</Text>
+                        <Text style={actionLabelStyle}>{t.dashboard.withdraw}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        onPress={() => dispatch(setScreen("History"))}
+                        onPress={() => navigation.getParent()?.navigate("History")}
                         style={actionCardStyle}
                     >
                         <View style={[actionIconStyle, { backgroundColor: "#8B7FD4" }]}>
                             <svg.ReportSvg color={theme.COLORS.white} />
                         </View>
-                        <Text style={actionLabelStyle}>View history</Text>
+                        <Text style={actionLabelStyle}>{t.dashboard.viewHistory}</Text>
                     </TouchableOpacity>
                 </View>
-            </View>
+            </components.MerchantContent>
 
-            <View style={{ paddingHorizontal: 20 }}>
+            <components.MerchantContent>
                 <Text style={{ ...theme.FONTS.H4, color: theme.COLORS.mainDark, marginBottom: 12 }}>
-                    Recent payments
+                    {t.dashboard.recentPayments}
                 </Text>
                 {loading ? (
                     <ActivityIndicator color={theme.COLORS.mainDark} />
                 ) : payments.length === 0 ? (
                     <Text style={{ color: theme.COLORS.bodyTextColor, textAlign: "center", paddingVertical: 24 }}>
-                        No payments yet. Tap Deposit to receive your first USDT payment.
+                        {t.dashboard.noPayments}
                     </Text>
                 ) : (
                     payments.map((item) => (
@@ -149,8 +144,8 @@ const Dashboard: React.FC = () => {
                         />
                     ))
                 )}
-            </View>
-        </ScrollView>
+            </components.MerchantContent>
+        </components.ScreenScroll>
     );
 };
 
@@ -158,6 +153,7 @@ export default Dashboard;
 
 const actionCardStyle = {
     flex: 1,
+    minWidth: 0,
     alignItems: "center" as const,
     backgroundColor: theme.COLORS.white,
     borderRadius: 14,

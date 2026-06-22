@@ -34,8 +34,10 @@
       "supportsTablet": true,
       "bundleIdentifier": "xyz.mohsinraza.merchantpayments"
     },
+    "newArchEnabled": false,
     "android": {
       "package": "xyz.mohsinraza.merchantpayments",
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1B1D4D"

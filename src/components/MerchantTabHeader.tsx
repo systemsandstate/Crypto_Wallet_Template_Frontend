@@ -1,15 +1,15 @@
-import { View, Text, StyleSheet } from "react-native";
 import React from "react";
+import { View, Text, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { theme } from "../constants";
+import LanguageTrigger from "./LanguageTrigger";
 
 type Props = {
     eyebrow?: string;
     title: string;
     subtitle?: string;
     children?: React.ReactNode;
-    /** Extra space below title for overlapping cards (e.g. Home balance card) */
     paddingBottom?: number;
 };
 
@@ -24,9 +24,14 @@ const MerchantTabHeader: React.FC<Props> = ({
         <View style={[styles.wrap, { paddingBottom }]}>
             <SafeAreaView edges={["top"]}>
                 <View style={styles.inner}>
-                    {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
-                    <Text style={styles.title}>{title}</Text>
-                    {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+                    <View style={styles.headerRow}>
+                        <View style={styles.textBlock}>
+                            {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
+                            <Text style={styles.title}>{title}</Text>
+                            {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+                        </View>
+                        <LanguageTrigger tone="on-dark" />
+                    </View>
                     {children ? <View style={styles.children}>{children}</View> : null}
                 </View>
             </SafeAreaView>
@@ -43,6 +48,15 @@ const styles = StyleSheet.create({
     inner: {
         paddingHorizontal: 20,
         paddingTop: 8,
+    },
+    headerRow: {
+        flexDirection: "row",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+    },
+    textBlock: {
+        flex: 1,
+        paddingRight: 12,
     },
     eyebrow: {
         ...theme.FONTS.Mulish_400Regular,

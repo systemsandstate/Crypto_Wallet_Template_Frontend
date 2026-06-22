@@ -10,16 +10,15 @@ import {
 } from "react-native";
 import React, { useState, useCallback } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSelector } from "react-redux";
 
 import { components } from "../components";
 import { theme } from "../constants";
-import { TAB_BAR_HEIGHT } from "../navigation/BottomTabBar";
 import { svg } from "../svg";
 import { api, PaymentRequest } from "../services/api";
 import { RootState } from "../store/store";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 import {
     NETWORK_LABELS,
     USDT_NETWORKS,
@@ -40,6 +39,8 @@ const formatAmount = (value: number) =>
 
 const FundTransfer: React.FC = () => {
     const merchant = useSelector((state: RootState) => state.auth.merchant);
+    const { width, horizontalPadding } = useResponsiveLayout();
+    const walletCardWidth = Math.min(300, width - horizontalPadding * 2);
     const [network, setNetwork] = useState<UsdtNetwork>("TRC20");
     const [selectedWallet, setSelectedWallet] = useState<UsdtNetwork>("TRC20");
     const [address, setAddress] = useState("");
@@ -154,7 +155,7 @@ const FundTransfer: React.FC = () => {
                             }}
                             style={{
                                 padding: 14,
-                                width: 300,
+                                width: walletCardWidth,
                                 backgroundColor: theme.COLORS.white,
                                 borderRadius: 10,
                                 marginRight: 14,
@@ -266,9 +267,8 @@ const FundTransfer: React.FC = () => {
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
             <components.Header title="Fund transfer" goBack={true} />
-            <KeyboardAwareScrollView
-                contentContainerStyle={{ flexGrow: 1, paddingBottom: TAB_BAR_HEIGHT + 16 }}
-                enableOnAndroid
+            <components.FormScrollView
+                contentContainerStyle={{ flexGrow: 1, paddingBottom: 16 }}
                 showsVerticalScrollIndicator={false}
             >
                 {renderLatestFundTransfers()}
@@ -279,7 +279,7 @@ const FundTransfer: React.FC = () => {
                     onPress={handleSend}
                     containerStyle={{ paddingHorizontal: 20, marginBottom: 20 }}
                 />
-            </KeyboardAwareScrollView>
+            </components.FormScrollView>
         </SafeAreaView>
     );
 };

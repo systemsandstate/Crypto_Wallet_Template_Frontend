@@ -1,11 +1,11 @@
-import { Text, ScrollView, View, Image, ActivityIndicator, Alert, Platform } from "react-native";
+import { Text, View, Image, ActivityIndicator, Alert, Platform, StyleSheet } from "react-native";
 import React, { useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { components } from "../components";
 import { theme } from "../constants";
 import { api, PaymentRequest } from "../services/api";
-import { TAB_BAR_HEIGHT } from "../navigation/BottomTabBar";
+import { useTabBarInset } from "../hooks/useTabBarInset";
 
 const statusMeta: Record<string, { label: string; color: string }> = {
     PAID: { label: "Success", color: theme.COLORS.green },
@@ -30,6 +30,7 @@ const copyText = async (label: string, value: string) => {
 };
 
 const TransactionDetails: React.FC = ({ navigation, route }: any) => {
+    const tabBarInset = useTabBarInset();
     const paymentId: string | undefined = route.params?.paymentId;
     const initial: PaymentRequest | undefined = route.params?.payment;
     const [payment, setPayment] = useState<PaymentRequest | null>(initial || null);
@@ -106,16 +107,14 @@ const TransactionDetails: React.FC = ({ navigation, route }: any) => {
 
     return (
         <View style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
-            <Image
-                source={require("../assets/bg/04.png")}
-                style={{ width: "100%", height: 400, position: "absolute" }}
-            />
+            <Image source={require("../assets/bg/04.png")} style={styles.background} />
             <SafeAreaView style={{ flex: 1 }}>
                 <components.Header goBack={true} />
-                <ScrollView
-                    contentContainerStyle={{ flexGrow: 1, paddingBottom: TAB_BAR_HEIGHT + 16 }}
-                    showsVerticalScrollIndicator={false}
+                <components.ScreenScroll
+                    withTabBarInset={false}
+                    contentContainerStyle={{ paddingBottom: tabBarInset }}
                 >
+                    <components.MerchantContent>
                     <Image
                         source={require("../assets/icons/26.png")}
                         style={{ width: 60, height: 60, alignSelf: "center", marginBottom: 30 }}
@@ -179,7 +178,7 @@ const TransactionDetails: React.FC = ({ navigation, route }: any) => {
                             {meta.label}
                         </Text>
                     </View>
-                    <View style={{ paddingHorizontal: 20, marginBottom: theme.SIZES.height * 0.1 }}>
+                    <View style={{ marginBottom: 24 }}>
                         <DetailItem leftTitle="Payment ID" rightTitle={payment.id.slice(0, 8) + "…"} />
                         <DetailItem leftTitle="Network" rightTitle={payment.network} />
                         <DetailItem leftTitle="Amount" rightTitle={`${payment.amount} ${payment.currency}`} />
@@ -203,30 +202,38 @@ const TransactionDetails: React.FC = ({ navigation, route }: any) => {
                         <components.Button
                             title="View QR & status"
                             onPress={() => navigation.navigate("InvoiceSent", { payment })}
-                            containerStyle={{ paddingHorizontal: 20, marginBottom: 12 }}
+                            containerStyle={{ marginBottom: 12 }}
                         />
                     )}
                     <components.Button
                         title="Copy payment ID"
                         onPress={() => copyText("Payment ID", payment.id)}
-                        containerStyle={{ paddingHorizontal: 20, marginBottom: 12 }}
+                        containerStyle={{ marginBottom: 12 }}
                     />
                     {payment.txHash && (
                         <components.Button
                             title="Copy transaction hash"
                             onPress={() => copyText("Transaction hash", payment.txHash!)}
-                            containerStyle={{ paddingHorizontal: 20, marginBottom: 12 }}
+                            containerStyle={{ marginBottom: 12 }}
                         />
                     )}
                     <components.Button
                         title="Back"
                         onPress={() => navigation.goBack()}
-                        containerStyle={{ paddingHorizontal: 20, marginBottom: 20 }}
+                        containerStyle={{ marginBottom: 20 }}
                     />
-                </ScrollView>
+                    </components.MerchantContent>
+                </components.ScreenScroll>
             </SafeAreaView>
         </View>
     );
 };
+
+const styles = StyleSheet.create({
+    background: {
+        ...StyleSheet.absoluteFill,
+        height: 400,
+    },
+});
 
 export default TransactionDetails;

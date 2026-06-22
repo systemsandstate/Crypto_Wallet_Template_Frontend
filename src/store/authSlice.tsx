@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Platform } from 'react-native';
-import { Merchant, setAuthToken, getAuthToken } from '../services/api';
+import { Merchant, setAuthToken } from '../services/api';
 import { getStoredAvatarUrl, setStoredAvatarUrl } from '../utils/avatarStorage';
 
 interface AuthState {
@@ -12,8 +12,8 @@ interface AuthState {
 
 const initialState: AuthState = {
   merchant: null,
-  accessToken: getAuthToken(),
-  isAuthenticated: !!getAuthToken(),
+  accessToken: null,
+  isAuthenticated: false,
   avatarUrl: null,
 };
 

@@ -1,67 +1,56 @@
-import { View, Text, TextInput, TouchableOpacity, Image } from "react-native";
-import React, { useState } from "react";
+import { View, Text, TextInput, TouchableOpacity } from "react-native";
+import React from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
-import { Shadow } from "react-native-shadow-2";
 
 import { components } from "../components";
 import { theme } from "../constants";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 
-const ConfirmationCode: React.FC = ({ navigation }: any) => {
-    const [isFocused, setIsFocused] = useState(0);
+const OTP_LENGTH = 5;
 
-    const Number = () => {
-        return (
-            <View
-                style={{
-                    backgroundColor: theme.COLORS.white,
-                    width: 60,
-                    height: 60,
-                    borderRadius: 10,
-                }}
-            >
-                <TextInput
-                    style={{
-                        textAlign: "center",
-                        flex: 1,
-                    }}
-                    keyboardType="number-pad"
-                    maxLength={1}
-                />
-            </View>
-        );
-    };
+const OtpBox: React.FC<{ size: number }> = ({ size }) => (
+    <View
+        style={{
+            flex: 1,
+            maxWidth: size,
+            aspectRatio: 1,
+            backgroundColor: theme.COLORS.white,
+            borderRadius: 10,
+            marginHorizontal: 4,
+        }}
+    >
+        <TextInput
+            style={{
+                textAlign: "center",
+                flex: 1,
+                fontSize: size * 0.4,
+            }}
+            keyboardType="number-pad"
+            maxLength={1}
+        />
+    </View>
+);
 
-    const renderHeader = () => {
-        return (
-            <components.Header
-                title={"Verify your phone number"}
-                goBack={true}
-            />
-        );
-    };
+const ConfirmationCode: React.FC = () => {
+    const { width, horizontalPadding, isCompact } = useResponsiveLayout();
+    const boxSize = Math.min(60, (width - horizontalPadding * 2 - 40) / OTP_LENGTH);
 
-    const renderContent = () => {
-        return (
-            <KeyboardAwareScrollView
+    return (
+        <SafeAreaView style={{ backgroundColor: theme.COLORS.bgColor, flex: 1 }}>
+            <components.Header title="Verify your phone number" goBack={true} />
+            <components.FormScrollView
                 contentContainerStyle={{
                     flexGrow: 1,
-                    paddingHorizontal: 20,
+                    paddingHorizontal: horizontalPadding,
                     paddingTop: 10,
                 }}
-                enableOnAndroid={true}
                 showsVerticalScrollIndicator={false}
             >
-                <View
-                    style={{
-                        paddingTop: 30,
-                        paddingBottom: 50,
-                    }}
-                >
+                <View style={{ paddingTop: 30, paddingBottom: 50 }}>
                     <Text
                         style={{
                             ...theme.FONTS.Mulish_400Regular,
-                            fontSize: 16,
+                            fontSize: isCompact ? 15 : 16,
                             color: theme.COLORS.bodyTextColor,
                             marginBottom: 30,
                         }}
@@ -72,22 +61,15 @@ const ConfirmationCode: React.FC = ({ navigation }: any) => {
                         style={{
                             flexDirection: "row",
                             alignItems: "center",
-                            justifyContent: "space-between",
+                            justifyContent: "center",
                             marginBottom: 30,
                         }}
                     >
-                        <Number />
-                        <Number />
-                        <Number />
-                        <Number />
-                        <Number />
+                        {Array.from({ length: OTP_LENGTH }).map((_, index) => (
+                            <OtpBox key={index} size={boxSize} />
+                        ))}
                     </View>
-                    <View
-                        style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                        }}
-                    >
+                    <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
                         <Text
                             style={{
                                 ...theme.FONTS.Mulish_400Regular,
@@ -96,7 +78,7 @@ const ConfirmationCode: React.FC = ({ navigation }: any) => {
                                 color: theme.COLORS.bodyTextColor,
                             }}
                         >
-                            Didn’t receive the OTP?{" "}
+                            Didn't receive the OTP?{" "}
                         </Text>
                         <TouchableOpacity>
                             <Text
@@ -112,16 +94,7 @@ const ConfirmationCode: React.FC = ({ navigation }: any) => {
                         </TouchableOpacity>
                     </View>
                 </View>
-            </KeyboardAwareScrollView>
-        );
-    };
-
-    return (
-        <SafeAreaView
-            style={{ backgroundColor: theme.COLORS.bgColor, flex: 1 }}
-        >
-            {renderHeader()}
-            {renderContent()}
+            </components.FormScrollView>
         </SafeAreaView>
     );
 };

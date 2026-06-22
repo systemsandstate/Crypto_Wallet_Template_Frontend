@@ -1,4 +1,4 @@
-import { View, Text, ScrollView } from "react-native";
+import { View, Text } from "react-native";
 import React, { useEffect } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch, useSelector } from "react-redux";
@@ -10,13 +10,14 @@ import { components } from "../components";
 import { RootState } from "../store/store";
 import { logoutAndNavigateToSignIn } from "../navigation/logoutAndNavigateToSignIn";
 import { setAvatarUrl } from "../store/authSlice";
-import { TAB_BAR_HEIGHT } from "../navigation/BottomTabBar";
 import { getStoredAvatarUrlAsync } from "../utils/avatarStorage";
 import { confirmAction } from "../utils/confirm";
+import { useTranslation } from "../hooks/useTranslation";
 
 const Profile: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
     const navigation: any = useNavigation();
     const dispatch = useDispatch();
+    const { t } = useTranslation();
     const merchant = useSelector((state: RootState) => state.auth.merchant);
     const avatarUrl = useSelector((state: RootState) => state.auth.avatarUrl);
 
@@ -31,47 +32,48 @@ const Profile: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
 
     const handleLogout = () => {
         confirmAction({
-            title: "Log out",
-            message: "Are you sure you want to log out?",
-            confirmLabel: "Log out",
+            title: t.auth.signOutConfirm,
+            message: t.auth.signOutMessage,
+            confirmLabel: t.auth.signOut,
+            cancelLabel: t.common.cancel,
             destructive: true,
             onConfirm: () => logoutAndNavigateToSignIn(dispatch),
         });
     };
 
     const menu = (
-        <View style={{ paddingHorizontal: 20, paddingVertical: 20 }}>
+        <components.MerchantContent style={{ paddingVertical: 20 }}>
             <components.ProfileCategory
-                title="Edit business info"
+                title={t.profile.editBusinessInfo}
                 icon={<svg.UserOneSvg />}
                 rightElement={<svg.ArrowOneSvg />}
                 onPress={() => navigation.navigate("EditPersonalInfo")}
             />
             <components.ProfileCategory
-                title="Change password"
+                title={t.profile.changePassword}
                 icon={<svg.FaceIdSvg />}
                 rightElement={<svg.ArrowOneSvg />}
                 onPress={() => navigation.navigate("ChangePassword")}
             />
             <components.ProfileCategory
-                title="Privacy policy"
+                title={t.profile.privacyPolicy}
                 icon={<svg.FileTextSvg />}
                 rightElement={<svg.ArrowOneSvg />}
                 onPress={() => navigation.navigate("PrivacyPolicy")}
             />
             <components.ProfileCategory
-                title="Terms of service"
+                title={t.profile.termsOfService}
                 icon={<svg.FileTextSvg />}
                 rightElement={<svg.ArrowOneSvg />}
                 onPress={() => navigation.navigate("FAQ")}
             />
             <components.ProfileCategory
-                title="Log out"
+                title={t.profile.logOut}
                 icon={<svg.LogOutSvg />}
                 titleStyle={{ color: "#FF5887" }}
                 onPress={handleLogout}
             />
-        </View>
+        </components.MerchantContent>
     );
 
     const avatarSection = (
@@ -96,28 +98,24 @@ const Profile: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
         return (
             <View style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
                 <components.MerchantTabHeader
-                    eyebrow="Your account"
-                    title={merchant?.businessName || "Merchant"}
+                    eyebrow={t.profile.yourAccount}
+                    title={merchant?.businessName || t.common.merchant}
                     subtitle={merchant?.email}
                 />
-                <ScrollView
-                    contentContainerStyle={{ flexGrow: 1, paddingBottom: TAB_BAR_HEIGHT + 16 }}
-                    showsVerticalScrollIndicator={false}
-                >
+                <components.ScreenScroll>
                     {avatarSection}
                     {menu}
-                </ScrollView>
+                </components.ScreenScroll>
             </View>
         );
     }
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
-            <components.Header title="Profile" goBack={true} />
-            <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-                <View
+            <components.Header title={t.profile.title} goBack={true} />
+            <components.ScreenScroll withTabBarInset={false}>
+                <components.MerchantContent
                     style={{
-                        paddingHorizontal: 20,
                         paddingTop: 24,
                         paddingBottom: 8,
                         borderBottomWidth: 1,
@@ -132,9 +130,9 @@ const Profile: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                     <Text style={{ ...theme.FONTS.Mulish_400Regular, color: theme.COLORS.bodyTextColor, fontSize: 16 }}>
                         {merchant?.email}
                     </Text>
-                </View>
+                </components.MerchantContent>
                 {menu}
-            </ScrollView>
+            </components.ScreenScroll>
         </SafeAreaView>
     );
 };

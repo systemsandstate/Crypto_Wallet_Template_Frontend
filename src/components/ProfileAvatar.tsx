@@ -8,6 +8,8 @@ import { svg } from "../svg";
 import { RootState } from "../store/store";
 import { setAvatarUrl } from "../store/authSlice";
 import { readImageFileAsDataUrl, validateImageDataUrl } from "../utils/avatarStorage";
+import { useTranslation } from "../hooks/useTranslation";
+import { pickWebImage } from "../utils/pickWebImage";
 
 const DEFAULT_AVATAR = require("../assets/users/07.png");
 
@@ -18,6 +20,7 @@ type Props = {
 
 const ProfileAvatar: React.FC<Props> = ({ size = 88, showEdit = true }) => {
     const dispatch = useDispatch();
+    const { t } = useTranslation();
     const merchant = useSelector((state: RootState) => state.auth.merchant);
     const avatarUrl = useSelector((state: RootState) => state.auth.avatarUrl);
 
@@ -27,7 +30,7 @@ const ProfileAvatar: React.FC<Props> = ({ size = 88, showEdit = true }) => {
             validateImageDataUrl(dataUrl);
             dispatch(setAvatarUrl({ merchantId: merchant.id, avatarUrl: dataUrl }));
         } catch (err: any) {
-            Alert.alert("Photo", err.message || "Could not update photo");
+            Alert.alert(t.profile.changePhoto, err.message || t.profile.photoError);
         }
     };
 
@@ -37,7 +40,7 @@ const ProfileAvatar: React.FC<Props> = ({ size = 88, showEdit = true }) => {
             const dataUrl = await readImageFileAsDataUrl(file);
             applyDataUrl(dataUrl);
         } catch (err: any) {
-            Alert.alert("Photo", err.message || "Could not update photo");
+            Alert.alert(t.profile.changePhoto, err.message || t.profile.photoError);
         }
     };
 
@@ -47,8 +50,8 @@ const ProfileAvatar: React.FC<Props> = ({ size = 88, showEdit = true }) => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== "granted") {
             Alert.alert(
-                "Photo",
-                "Please allow photo library access to change your profile picture."
+                t.profile.changePhoto,
+                t.profile.photoPermission
             );
             return;
         }
@@ -73,15 +76,8 @@ const ProfileAvatar: React.FC<Props> = ({ size = 88, showEdit = true }) => {
     };
 
     const openPicker = () => {
-        if (Platform.OS === "web" && typeof document !== "undefined") {
-            const input = document.createElement("input");
-            input.type = "file";
-            input.accept = "image/*";
-            input.onchange = () => {
-                const file = input.files?.[0];
-                if (file) void applyFile(file);
-            };
-            input.click();
+        if (Platform.OS === "web") {
+            pickWebImage((file) => void applyFile(file));
             return;
         }
         void openNativePicker();
@@ -135,7 +131,7 @@ const ProfileAvatar: React.FC<Props> = ({ size = 88, showEdit = true }) => {
                             color: theme.COLORS.linkColor,
                         }}
                     >
-                        Change photo
+                        {t.profile.changePhoto}
                     </Text>
                 </TouchableOpacity>
             ) : null}

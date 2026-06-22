@@ -1,17 +1,14 @@
-import { CommonActions } from "@react-navigation/native";
 import { Platform } from "react-native";
 
 import { logout } from "../store/authSlice";
 import type { AppDispatch } from "../store/store";
-import { setScreen } from "../store/tabSlice";
-import { navigationRef } from "./navigationRef";
+import { safeReset } from "../utils/safeNavigation";
 
 export function logoutAndNavigateToSignIn(
     dispatch: AppDispatch,
     params?: { sessionExpired?: string }
 ) {
     dispatch(logout());
-    dispatch(setScreen("Dashboard"));
 
     if (Platform.OS === "web") {
         if (typeof window !== "undefined") {
@@ -23,12 +20,5 @@ export function logoutAndNavigateToSignIn(
         return;
     }
 
-    if (navigationRef.isReady()) {
-        navigationRef.dispatch(
-            CommonActions.reset({
-                index: 0,
-                routes: [{ name: "SignIn", params }],
-            })
-        );
-    }
+    safeReset([{ name: "SignIn", params }]);
 }

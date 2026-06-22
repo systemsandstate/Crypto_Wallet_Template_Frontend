@@ -7,10 +7,11 @@ import { components } from "../components";
 import { api } from "../services/api";
 import { setCredentials } from "../store/authSlice";
 import { RootState } from "../store/store";
-import { TAB_BAR_HEIGHT } from "../navigation/BottomTabBar";
+import { useTabBarInset } from "../hooks/useTabBarInset";
 
 const EditPersonalInfo: React.FC = ({ navigation }: any) => {
     const dispatch = useDispatch();
+    const tabBarInset = useTabBarInset();
     const merchant = useSelector((state: RootState) => state.auth.merchant);
     const [businessName, setBusinessName] = useState(merchant?.businessName || "");
     const [phone, setPhone] = useState(merchant?.phone || "");
@@ -43,7 +44,7 @@ const EditPersonalInfo: React.FC = ({ navigation }: any) => {
     return (
         <components.AuthScreenLayout
             header={<components.Header title="Business info" goBack={true} />}
-            cardStyle={{ marginBottom: TAB_BAR_HEIGHT }}
+            cardStyle={{ marginBottom: tabBarInset }}
         >
             <components.InputField
                 placeholder="Business name"

@@ -1,12 +1,14 @@
-import { View, Text, TouchableOpacity, TextInput, Alert } from "react-native";
-import React, { useState } from "react";
+import { View, Text, TouchableOpacity, TextInput, Alert, StyleSheet } from "react-native";
+import React, { memo } from "react";
 import { useNavigation } from "@react-navigation/native";
 
 import { svg } from "../svg";
 import { theme } from "../constants";
+import LanguageTrigger from "./LanguageTrigger";
+import type { LanguageSwitcherTone } from "../context/LanguageSwitcherToneContext";
 
 type Props = {
-    containerStyle?: any;
+    containerStyle?: object;
     goBack?: boolean;
     burgerMenu?: boolean;
     title?: string;
@@ -14,122 +16,118 @@ type Props = {
     search?: boolean;
     bag?: boolean;
     border?: boolean;
-    titleStyle?: any;
+    titleStyle?: object;
     arrowColor?: string;
     fileIcon?: boolean;
     goBackColor?: string;
+    showLanguage?: boolean;
+    languageTone?: LanguageSwitcherTone;
 };
 
 const Header: React.FC<Props> = ({
     containerStyle,
     goBack,
     title,
-    logo,
     search,
-    bag,
     border,
     titleStyle,
-    arrowColor,
     fileIcon,
     goBackColor,
+    showLanguage = true,
+    languageTone = "on-light",
 }) => {
     const navigation: any = useNavigation();
 
-    const cartIsEmpty = () => {
-        return Alert.alert(
-            "Message",
-            "Your cart is empty, add something to cart.",
-            [
-                {
-                    text: "OK",
-                },
-            ]
-        );
-    };
-
     return (
         <View
-            style={{
-                flexDirection: "row",
-                justifyContent: "center",
-                alignItems: "center",
-                height: 47,
-                borderBottomWidth: border ? 1 : 0,
-                ...containerStyle,
-            }}
+            style={[
+                styles.bar,
+                border ? styles.barBorder : null,
+                containerStyle,
+            ]}
         >
             {goBack && (
-                <View
-                    style={{
-                        position: "absolute",
-                        left: 0,
-                        alignItems: "center",
-                    }}
-                >
+                <View style={styles.backSlot}>
                     <TouchableOpacity
-                        style={{
-                            paddingHorizontal: 20,
-                            paddingVertical: 12,
-                        }}
+                        style={styles.backButton}
                         onPress={() => navigation.goBack()}
                     >
                         <svg.GoBackSvg goBackColor={goBackColor} />
                     </TouchableOpacity>
                 </View>
             )}
-            {title && (
-                <Text
-                    style={{
-                        textAlign: "center",
-                        ...theme.FONTS.H4,
-                        color: theme.COLORS.mainDark,
-                        ...titleStyle,
-                    }}
-                >
-                    {title}
-                </Text>
-            )}
+            {title ? (
+                <Text style={[styles.title, titleStyle]}>{title}</Text>
+            ) : null}
             {search && (
-                <View
-                    style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        width: theme.SIZES.width - 200,
-                    }}
-                >
-                    <View style={{ marginRight: 7 }}>
-                        {/* <svg.HeaderSearchSvg /> */}
-                    </View>
-
-                    <TextInput
-                        placeholder="Search"
-                        style={{ height: "100%", width: "100%" }}
-                    />
+                <View style={styles.searchRow}>
+                    <TextInput placeholder="Search" style={styles.searchInput} />
                 </View>
             )}
             {fileIcon && (
-                <TouchableOpacity
-                    style={{
-                        position: "absolute",
-                        right: 0,
-                        height: "100%",
-                        justifyContent: "center",
-                        paddingLeft: 20,
-                    }}
-                >
-                    <View
-                        style={{
-                            paddingHorizontal: 20,
-                            flexDirection: "row",
-                            paddingVertical: 6,
-                        }}
-                    >
-                        <svg.FileTextSvg color={theme.COLORS.white} />
-                    </View>
+                <TouchableOpacity style={styles.fileSlot}>
+                    <svg.FileTextSvg color={theme.COLORS.white} />
                 </TouchableOpacity>
             )}
+            {showLanguage ? (
+                <View style={styles.languageSlot}>
+                    <LanguageTrigger tone={languageTone} />
+                </View>
+            ) : null}
         </View>
     );
 };
 
-export default Header;
+const styles = StyleSheet.create({
+    bar: {
+        flexDirection: "row",
+        justifyContent: "center",
+        alignItems: "center",
+        height: 47,
+        position: "relative",
+    },
+    barBorder: {
+        borderBottomWidth: 1,
+    },
+    backSlot: {
+        position: "absolute",
+        left: 0,
+        alignItems: "center",
+    },
+    backButton: {
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+    },
+    title: {
+        textAlign: "center",
+        ...theme.FONTS.H4,
+        color: theme.COLORS.mainDark,
+    },
+    searchRow: {
+        flex: 1,
+        flexDirection: "row",
+        alignItems: "center",
+        marginHorizontal: 72,
+    },
+    searchInput: {
+        height: "100%",
+        width: "100%",
+    },
+    fileSlot: {
+        position: "absolute",
+        right: 0,
+        height: "100%",
+        justifyContent: "center",
+        paddingHorizontal: 20,
+        paddingVertical: 6,
+    },
+    languageSlot: {
+        position: "absolute",
+        right: 8,
+        top: 0,
+        bottom: 0,
+        justifyContent: "center",
+    },
+});
+
+export default memo(Header);

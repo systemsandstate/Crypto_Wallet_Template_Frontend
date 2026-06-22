@@ -1,8 +1,17 @@
-import { View, Image, StyleSheet, ViewStyle } from "react-native";
-import React from "react";
+import {
+    View,
+    Image,
+    StyleSheet,
+    ViewStyle,
+    Platform,
+    ScrollView,
+    KeyboardAvoidingView,
+} from "react-native";
+import React, { memo } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { theme } from "../constants";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 
 type Props = {
     header?: React.ReactNode;
@@ -11,6 +20,38 @@ type Props = {
 };
 
 const AuthScreenLayout: React.FC<Props> = ({ header, children, cardStyle }) => {
+    const { authCardMaxWidth, horizontalPadding, isCompact } = useResponsiveLayout();
+
+    const card = (
+        <View
+            style={[
+                styles.card,
+                { maxWidth: authCardMaxWidth, paddingHorizontal: isCompact ? 20 : 24 },
+                cardStyle,
+            ]}
+        >
+            {children}
+        </View>
+    );
+
+    const bodyContent = (
+        <View style={[styles.centeredBody, { paddingHorizontal: horizontalPadding }]}>
+            {card}
+        </View>
+    );
+
+    const scrollBody = (
+        <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+            keyboardDismissMode="on-drag"
+            style={styles.flex}
+        >
+            {bodyContent}
+        </ScrollView>
+    );
+
     return (
         <View style={styles.root}>
             <Image
@@ -19,9 +60,15 @@ const AuthScreenLayout: React.FC<Props> = ({ header, children, cardStyle }) => {
                 resizeMode="cover"
             />
             <View style={styles.overlay} />
-            <SafeAreaView style={styles.safe}>
+            <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
                 {header}
-                <View style={[styles.card, cardStyle]}>{children}</View>
+                {Platform.OS === "ios" ? (
+                    <KeyboardAvoidingView style={styles.flex} behavior="padding">
+                        {scrollBody}
+                    </KeyboardAvoidingView>
+                ) : (
+                    scrollBody
+                )}
             </SafeAreaView>
         </View>
     );
@@ -32,12 +79,12 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: theme.COLORS.bgColor,
     },
+    flex: {
+        flex: 1,
+        minHeight: 0,
+    },
     background: {
-        position: "absolute",
-        top: 0,
-        left: 0,
-        width: theme.SIZES.width,
-        height: theme.SIZES.height,
+        ...StyleSheet.absoluteFill,
     },
     overlay: {
         ...StyleSheet.absoluteFill,
@@ -46,20 +93,34 @@ const styles = StyleSheet.create({
     safe: {
         flex: 1,
     },
+    scrollContent: {
+        flexGrow: 1,
+        justifyContent: "center",
+        paddingVertical: 20,
+    },
+    centeredBody: {
+        width: "100%",
+        alignItems: "center",
+        justifyContent: "center",
+    },
     card: {
-        marginHorizontal: 20,
-        marginTop: 12,
-        marginBottom: 24,
+        width: "100%",
         backgroundColor: theme.COLORS.white,
         borderRadius: 20,
-        paddingHorizontal: 24,
         paddingVertical: 28,
-        shadowColor: "#062664",
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.1,
-        shadowRadius: 24,
-        elevation: 6,
+        ...(Platform.OS === "android"
+            ? { elevation: 8 }
+            : Platform.OS === "web"
+              ? ({
+                    boxShadow: "0 12px 40px rgba(6, 38, 100, 0.12)",
+                } as object)
+              : {
+                    shadowColor: "#062664",
+                    shadowOffset: { width: 0, height: 12 },
+                    shadowOpacity: 0.14,
+                    shadowRadius: 28,
+                }),
     },
 });
 
-export default AuthScreenLayout;
+export default memo(AuthScreenLayout);

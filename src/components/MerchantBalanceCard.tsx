@@ -1,9 +1,10 @@
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Platform } from "react-native";
 import React from "react";
 import { Shadow } from "react-native-shadow-2";
 
 import { theme } from "../constants";
 import { svg } from "../svg";
+import { useTranslation } from "../hooks/useTranslation";
 
 type Props = {
     businessName: string;
@@ -14,9 +15,9 @@ type Props = {
     accountLabel?: string;
 };
 
-const formatAmount = (value: number) => {
+const formatAmount = (value: number, locale: string) => {
     const safe = Number.isFinite(value) ? value : 0;
-    return safe.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return safe.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
 const MerchantBalanceCard: React.FC<Props> = ({
@@ -27,7 +28,68 @@ const MerchantBalanceCard: React.FC<Props> = ({
     paidCount,
     accountLabel,
 }) => {
-    const [whole, fraction = "00"] = formatAmount(totalReceived).split(".");
+    const { t, dateLocale } = useTranslation();
+    const [whole, fraction = "00"] = formatAmount(totalReceived, dateLocale).split(".");
+
+    const cardBody = (
+        <>
+            <View style={styles.topRow}>
+                <View style={styles.chip}>
+                    <View style={styles.chipLine} />
+                    <View style={[styles.chipLine, styles.chipLineMid]} />
+                    <View style={styles.chipLine} />
+                </View>
+                <Text style={styles.network}>{t.balance.multiChain}</Text>
+            </View>
+
+            <Text style={styles.account}>{accountLabel || t.balance.merchantWallet}</Text>
+
+            <View style={styles.balanceRow}>
+                <Text style={styles.balanceWhole}>{whole}</Text>
+                <Text style={styles.balanceFraction}>.{fraction}</Text>
+                <Text style={styles.balanceCurrency}>USDT</Text>
+            </View>
+
+            <Text style={styles.balanceLabel}>{t.balance.totalReceived}</Text>
+
+            <View style={styles.bottomRow}>
+                <View style={styles.bottomLeft}>
+                    <Text style={styles.metaLabel}>{t.common.merchant}</Text>
+                    <Text style={styles.merchantName} numberOfLines={1}>
+                        {(businessName || t.common.merchant).toUpperCase()}
+                    </Text>
+                </View>
+
+                <View style={styles.bottomRight}>
+                    <View style={styles.statsRow}>
+                        <View style={styles.statBlock}>
+                            <Text style={styles.metaLabel}>{t.balance.pending}</Text>
+                            <Text style={styles.statValue}>{pendingCount}</Text>
+                            <Text style={styles.statSub}>{formatAmount(pendingAmount, dateLocale)}</Text>
+                        </View>
+                        <View style={styles.statDivider} />
+                        <View style={styles.statBlock}>
+                            <Text style={styles.metaLabel}>{t.balance.paid}</Text>
+                            <Text style={[styles.statValue, { color: "#7BE0B8" }]}>{paidCount}</Text>
+                            <Text style={styles.statSub}>{t.balance.recent}</Text>
+                        </View>
+                    </View>
+                    <View style={styles.brandMark}>
+                        <svg.UsdtMarkSvg size={28} />
+                        <Text style={styles.brandTitle}>USDT</Text>
+                    </View>
+                </View>
+            </View>
+        </>
+    );
+
+    if (Platform.OS === "android") {
+        return (
+            <View style={styles.androidShadowWrap}>
+                <View style={[styles.card, styles.cardAndroid]}>{cardBody}</View>
+            </View>
+        );
+    }
 
     return (
         <Shadow
@@ -38,53 +100,7 @@ const MerchantBalanceCard: React.FC<Props> = ({
             containerStyle={styles.shadowWrap}
             style={styles.card}
         >
-            <View style={styles.topRow}>
-                <View style={styles.chip}>
-                    <View style={styles.chipLine} />
-                    <View style={[styles.chipLine, styles.chipLineMid]} />
-                    <View style={styles.chipLine} />
-                </View>
-                <Text style={styles.network}>USDT · Multi-chain</Text>
-            </View>
-
-            <Text style={styles.account}>{accountLabel || "Merchant wallet"}</Text>
-
-            <View style={styles.balanceRow}>
-                <Text style={styles.balanceWhole}>{whole}</Text>
-                <Text style={styles.balanceFraction}>.{fraction}</Text>
-                <Text style={styles.balanceCurrency}>USDT</Text>
-            </View>
-
-            <Text style={styles.balanceLabel}>Total received</Text>
-
-            <View style={styles.bottomRow}>
-                <View style={styles.bottomLeft}>
-                    <Text style={styles.metaLabel}>Merchant</Text>
-                    <Text style={styles.merchantName} numberOfLines={1}>
-                        {(businessName || "Merchant").toUpperCase()}
-                    </Text>
-                </View>
-
-                <View style={styles.bottomRight}>
-                    <View style={styles.statsRow}>
-                        <View style={styles.statBlock}>
-                            <Text style={styles.metaLabel}>Pending</Text>
-                            <Text style={styles.statValue}>{pendingCount}</Text>
-                            <Text style={styles.statSub}>{formatAmount(pendingAmount)}</Text>
-                        </View>
-                        <View style={styles.statDivider} />
-                        <View style={styles.statBlock}>
-                            <Text style={styles.metaLabel}>Paid</Text>
-                            <Text style={[styles.statValue, { color: "#7BE0B8" }]}>{paidCount}</Text>
-                            <Text style={styles.statSub}>recent</Text>
-                        </View>
-                    </View>
-                    <View style={styles.brandMark}>
-                        <svg.UsdtMarkSvg size={28} />
-                        <Text style={styles.brandTitle}>USDT</Text>
-                    </View>
-                </View>
-            </View>
+            {cardBody}
         </Shadow>
     );
 };
@@ -92,6 +108,11 @@ const MerchantBalanceCard: React.FC<Props> = ({
 const styles = StyleSheet.create({
     shadowWrap: {
         width: "100%",
+    },
+    androidShadowWrap: {
+        width: "100%",
+        elevation: 8,
+        shadowColor: "#062664",
     },
     card: {
         width: "100%",
@@ -101,6 +122,9 @@ const styles = StyleSheet.create({
         paddingTop: 22,
         paddingBottom: 20,
         overflow: "hidden",
+    },
+    cardAndroid: {
+        elevation: 0,
     },
     topRow: {
         flexDirection: "row",

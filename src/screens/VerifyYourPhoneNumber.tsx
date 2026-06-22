@@ -9,7 +9,6 @@ import {
 } from "react-native";
 import React, { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { Shadow } from "react-native-shadow-2";
 
 import { svg } from "../svg";
@@ -25,7 +24,7 @@ const VerifyYourPhoneNumber: React.FC = ({ navigation }: any) => {
 
     const renderContent = () => {
         return (
-            <KeyboardAwareScrollView
+            <components.FormScrollView
                 contentContainerStyle={{ paddingHorizontal: 20 }}
             >
                 <Text
@@ -58,7 +57,7 @@ const VerifyYourPhoneNumber: React.FC = ({ navigation }: any) => {
                     title="Confirm"
                     onPress={() => navigation.navigate("SignUpAccountCreated")}
                 />
-            </KeyboardAwareScrollView>
+            </components.FormScrollView>
         );
     };
 

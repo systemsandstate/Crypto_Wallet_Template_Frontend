@@ -9,7 +9,6 @@ import {
 import React from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Shadow } from "react-native-shadow-2";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 import { theme } from "../constants";
 import { components } from "../components";
@@ -21,13 +20,12 @@ const ChangePinCode: React.FC = () => {
 
     const renderContent = () => {
         return (
-            <KeyboardAwareScrollView
+            <components.FormScrollView
                 contentContainerStyle={{
                     flexGrow: 1,
                     paddingHorizontal: 20,
                     paddingTop: 10,
                 }}
-                enableOnAndroid={true}
                 showsVerticalScrollIndicator={false}
             >
                 <components.InputField
@@ -64,7 +62,7 @@ const ChangePinCode: React.FC = () => {
                     title="Save"
                     containerStyle={{ marginBottom: 20 }}
                 />
-            </KeyboardAwareScrollView>
+            </components.FormScrollView>
         );
     };
 

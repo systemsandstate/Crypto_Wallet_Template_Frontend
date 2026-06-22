@@ -1,6 +1,5 @@
 import { Text, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import React, { useState } from "react";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 import { theme } from "../constants";
 import { components } from "../components";
@@ -42,8 +41,7 @@ const NewPassword: React.FC = ({ navigation, route }: any) => {
         <components.AuthScreenLayout
             header={<components.Header title="New password" goBack={true} />}
         >
-            <KeyboardAwareScrollView showsVerticalScrollIndicator={false}>
-                <Text
+            <Text
                     style={{
                         ...theme.FONTS.H3,
                         color: theme.COLORS.mainDark,
@@ -94,7 +92,6 @@ const NewPassword: React.FC = ({ navigation, route }: any) => {
                 ) : (
                     <components.Button title="Change Password" onPress={handleReset} />
                 )}
-            </KeyboardAwareScrollView>
         </components.AuthScreenLayout>
     );
 };

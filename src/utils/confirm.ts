@@ -1,5 +1,7 @@
 import { Alert, Platform } from "react-native";
 
+import { blurActiveElement } from "./blurActiveElement";
+
 type ConfirmOptions = {
     title: string;
     message: string;
@@ -18,6 +20,7 @@ export function confirmAction({
     onConfirm,
 }: ConfirmOptions) {
     if (Platform.OS === "web") {
+        blurActiveElement();
         if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
             onConfirm();
         }

@@ -4,9 +4,10 @@ import React, { useState } from "react";
 import { theme } from "../constants";
 import { components } from "../components";
 import { api } from "../services/api";
-import { TAB_BAR_HEIGHT } from "../navigation/BottomTabBar";
+import { useTabBarInset } from "../hooks/useTabBarInset";
 
 const ChangePassword: React.FC = ({ navigation }: any) => {
+    const tabBarInset = useTabBarInset();
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
@@ -33,7 +34,7 @@ const ChangePassword: React.FC = ({ navigation }: any) => {
     return (
         <components.AuthScreenLayout
             header={<components.Header title="Change password" goBack={true} />}
-            cardStyle={{ marginBottom: TAB_BAR_HEIGHT }}
+            cardStyle={{ marginBottom: tabBarInset }}
         >
             <Text
                 style={{

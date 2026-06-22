@@ -1,4 +1,8 @@
+import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
+
+const TOKEN_STORAGE_KEY = 'accessToken';
 
 export interface Merchant {
   id: string;
@@ -43,21 +47,56 @@ export const setUnauthorizedHandler = (handler: ((message: string) => void) | nu
   onUnauthorized = handler;
 };
 
-export const setAuthToken = (token: string | null) => {
-  authToken = token;
-  if (typeof localStorage !== 'undefined') {
-    if (token) localStorage.setItem('accessToken', token);
-    else localStorage.removeItem('accessToken');
+const readWebToken = (): string | null => {
+  if (Platform.OS !== 'web' || typeof localStorage === 'undefined') return null;
+  try {
+    return localStorage.getItem(TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
   }
 };
 
-export const getAuthToken = (): string | null => {
-  if (authToken) return authToken;
-  if (typeof localStorage !== 'undefined') {
-    authToken = localStorage.getItem('accessToken');
+const writeWebToken = (token: string | null) => {
+  if (Platform.OS !== 'web' || typeof localStorage === 'undefined') return;
+  try {
+    if (token) localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    else localStorage.removeItem(TOKEN_STORAGE_KEY);
+  } catch {
+    // ignore
   }
-  return authToken;
 };
+
+const readNativeToken = async (): Promise<string | null> => {
+  if (Platform.OS === 'web') return null;
+  try {
+    return await AsyncStorage.getItem(TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+};
+
+const writeNativeToken = (token: string | null) => {
+  if (Platform.OS === 'web') return;
+  if (token) void AsyncStorage.setItem(TOKEN_STORAGE_KEY, token);
+  else void AsyncStorage.removeItem(TOKEN_STORAGE_KEY);
+};
+
+export async function hydrateAuthToken(): Promise<string | null> {
+  if (Platform.OS === 'web') {
+    authToken = readWebToken();
+    return authToken;
+  }
+  authToken = await readNativeToken();
+  return authToken;
+}
+
+export const setAuthToken = (token: string | null) => {
+  authToken = token;
+  writeWebToken(token);
+  writeNativeToken(token);
+};
+
+export const getAuthToken = (): string | null => authToken;
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken();

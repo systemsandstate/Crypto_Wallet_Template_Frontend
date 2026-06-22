@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, Platform, Pressable } from "react-native";
+import { View, Text, TouchableOpacity, Platform, Pressable, StyleSheet } from "react-native";
 import React, { useState } from "react";
 import { Shadow } from "react-native-shadow-2";
 import { theme } from "../constants";
@@ -11,6 +11,8 @@ type Props = {
     rightElement?: React.ReactElement;
     toggleButton?: boolean;
 };
+
+const ICON_SIZE = 24;
 
 const ProfileCategory: React.FC<Props> = ({
     onPress,
@@ -60,7 +62,7 @@ const ProfileCategory: React.FC<Props> = ({
                     <View
                         style={{ flexDirection: "row", alignItems: "center" }}
                     >
-                        {icon && icon}
+                        {icon ? <View style={styles.iconSlot}>{icon}</View> : null}
                         <Text
                             style={{
                                 marginLeft: 10,
@@ -112,5 +114,14 @@ const ProfileCategory: React.FC<Props> = ({
         </View>
     );
 };
+
+const styles = StyleSheet.create({
+    iconSlot: {
+        width: ICON_SIZE,
+        height: ICON_SIZE,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+});
 
 export default ProfileCategory;

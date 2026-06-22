@@ -1,4 +1,9 @@
 import 'react-native-gesture-handler';
+import { enableScreens } from 'react-native-screens';
+
+// Avoids native-screen + TextInput crashes in Expo Go on Android.
+enableScreens(false);
+
 import { registerRootComponent } from 'expo';
 
 import App from './App';

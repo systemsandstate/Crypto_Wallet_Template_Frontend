@@ -6,6 +6,7 @@ import { screens } from "../screens";
 const stackScreenOptions = {
     headerShown: false,
     gestureEnabled: false,
+    freezeOnBlur: false,
     contentStyle: { backgroundColor: "transparent" },
 };
 
