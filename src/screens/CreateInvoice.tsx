@@ -107,6 +107,7 @@ const CreateInvoice: React.FC = () => {
                     />
                     <components.InputField
                         placeholder={t.payment.referencePlaceholder}
+                        hint={t.payment.referenceHint}
                         value={reference}
                         onChangeText={setReference}
                         containerStyle={{ marginBottom: 14 }}

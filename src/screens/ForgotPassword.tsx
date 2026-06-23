@@ -5,14 +5,16 @@ import { theme } from "../constants";
 import { components } from "../components";
 import { svg } from "../svg";
 import { api } from "../services/api";
+import { useTranslation } from "../hooks/useTranslation";
 
 const ForgotPassword: React.FC = ({ navigation }: any) => {
+    const { t } = useTranslation();
     const [email, setEmail] = useState("");
     const [loading, setLoading] = useState(false);
 
     const handleSend = async () => {
         if (!email.trim()) {
-            Alert.alert("Error", "Please enter your email address");
+            Alert.alert(t.common.error, t.auth.enterEmail);
             return;
         }
         setLoading(true);
@@ -20,7 +22,7 @@ const ForgotPassword: React.FC = ({ navigation }: any) => {
             await api.forgotPassword({ email: email.trim() });
             navigation.navigate("ForgotPasswordSentEmail", { mode: "email_sent" });
         } catch (err: any) {
-            Alert.alert("Error", err.message || "Could not send reset email");
+            Alert.alert(t.common.error, err.message || t.auth.couldNotSendReset);
         } finally {
             setLoading(false);
         }
@@ -28,7 +30,7 @@ const ForgotPassword: React.FC = ({ navigation }: any) => {
 
     return (
         <components.AuthScreenLayout
-            header={<components.Header title="Forgot Password" goBack={true} />}
+            header={<components.Header title={t.auth.forgotPasswordTitle} goBack={true} />}
         >
             <Text
                 style={{
@@ -38,7 +40,7 @@ const ForgotPassword: React.FC = ({ navigation }: any) => {
                     textAlign: "center",
                 }}
             >
-                Reset password
+                {t.auth.resetPassword}
             </Text>
             <Text
                 style={{
@@ -50,10 +52,10 @@ const ForgotPassword: React.FC = ({ navigation }: any) => {
                     textAlign: "center",
                 }}
             >
-                Enter your email address. You will receive a link to create a new password via email.
+                {t.auth.resetPasswordInstructions}
             </Text>
             <components.InputField
-                placeholder="your@email.com"
+                placeholder={t.auth.emailPlaceholder}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -64,7 +66,7 @@ const ForgotPassword: React.FC = ({ navigation }: any) => {
             {loading ? (
                 <ActivityIndicator size="large" color={theme.COLORS.mainDark} />
             ) : (
-                <components.Button title="Send" onPress={handleSend} />
+                <components.Button title={t.common.send} onPress={handleSend} />
             )}
         </components.AuthScreenLayout>
     );

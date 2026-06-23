@@ -5,8 +5,10 @@ import { theme } from "../constants";
 import { components } from "../components";
 import { svg } from "../svg";
 import { api } from "../services/api";
+import { useTranslation } from "../hooks/useTranslation";
 
 const NewPassword: React.FC = ({ navigation, route }: any) => {
+    const { t } = useTranslation();
     const resetToken: string = route.params?.resetToken || "";
     const [password, setPassword] = useState("");
     const [confirm, setConfirm] = useState("");
@@ -15,15 +17,15 @@ const NewPassword: React.FC = ({ navigation, route }: any) => {
 
     const handleReset = async () => {
         if (!resetToken) {
-            Alert.alert("Error", "Invalid reset link. Please request a new one.");
+            Alert.alert(t.common.error, t.auth.invalidResetLink);
             return;
         }
         if (password.length < 8) {
-            Alert.alert("Error", "Password must be at least 8 characters");
+            Alert.alert(t.common.error, t.auth.passwordMin8);
             return;
         }
         if (password !== confirm) {
-            Alert.alert("Error", "Passwords do not match");
+            Alert.alert(t.common.error, t.auth.passwordsNotMatch);
             return;
         }
         setLoading(true);
@@ -31,7 +33,7 @@ const NewPassword: React.FC = ({ navigation, route }: any) => {
             await api.resetPassword({ token: resetToken, newPassword: password });
             navigation.navigate("ForgotPasswordSentEmail", { mode: "success" });
         } catch (err: any) {
-            Alert.alert("Error", err.message || "Could not reset password");
+            Alert.alert(t.common.error, err.message || t.auth.couldNotResetPassword);
         } finally {
             setLoading(false);
         }
@@ -39,59 +41,59 @@ const NewPassword: React.FC = ({ navigation, route }: any) => {
 
     return (
         <components.AuthScreenLayout
-            header={<components.Header title="New password" goBack={true} />}
+            header={<components.Header title={t.auth.newPasswordTitle} goBack={true} />}
         >
             <Text
-                    style={{
-                        ...theme.FONTS.H3,
-                        color: theme.COLORS.mainDark,
-                        marginBottom: 12,
-                        textAlign: "center",
-                    }}
-                >
-                    Choose a new password
-                </Text>
-                <Text
-                    style={{
-                        ...theme.FONTS.Mulish_400Regular,
-                        fontSize: 16,
-                        color: theme.COLORS.bodyTextColor,
-                        lineHeight: 16 * 1.7,
-                        marginBottom: 24,
-                        textAlign: "center",
-                    }}
-                >
-                    Enter new password and confirm.
-                </Text>
-                <components.InputField
-                    placeholder="••••••••"
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry={!showPassword}
-                    containerStyle={{ marginBottom: 10 }}
-                    icon={
-                        <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                            <svg.EyeOffSvg />
-                        </TouchableOpacity>
-                    }
-                />
-                <components.InputField
-                    placeholder="••••••••"
-                    value={confirm}
-                    onChangeText={setConfirm}
-                    secureTextEntry={!showPassword}
-                    containerStyle={{ marginBottom: 20 }}
-                    icon={
-                        <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                            <svg.EyeOffSvg />
-                        </TouchableOpacity>
-                    }
-                />
-                {loading ? (
-                    <ActivityIndicator size="large" color={theme.COLORS.mainDark} />
-                ) : (
-                    <components.Button title="Change Password" onPress={handleReset} />
-                )}
+                style={{
+                    ...theme.FONTS.H3,
+                    color: theme.COLORS.mainDark,
+                    marginBottom: 12,
+                    textAlign: "center",
+                }}
+            >
+                {t.auth.chooseNewPassword}
+            </Text>
+            <Text
+                style={{
+                    ...theme.FONTS.Mulish_400Regular,
+                    fontSize: 16,
+                    color: theme.COLORS.bodyTextColor,
+                    lineHeight: 16 * 1.7,
+                    marginBottom: 24,
+                    textAlign: "center",
+                }}
+            >
+                {t.auth.enterNewPasswordConfirm}
+            </Text>
+            <components.InputField
+                placeholder="••••••••"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                containerStyle={{ marginBottom: 10 }}
+                icon={
+                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                        <svg.EyeOffSvg />
+                    </TouchableOpacity>
+                }
+            />
+            <components.InputField
+                placeholder="••••••••"
+                value={confirm}
+                onChangeText={setConfirm}
+                secureTextEntry={!showPassword}
+                containerStyle={{ marginBottom: 20 }}
+                icon={
+                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                        <svg.EyeOffSvg />
+                    </TouchableOpacity>
+                }
+            />
+            {loading ? (
+                <ActivityIndicator size="large" color={theme.COLORS.mainDark} />
+            ) : (
+                <components.Button title={t.auth.changePasswordButton} onPress={handleReset} />
+            )}
         </components.AuthScreenLayout>
     );
 };

@@ -5,8 +5,10 @@ import { theme } from "../constants";
 import { components } from "../components";
 import { api } from "../services/api";
 import { useTabBarInset } from "../hooks/useTabBarInset";
+import { useTranslation } from "../hooks/useTranslation";
 
 const ChangePassword: React.FC = ({ navigation }: any) => {
+    const { t } = useTranslation();
     const tabBarInset = useTabBarInset();
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
@@ -15,17 +17,17 @@ const ChangePassword: React.FC = ({ navigation }: any) => {
 
     const handleSubmit = async () => {
         if (newPassword !== confirmPassword) {
-            Alert.alert("Error", "New passwords do not match");
+            Alert.alert(t.common.error, t.account.passwordsDoNotMatch);
             return;
         }
         setLoading(true);
         try {
             await api.changePassword({ currentPassword, newPassword });
-            Alert.alert("Success", "Password updated", [
-                { text: "OK", onPress: () => navigation.goBack() },
+            Alert.alert(t.common.success, t.account.passwordUpdated, [
+                { text: t.common.ok, onPress: () => navigation.goBack() },
             ]);
         } catch (err: any) {
-            Alert.alert("Error", err.message || "Could not change password");
+            Alert.alert(t.common.error, err.message || t.account.couldNotChangePassword);
         } finally {
             setLoading(false);
         }
@@ -33,7 +35,7 @@ const ChangePassword: React.FC = ({ navigation }: any) => {
 
     return (
         <components.AuthScreenLayout
-            header={<components.Header title="Change password" goBack={true} />}
+            header={<components.Header title={t.account.changePasswordTitle} goBack={true} />}
             cardStyle={{ marginBottom: tabBarInset }}
         >
             <Text
@@ -45,33 +47,33 @@ const ChangePassword: React.FC = ({ navigation }: any) => {
                     textAlign: "center",
                 }}
             >
-                Update your account password
+                {t.account.updatePasswordDescription}
             </Text>
             <components.InputField
-                placeholder="Current password"
+                placeholder={t.account.currentPassword}
                 value={currentPassword}
                 onChangeText={setCurrentPassword}
                 secureTextEntry
                 containerStyle={{ marginBottom: 14 }}
             />
             <components.InputField
-                placeholder="New password"
+                placeholder={t.account.newPassword}
                 value={newPassword}
                 onChangeText={setNewPassword}
                 secureTextEntry
                 containerStyle={{ marginBottom: 14 }}
             />
             <components.InputField
-                placeholder="Confirm new password"
+                placeholder={t.account.confirmNewPassword}
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 secureTextEntry
                 containerStyle={{ marginBottom: 20 }}
             />
             {loading ? (
-                <ActivityIndicator color={theme.COLORS.mainDark} />
+                <ActivityIndicator size="large" color={theme.COLORS.mainDark} />
             ) : (
-                <components.Button title="Update password" onPress={handleSubmit} />
+                <components.Button title={t.account.updatePassword} onPress={handleSubmit} />
             )}
         </components.AuthScreenLayout>
     );

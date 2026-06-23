@@ -2,7 +2,9 @@ import { View, Text, TouchableOpacity, ScrollView } from "react-native";
 import React from "react";
 
 import { theme } from "../constants";
-import { NETWORK_LABELS, USDT_NETWORKS, UsdtNetwork } from "../constants/usdtNetworks";
+import { USDT_NETWORKS, UsdtNetwork } from "../constants/usdtNetworks";
+import { getLocalizedNetworkLabel } from "../i18n/network";
+import { useTranslation } from "../hooks/useTranslation";
 import NetworkLogo from "./NetworkLogo";
 
 type Props = {
@@ -11,6 +13,8 @@ type Props = {
 };
 
 const NetworkSelector: React.FC<Props> = ({ value, onChange }) => {
+    const { t } = useTranslation();
+
     return (
         <View style={{ marginBottom: 20 }}>
             <Text
@@ -21,7 +25,7 @@ const NetworkSelector: React.FC<Props> = ({ value, onChange }) => {
                     marginBottom: 10,
                 }}
             >
-                USDT network
+                {t.network.usdtNetwork}
             </Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 8 }}>
                 {USDT_NETWORKS.map((network) => {
@@ -61,7 +65,7 @@ const NetworkSelector: React.FC<Props> = ({ value, onChange }) => {
                                     color: selected ? "#CED6E1" : theme.COLORS.bodyTextColor,
                                 }}
                             >
-                                {NETWORK_LABELS[network]}
+                                {getLocalizedNetworkLabel(network, t)}
                             </Text>
                         </TouchableOpacity>
                     );

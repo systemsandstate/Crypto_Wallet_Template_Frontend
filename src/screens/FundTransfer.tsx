@@ -19,8 +19,10 @@ import { svg } from "../svg";
 import { api, PaymentRequest } from "../services/api";
 import { RootState } from "../store/store";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
+import { useTranslation } from "../hooks/useTranslation";
+import { formatMessage } from "../i18n";
+import { getLocalizedNetworkLabel } from "../i18n/network";
 import {
-    NETWORK_LABELS,
     USDT_NETWORKS,
     UsdtNetwork,
     formatUsdtNetwork,
@@ -38,6 +40,7 @@ const formatAmount = (value: number) =>
     Number.isFinite(value) ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00";
 
 const FundTransfer: React.FC = () => {
+    const { t } = useTranslation();
     const merchant = useSelector((state: RootState) => state.auth.merchant);
     const { width, horizontalPadding } = useResponsiveLayout();
     const walletCardWidth = Math.min(300, width - horizontalPadding * 2);
@@ -75,16 +78,22 @@ const FundTransfer: React.FC = () => {
     const handleSend = () => {
         const num = parseFloat(amount);
         if (!num || num <= 0) {
-            Alert.alert("Error", "Enter a valid amount");
+            Alert.alert(t.common.error, t.payment.invalidAmount);
             return;
         }
         if (!address.trim()) {
-            Alert.alert("Error", "Enter a wallet address");
+            Alert.alert(t.common.error, t.withdraw.enterWalletAddress);
             return;
         }
+        const note = comment.trim() ? `\n${t.transfer.notePrefix} ${comment.trim()}` : "";
         Alert.alert(
-            "Transfer request",
-            `USDT transfers will be processed once payout is enabled for your merchant account.\n\nAmount: ${num} USDT\nNetwork: ${network}\nTo: ${address.trim()}${comment.trim() ? `\nNote: ${comment.trim()}` : ""}`
+            t.transfer.transferRequest,
+            formatMessage(t.transfer.transferMessage, {
+                amount: String(num),
+                network,
+                address: address.trim(),
+                note,
+            })
         );
     };
 
@@ -98,7 +107,7 @@ const FundTransfer: React.FC = () => {
             }}
         >
             <View style={{ marginBottom: 14, marginLeft: 20, marginTop: 14 }}>
-                <Text style={{ ...theme.FONTS.H5, color: theme.COLORS.mainDark }}>Latest fund transfers</Text>
+                <Text style={{ ...theme.FONTS.H5, color: theme.COLORS.mainDark }}>{t.transfer.latestTransfers}</Text>
             </View>
             {loading ? (
                 <ActivityIndicator color={theme.COLORS.mainDark} style={{ marginBottom: 16 }} />
@@ -111,7 +120,7 @@ const FundTransfer: React.FC = () => {
                         fontSize: 13,
                     }}
                 >
-                    Paid transfers will appear here.
+                    {t.transfer.noTransfers}
                 </Text>
             ) : (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 20 }}>
@@ -142,7 +151,7 @@ const FundTransfer: React.FC = () => {
 
     const renderUseWallet = () => (
         <View style={{ marginBottom: 14 }}>
-            <components.SmallHeader title="Use wallet" containerStyle={{ marginBottom: 6, marginLeft: 20 }} />
+            <components.SmallHeader title={t.transfer.useWallet} containerStyle={{ marginBottom: 6, marginLeft: 20 }} />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 20 }}>
                 {USDT_NETWORKS.map((item) => {
                     const selected = selectedWallet === item;
@@ -170,13 +179,13 @@ const FundTransfer: React.FC = () => {
                                         USDT · {item}
                                     </Text>
                                     <Text style={{ ...theme.FONTS.Mulish_400Regular, fontSize: 12, color: theme.COLORS.bodyTextColor }}>
-                                        {NETWORK_LABELS[item]}
+                                        {getLocalizedNetworkLabel(item, t)}
                                     </Text>
                                 </View>
                                 <svg.UsdtMarkSvg size={22} />
                             </View>
                             <Text style={{ ...theme.FONTS.Mulish_400Regular, fontSize: 12, color: theme.COLORS.bodyTextColor }}>
-                                {merchant?.businessName || "Merchant wallet"}
+                                {merchant?.businessName || t.balance.merchantWallet}
                             </Text>
                             <Text style={{ ...theme.FONTS.H6, color: theme.COLORS.mainDark, marginTop: 4 }}>
                                 {formatAmount(balance)} USDT
@@ -190,7 +199,7 @@ const FundTransfer: React.FC = () => {
 
     const renderSendMoney = () => (
         <View>
-            <components.SmallHeader title="Send money to:" containerStyle={{ marginBottom: 6, marginLeft: 20 }} />
+            <components.SmallHeader title={t.transfer.sendMoneyTo} containerStyle={{ marginBottom: 6, marginLeft: 20 }} />
             <View style={{ paddingHorizontal: 20 }}>
                 <components.NetworkSelector value={network} onChange={setNetwork} />
                 <View
@@ -207,7 +216,7 @@ const FundTransfer: React.FC = () => {
                 >
                     <components.NetworkLogo network={network} size={18} />
                     <TextInput
-                        placeholder="Enter wallet address"
+                        placeholder={t.transfer.enterWalletAddress}
                         value={address}
                         onChangeText={setAddress}
                         placeholderTextColor="#868698"
@@ -224,7 +233,7 @@ const FundTransfer: React.FC = () => {
                     </TouchableOpacity>
                 </View>
                 <components.InputField
-                    placeholder="Amount (USDT)"
+                    placeholder={t.payment.amountPlaceholder}
                     value={amount}
                     onChangeText={setAmount}
                     keyboardType="numeric"
@@ -241,7 +250,7 @@ const FundTransfer: React.FC = () => {
                     }}
                 >
                     <TextInput
-                        placeholder="Comment"
+                        placeholder={t.transfer.comment}
                         value={comment}
                         onChangeText={setComment}
                         placeholderTextColor="#868698"
@@ -257,7 +266,7 @@ const FundTransfer: React.FC = () => {
                     />
                 </View>
                 <components.SmallHeader
-                    title={`${formatUsdtNetwork(network)} · Network fee varies`}
+                    title={`${formatUsdtNetwork(network)} · ${t.transfer.networkFeeVaries}`}
                     containerStyle={{ marginBottom: 18 }}
                 />
             </View>
@@ -266,7 +275,7 @@ const FundTransfer: React.FC = () => {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
-            <components.Header title="Fund transfer" goBack={true} />
+            <components.Header title={t.transfer.title} goBack={true} />
             <components.FormScrollView
                 contentContainerStyle={{ flexGrow: 1, paddingBottom: 16 }}
                 showsVerticalScrollIndicator={false}
@@ -275,7 +284,7 @@ const FundTransfer: React.FC = () => {
                 {renderUseWallet()}
                 {renderSendMoney()}
                 <components.Button
-                    title="Send"
+                    title={t.transfer.send}
                     onPress={handleSend}
                     containerStyle={{ paddingHorizontal: 20, marginBottom: 20 }}
                 />

@@ -4,10 +4,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { theme } from "../constants";
 import { components } from "../components";
-import { NETWORK_LABELS } from "../constants/usdtNetworks";
 import { api, PaymentRequest } from "../services/api";
+import { useTranslation } from "../hooks/useTranslation";
+import { getLocalizedNetworkLabel } from "../i18n/network";
+import { USDT_NETWORKS, UsdtNetwork } from "../constants/usdtNetworks";
 
 const InvoiceSent: React.FC = ({ navigation, route }: any) => {
+    const { t } = useTranslation();
     const initial: PaymentRequest = route.params?.payment;
     const [payment, setPayment] = useState<PaymentRequest | null>(initial || null);
     const [cancelling, setCancelling] = useState(false);
@@ -30,12 +33,21 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
         return () => clearInterval(interval);
     }, [payment?.id, payment?.status]);
 
+    const getStatusTitle = () => {
+        if (!payment) return "";
+        if (payment.status === "PAID") return t.payment.statusSuccess + "!";
+        if (payment.status === "PENDING") return t.transaction.waitingForPayment;
+        if (payment.status === "CANCELLED") return t.payment.statusCancelled;
+        if (payment.status === "EXPIRED") return t.payment.statusExpired;
+        return t.payment.paymentFailed;
+    };
+
     const handleCancel = () => {
         if (!payment) return;
-        Alert.alert("Cancel payment", "Cancel this pending payment request?", [
-            { text: "No", style: "cancel" },
+        Alert.alert(t.transaction.cancelPaymentTitle, t.transaction.cancelPaymentConfirm, [
+            { text: t.common.no, style: "cancel" },
             {
-                text: "Yes, cancel",
+                text: t.transaction.yesCancel,
                 style: "destructive",
                 onPress: async () => {
                     setCancelling(true);
@@ -43,7 +55,7 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                         const res = await api.cancelPayment(payment.id);
                         setPayment(res.data);
                     } catch (err: any) {
-                        Alert.alert("Error", err.message || "Could not cancel payment");
+                        Alert.alert(t.common.error, err.message || t.transaction.couldNotCancel);
                     } finally {
                         setCancelling(false);
                     }
@@ -55,13 +67,16 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
     if (!payment) {
         return (
             <SafeAreaView style={{ flex: 1, backgroundColor: theme.COLORS.bgColor, justifyContent: "center", alignItems: "center" }}>
-                <Text>No payment data</Text>
+                <Text>{t.transaction.noPaymentData}</Text>
             </SafeAreaView>
         );
     }
 
     const isPaid = payment.status === "PAID";
     const isPending = payment.status === "PENDING";
+    const networkLabel = (USDT_NETWORKS as readonly string[]).includes(payment.network)
+        ? getLocalizedNetworkLabel(payment.network as UsdtNetwork, t)
+        : payment.network;
 
     return (
         <View style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
@@ -93,15 +108,7 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                                 marginBottom: 12,
                             }}
                         >
-                            {isPaid
-                                ? "Success!"
-                                : isPending
-                                ? "Waiting for payment"
-                                : payment.status === "CANCELLED"
-                                ? "Cancelled"
-                                : payment.status === "EXPIRED"
-                                ? "Expired"
-                                : "Payment failed"}
+                            {getStatusTitle()}
                         </Text>
                         <Text
                             style={{
@@ -123,8 +130,8 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                                 marginBottom: 8,
                             }}
                         >
-                            Network:{" "}
-                            {NETWORK_LABELS[payment.network as keyof typeof NETWORK_LABELS] || payment.network}
+                            {t.network.networkLabel}{" "}
+                            {networkLabel}
                             {payment.network ? ` (${payment.network})` : ""}
                         </Text>
                         {payment.reference && (
@@ -137,7 +144,7 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                                     marginBottom: 16,
                                 }}
                             >
-                                Ref: {payment.reference}
+                                {t.network.refLabel} {payment.reference}
                             </Text>
                         )}
                         {payment.failureReason && (
@@ -172,13 +179,13 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                         {isPending && (
                             <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 24 }}>
                                 <ActivityIndicator size="small" color={theme.COLORS.mainDark} style={{ marginRight: 8 }} />
-                                <Text style={{ color: theme.COLORS.bodyTextColor }}>Checking payment status…</Text>
+                                <Text style={{ color: theme.COLORS.bodyTextColor }}>{t.transaction.checkingStatus}</Text>
                             </View>
                         )}
 
                         {isPaid && (
                             <components.Button
-                                title="View details"
+                                title={t.transaction.viewDetails}
                                 onPress={() => navigation.navigate("TransactionDetails", { payment })}
                                 containerStyle={{ width: "100%", marginBottom: 12 }}
                             />
@@ -186,14 +193,14 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
 
                         {isPending && (
                             <components.Button
-                                title={cancelling ? "Cancelling…" : "Cancel payment"}
+                                title={cancelling ? t.transaction.cancelling : t.transaction.cancelPayment}
                                 onPress={handleCancel}
                                 containerStyle={{ width: "100%", marginBottom: 12 }}
                             />
                         )}
 
                         <components.Button
-                            title={isPaid ? "Back to dashboard" : "Done"}
+                            title={isPaid ? t.transaction.backToDashboard : t.common.done}
                             onPress={() => navigation.navigate("Dashboard")}
                             containerStyle={{ width: "100%", marginBottom: 20 }}
                         />

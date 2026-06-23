@@ -4,8 +4,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { theme } from "../constants";
 import { components } from "../components";
+import { useTranslation } from "../hooks/useTranslation";
 
 const SignUpAccountCreated: React.FC = ({ navigation }: any) => {
+    const { t } = useTranslation();
+
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
             <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
@@ -13,7 +16,7 @@ const SignUpAccountCreated: React.FC = ({ navigation }: any) => {
                     source={require("../assets/bg-02.png")}
                     style={{ width: "100%", height: 530, position: "absolute" }}
                 />
-                <View style={{ paddingTop: theme.SIZES.height * 0.2, paddingHorizontal: 20 }}>
+                <View style={{ paddingTop: "20%", paddingHorizontal: 20 }}>
                     <Image
                         source={require("../assets/account.png")}
                         style={{ width: 161, height: 111, alignSelf: "center", marginBottom: 30 }}
@@ -26,7 +29,7 @@ const SignUpAccountCreated: React.FC = ({ navigation }: any) => {
                             marginBottom: 20,
                         }}
                     >
-                        Account created!
+                        {t.auth.accountCreated}
                     </Text>
                     <Text
                         style={{
@@ -35,13 +38,13 @@ const SignUpAccountCreated: React.FC = ({ navigation }: any) => {
                             fontSize: 16,
                             color: theme.COLORS.bodyTextColor,
                             lineHeight: 16 * 1.6,
-                            marginBottom: theme.SIZES.height * 0.2,
+                            marginBottom: "20%",
                         }}
                     >
-                        Your merchant account is ready.{"\n"}Start accepting USDT payments.
+                        {t.auth.accountCreatedMessage}
                     </Text>
                     <components.Button
-                        title="Go to dashboard"
+                        title={t.auth.goToDashboard}
                         onPress={() => navigation.reset({ index: 0, routes: [{ name: "TabNavigator" }] })}
                     />
                 </View>

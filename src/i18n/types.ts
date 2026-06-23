@@ -1,5 +1,8 @@
 export type AppLocale = "es" | "en";
 
+export type FaqItem = { question: string; answer: string };
+export type LegalSection = { title: string; body: string };
+
 export type TranslationDict = {
     common: {
         cancel: string;
@@ -9,6 +12,13 @@ export type TranslationDict = {
         loading: string;
         sessionExpired: string;
         sessionExpiredMessage: string;
+        save: string;
+        send: string;
+        success: string;
+        yes: string;
+        no: string;
+        done: string;
+        back: string;
     };
     language: {
         title: string;
@@ -46,6 +56,27 @@ export type TranslationDict = {
         registrationFailed: string;
         fillAllFields: string;
         passwordMinLength: string;
+        forgotPasswordTitle: string;
+        resetPassword: string;
+        resetPasswordInstructions: string;
+        enterEmail: string;
+        couldNotSendReset: string;
+        newPasswordTitle: string;
+        chooseNewPassword: string;
+        enterNewPasswordConfirm: string;
+        changePasswordButton: string;
+        invalidResetLink: string;
+        passwordMin8: string;
+        passwordsNotMatch: string;
+        couldNotResetPassword: string;
+        checkEmail: string;
+        passwordResetSuccess: string;
+        resetEmailSent: string;
+        passwordResetDone: string;
+        backToSignIn: string;
+        accountCreated: string;
+        accountCreatedMessage: string;
+        goToDashboard: string;
     };
     dashboard: {
         welcomeBack: string;
@@ -72,6 +103,7 @@ export type TranslationDict = {
         createDescription: string;
         amountPlaceholder: string;
         referencePlaceholder: string;
+        referenceHint: string;
         generateQr: string;
         paymentFailed: string;
         invalidAmount: string;
@@ -84,6 +116,7 @@ export type TranslationDict = {
         statusExpired: string;
         statusFailed: string;
         statusCancelled: string;
+        statusSuccess: string;
         filterAll: string;
         filterPending: string;
         filterPaid: string;
@@ -93,6 +126,85 @@ export type TranslationDict = {
         historyTitle: string;
         historySubtitle: string;
         noHistory: string;
+        walletAddressPlaceholder: string;
+    };
+    withdraw: {
+        title: string;
+        description: string;
+        requestWithdrawal: string;
+        withdrawalRequest: string;
+        withdrawalMessage: string;
+        enterWalletAddress: string;
+    };
+    transfer: {
+        title: string;
+        latestTransfers: string;
+        noTransfers: string;
+        useWallet: string;
+        sendMoneyTo: string;
+        enterWalletAddress: string;
+        comment: string;
+        send: string;
+        transferRequest: string;
+        transferMessage: string;
+        networkFeeVaries: string;
+        notePrefix: string;
+    };
+    network: {
+        usdtNetwork: string;
+        tron: string;
+        ethereum: string;
+        bnbChain: string;
+        solana: string;
+        polygon: string;
+        networkLabel: string;
+        refLabel: string;
+        field: string;
+    };
+    account: {
+        businessInfo: string;
+        businessNameRequired: string;
+        saved: string;
+        profileUpdated: string;
+        couldNotSave: string;
+        phoneOptional: string;
+        emailReadOnly: string;
+        changePasswordTitle: string;
+        updatePasswordDescription: string;
+        currentPassword: string;
+        newPassword: string;
+        confirmNewPassword: string;
+        updatePassword: string;
+        passwordsDoNotMatch: string;
+        passwordUpdated: string;
+        couldNotChangePassword: string;
+    };
+    transaction: {
+        paymentNotFound: string;
+        noPaymentData: string;
+        waitingForPayment: string;
+        checkingStatus: string;
+        viewDetails: string;
+        cancelPayment: string;
+        cancelling: string;
+        cancelPaymentTitle: string;
+        cancelPaymentConfirm: string;
+        yesCancel: string;
+        couldNotCancel: string;
+        backToDashboard: string;
+        paymentId: string;
+        amount: string;
+        paidAmount: string;
+        txHash: string;
+        note: string;
+        expires: string;
+        viewQrStatus: string;
+        copyPaymentId: string;
+        copyTxHash: string;
+        copied: string;
+        copiedToClipboard: string;
+        copyFailed: string;
+        couldNotCopy: string;
     };
     profile: {
         title: string;
@@ -115,5 +227,11 @@ export type TranslationDict = {
     splash: {
         title: string;
         subtitle: string;
+    };
+    legal: {
+        privacyTitle: string;
+        privacySections: LegalSection[];
+        faqTitle: string;
+        faqItems: FaqItem[];
     };
 };

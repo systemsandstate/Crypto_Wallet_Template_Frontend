@@ -8,9 +8,12 @@ import { api } from "../services/api";
 import { setCredentials } from "../store/authSlice";
 import { RootState } from "../store/store";
 import { useTabBarInset } from "../hooks/useTabBarInset";
+import { useTranslation } from "../hooks/useTranslation";
+import { formatMessage } from "../i18n";
 
 const EditPersonalInfo: React.FC = ({ navigation }: any) => {
     const dispatch = useDispatch();
+    const { t } = useTranslation();
     const tabBarInset = useTabBarInset();
     const merchant = useSelector((state: RootState) => state.auth.merchant);
     const [businessName, setBusinessName] = useState(merchant?.businessName || "");
@@ -19,7 +22,7 @@ const EditPersonalInfo: React.FC = ({ navigation }: any) => {
 
     const handleSave = async () => {
         if (!businessName.trim()) {
-            Alert.alert("Error", "Business name is required");
+            Alert.alert(t.common.error, t.account.businessNameRequired);
             return;
         }
         setLoading(true);
@@ -33,9 +36,11 @@ const EditPersonalInfo: React.FC = ({ navigation }: any) => {
             if (token) {
                 dispatch(setCredentials({ merchant: res.data, accessToken: token }));
             }
-            Alert.alert("Saved", "Profile updated", [{ text: "OK", onPress: () => navigation.goBack() }]);
+            Alert.alert(t.account.saved, t.account.profileUpdated, [
+                { text: t.common.ok, onPress: () => navigation.goBack() },
+            ]);
         } catch (err: any) {
-            Alert.alert("Error", err.message || "Could not save");
+            Alert.alert(t.common.error, err.message || t.account.couldNotSave);
         } finally {
             setLoading(false);
         }
@@ -43,29 +48,39 @@ const EditPersonalInfo: React.FC = ({ navigation }: any) => {
 
     return (
         <components.AuthScreenLayout
-            header={<components.Header title="Business info" goBack={true} />}
+            header={<components.Header title={t.account.businessInfo} goBack={true} />}
             cardStyle={{ marginBottom: tabBarInset }}
         >
             <components.InputField
-                placeholder="Business name"
+                placeholder={t.auth.businessNamePlaceholder}
                 value={businessName}
                 onChangeText={setBusinessName}
                 containerStyle={{ marginBottom: 14 }}
             />
             <components.InputField
-                placeholder="Phone (optional)"
+                placeholder={t.account.phoneOptional}
                 value={phone}
                 onChangeText={setPhone}
                 keyboardType="phone-pad"
                 containerStyle={{ marginBottom: 14 }}
             />
-            <Text style={{ fontSize: 12, color: theme.COLORS.bodyTextColor, marginBottom: 20 }}>
-                Email: {merchant?.email} (cannot be changed here)
-            </Text>
+            {merchant?.email ? (
+                <Text
+                    style={{
+                        ...theme.FONTS.Mulish_400Regular,
+                        fontSize: 13,
+                        color: theme.COLORS.bodyTextColor,
+                        marginBottom: 16,
+                        textAlign: "center",
+                    }}
+                >
+                    {formatMessage(t.account.emailReadOnly, { email: merchant.email })}
+                </Text>
+            ) : null}
             {loading ? (
-                <ActivityIndicator color={theme.COLORS.mainDark} />
+                <ActivityIndicator size="large" color={theme.COLORS.mainDark} />
             ) : (
-                <components.Button title="Save" onPress={handleSave} />
+                <components.Button title={t.common.save} onPress={handleSave} />
             )}
         </components.AuthScreenLayout>
     );
