@@ -1,6 +1,8 @@
-import { Text, Alert, ActivityIndicator } from "react-native";
+import { Text, Alert } from "react-native";
+import LoadingSpinner from "../components/LoadingSpinner";
 import React, { useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
+import { useAppSelector } from "../hooks/useAppSelector";
 
 import { theme } from "../constants";
 import { components } from "../components";
@@ -10,12 +12,13 @@ import { RootState } from "../store/store";
 import { useTabBarInset } from "../hooks/useTabBarInset";
 import { useTranslation } from "../hooks/useTranslation";
 import { formatMessage } from "../i18n";
+import { navigateUp } from "../navigation/navigateUp";
 
 const EditPersonalInfo: React.FC = ({ navigation }: any) => {
     const dispatch = useDispatch();
     const { t } = useTranslation();
     const tabBarInset = useTabBarInset();
-    const merchant = useSelector((state: RootState) => state.auth.merchant);
+    const merchant = useAppSelector((state: RootState) => state.auth.merchant);
     const [businessName, setBusinessName] = useState(merchant?.businessName || "");
     const [phone, setPhone] = useState(merchant?.phone || "");
     const [loading, setLoading] = useState(false);
@@ -37,7 +40,7 @@ const EditPersonalInfo: React.FC = ({ navigation }: any) => {
                 dispatch(setCredentials({ merchant: res.data, accessToken: token }));
             }
             Alert.alert(t.account.saved, t.account.profileUpdated, [
-                { text: t.common.ok, onPress: () => navigation.goBack() },
+                { text: t.common.ok, onPress: () => navigateUp(navigation, "EditPersonalInfo") },
             ]);
         } catch (err: any) {
             Alert.alert(t.common.error, err.message || t.account.couldNotSave);
@@ -78,7 +81,7 @@ const EditPersonalInfo: React.FC = ({ navigation }: any) => {
                 </Text>
             ) : null}
             {loading ? (
-                <ActivityIndicator size="large" color={theme.COLORS.mainDark} />
+                <LoadingSpinner size={48} />
             ) : (
                 <components.Button title={t.common.save} onPress={handleSave} />
             )}

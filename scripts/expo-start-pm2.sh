@@ -13,4 +13,4 @@ export EXPO_UNSTABLE_HEADLESS="${EXPO_UNSTABLE_HEADLESS:-1}"
 EXPO_URL="exp://${REACT_NATIVE_PACKAGER_HOSTNAME}:${METRO_PORT}"
 node scripts/print-expo-qr.js "${EXPO_URL}" || true
 
-exec npx expo start --host lan --go --port "${METRO_PORT}"
+exec npx expo start --host lan --go --port "${METRO_PORT}" --clear

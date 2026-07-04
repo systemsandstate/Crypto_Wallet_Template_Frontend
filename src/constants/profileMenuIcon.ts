@@ -1,0 +1,1 @@
+export { MENU_ICON_SIZE, MENU_ICON_STROKE, PROFILE_MENU_ICON_SIZE } from "./menuIcon";

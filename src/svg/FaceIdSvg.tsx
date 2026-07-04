@@ -1,11 +1,29 @@
 import * as React from "react";
 import Svg, { Path } from "react-native-svg";
 
-const FaceIdSvg: React.FC = () => (
-    <Svg width={24} height={24} viewBox="0 0 16 16" fill="none">
+import { MENU_ICON_SIZE, MENU_ICON_STROKE } from "../constants/menuIcon";
+
+type Props = {
+    color?: string;
+    size?: number;
+};
+
+const FaceIdSvg: React.FC<Props> = ({ color = "#4C4C60", size = MENU_ICON_SIZE }) => (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
         <Path
-            d="M2.667 10.667a.666.666 0 0 1 .662.588l.004.078v1.334h1.334a.666.666 0 0 1 .078 1.328L4.667 14H3.333a1.333 1.333 0 0 1-1.33-1.233l-.003-.1v-1.334a.667.667 0 0 1 .667-.666Zm10.666 0a.667.667 0 0 1 .667.666v1.334A1.334 1.334 0 0 1 12.667 14h-1.334a.667.667 0 1 1 0-1.333h1.334v-1.334a.667.667 0 0 1 .666-.666ZM9.867 9.238a.666.666 0 1 1 .933.952A3.99 3.99 0 0 1 8 11.333a3.99 3.99 0 0 1-2.8-1.143.666.666 0 1 1 .933-.952c.498.49 1.169.763 1.867.762.727 0 1.385-.29 1.867-.762Zm-4.2-3.905a1 1 0 1 1 0 2 1 1 0 0 1 0-2Zm4.666 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2ZM4.667 2a.667.667 0 0 1 0 1.333H3.333v1.334a.667.667 0 1 1-1.333 0V3.333A1.333 1.333 0 0 1 3.333 2h1.334Zm8 0A1.333 1.333 0 0 1 14 3.333v1.334a.666.666 0 1 1-1.333 0V3.333h-1.334a.667.667 0 0 1 0-1.333h1.334Z"
-            fill="#4C4C60"
+            d="M7 3H4v3M4 17v3h3M17 3h3v3M20 17v3h-3"
+            stroke={color}
+            strokeWidth={MENU_ICON_STROKE}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+        <Path d="M9 10h.01M15 10h.01" stroke={color} strokeWidth={2} strokeLinecap="round" />
+        <Path
+            d="M9.5 14a3 3 0 0 0 5 0"
+            stroke={color}
+            strokeWidth={MENU_ICON_STROKE}
+            strokeLinecap="round"
+            strokeLinejoin="round"
         />
     </Svg>
 );

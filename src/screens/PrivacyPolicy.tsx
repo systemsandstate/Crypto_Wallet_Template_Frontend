@@ -1,4 +1,4 @@
-import { View, ScrollView, Image, Text, StyleSheet } from "react-native";
+import { View, ScrollView, Text } from "react-native";
 import React from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -26,24 +26,14 @@ const PrivacyPolicy: React.FC = () => {
 
     return (
         <View style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
-            <View style={{ height: 179 }}>
-                <SafeAreaView>
-                    <components.Header goBack={true} containerStyle={{ marginBottom: 20 }} />
-                    <View style={{ paddingHorizontal: 20 }}>
-                        <Text style={{ ...theme.FONTS.H2, color: theme.COLORS.mainDark }}>
-                            {t.legal.privacyTitle}
-                        </Text>
-                    </View>
-                </SafeAreaView>
-                <Image
-                    source={require("../assets/bg-01.png")}
-                    style={{
-                        height: 350,
-                        ...StyleSheet.absoluteFill,
-                        zIndex: -1,
-                    }}
-                />
-            </View>
+            <SafeAreaView>
+                <components.Header goBack={true} containerStyle={{ marginBottom: 20 }} />
+                <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
+                    <Text style={{ ...theme.FONTS.H2, color: theme.COLORS.mainDark }}>
+                        {t.legal.privacyTitle}
+                    </Text>
+                </View>
+            </SafeAreaView>
             <ScrollView contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20, paddingBottom: TAB_BAR_HEIGHT + 24 }}>
                 {t.legal.privacySections.map((section) => (
                     <View key={section.title}>

@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, Platform, StyleSheet, ActivityIndicator } from "react-native";
+import { View, Text, TouchableOpacity, Platform, StyleSheet } from "react-native";
+import LoadingSpinner from "./LoadingSpinner";
 import React from "react";
 import { LinearGradient } from "expo-linear-gradient";
 
@@ -11,6 +12,7 @@ type Props = {
     leading?: React.ReactNode;
     loading?: boolean;
     disabled?: boolean;
+    size?: "default" | "compact";
 };
 
 const GRADIENT_COLORS = ["#96D9FE", "#1D5DA2"] as const;
@@ -23,16 +25,24 @@ const Button: React.FC<Props> = ({
     leading,
     loading = false,
     disabled = false,
+    size = "default",
 }) => {
     const isDisabled = disabled || loading;
+    const compact = size === "compact";
     const content = (
         <>
             {loading ? (
-                <ActivityIndicator color={theme.COLORS.white} style={styles.loader} />
+                <LoadingSpinner size={22} style={styles.loader} />
             ) : (
                 leading
             )}
-            <Text style={[styles.label, leading && !loading ? styles.labelWithLeading : null]}>
+            <Text
+                style={[
+                    styles.label,
+                    compact && styles.labelCompact,
+                    leading && !loading ? styles.labelWithLeading : null,
+                ]}
+            >
                 {title}
             </Text>
         </>
@@ -46,13 +56,20 @@ const Button: React.FC<Props> = ({
                 activeOpacity={0.85}
             >
                 {Platform.OS === "android" ? (
-                    <View style={[styles.inner, styles.innerSolid, isDisabled && styles.innerDisabled]}>
+                    <View
+                        style={[
+                            styles.inner,
+                            compact && styles.innerCompact,
+                            styles.innerSolid,
+                            isDisabled && styles.innerDisabled,
+                        ]}
+                    >
                         {content}
                     </View>
                 ) : (
                     <LinearGradient
                         colors={[...GRADIENT_COLORS]}
-                        style={[styles.inner, isDisabled && styles.innerDisabled]}
+                        style={[styles.inner, compact && styles.innerCompact, isDisabled && styles.innerDisabled]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                     >
@@ -76,6 +93,10 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         flexDirection: "row",
     },
+    innerCompact: {
+        height: 36,
+        borderRadius: 8,
+    },
     innerSolid: {
         backgroundColor: SOLID_COLOR,
     },
@@ -86,9 +107,12 @@ const styles = StyleSheet.create({
         marginRight: 8,
     },
     label: {
-        color: theme.COLORS.white,
+        color: theme.COLORS.pureWhite,
         ...theme.FONTS.Mulish_600SemiBold,
         fontSize: 16,
+    },
+    labelCompact: {
+        fontSize: 13,
     },
     labelWithLeading: {
         marginLeft: 10,

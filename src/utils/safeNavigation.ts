@@ -1,5 +1,5 @@
 import { CommonActions, type NavigationState } from "@react-navigation/native";
-import { InteractionManager, Platform } from "react-native";
+import { Platform } from "react-native";
 
 import { navigationRef } from "../navigation/navigationRef";
 
@@ -9,6 +9,19 @@ const queue: Array<() => void> = [];
 let flushScheduled = false;
 
 const ANDROID_SETTLE_MS = 64;
+
+function runWhenIdle(callback: () => void) {
+    const requestIdle = (
+        globalThis as { requestIdleCallback?: (cb: () => void) => number }
+    ).requestIdleCallback;
+    if (typeof requestIdle === "function") {
+        requestIdle(callback);
+        return;
+    }
+    requestAnimationFrame(() => {
+        setTimeout(callback, 0);
+    });
+}
 
 function waitForNavReady(attempt = 0): Promise<void> {
     if (navigationRef.isReady()) return Promise.resolve();
@@ -35,7 +48,7 @@ function scheduleFlush() {
     if (flushScheduled) return;
     flushScheduled = true;
 
-    InteractionManager.runAfterInteractions(() => {
+    runWhenIdle(() => {
         requestAnimationFrame(() => {
             const delay = Platform.OS === "android" ? ANDROID_SETTLE_MS : 0;
             setTimeout(runFlush, delay);

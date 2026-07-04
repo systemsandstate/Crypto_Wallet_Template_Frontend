@@ -21,6 +21,7 @@ export interface PaymentRequest {
   network: string;
   reference: string | null;
   status: string;
+  depositAddress: string | null;
   paymentUrl: string | null;
   qrCodeDataUrl: string | null;
   txHash: string | null;
@@ -29,6 +30,28 @@ export interface PaymentRequest {
   expiresAt: string | null;
   paidAt: string | null;
   createdAt: string;
+}
+
+export interface MerchantWallet {
+  id: string;
+  network: string;
+  address: string;
+  isPrimary: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WalletTransfer {
+  id: string;
+  type: 'DEPOSIT' | 'SEND';
+  network: string;
+  amount: number;
+  currency: string;
+  txHash: string;
+  fromAddress: string;
+  toAddress: string;
+  timestamp: string;
+  blockNumber: number;
 }
 
 export interface AuthResponse {
@@ -158,6 +181,12 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  verifyPassword: (body: { password: string }) =>
+    request<{ success: boolean; data: { verified: boolean } }>('/merchant/verify-password', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
   createPayment: (body: { amount: number; reference?: string; currency?: string; network?: string }) =>
     request<{ success: boolean; data: PaymentRequest }>('/payments/requests', {
       method: 'POST',
@@ -187,4 +216,68 @@ export const api = {
       `/payments/requests${qs ? `?${qs}` : ''}`
     );
   },
+
+  getWalletStatus: () =>
+    request<{ success: boolean; data: { hasWallet: boolean } }>('/merchant/wallets/status'),
+
+  getWallets: () =>
+    request<{ success: boolean; data: { wallets: MerchantWallet[]; hasWallet: boolean } }>(
+      '/merchant/wallets'
+    ),
+
+  getWalletBalances: () =>
+    request<{
+      success: boolean;
+      data: {
+        balances: Array<{
+          network: string;
+          address: string;
+          usdtBalance: number | null;
+          nativeBalance: number | null;
+          nativeSymbol: string;
+        }>;
+      };
+    }>('/merchant/wallets/balances'),
+
+  getWalletTransfers: () =>
+    request<{ success: boolean; data: { transfers: WalletTransfer[] } }>(
+      '/merchant/wallets/transfers'
+    ),
+
+  reportWalletSend: (body: {
+    network: string;
+    txHash: string;
+    fromAddress: string;
+    toAddress: string;
+    amount: number;
+    currency: string;
+    blockNumber?: number;
+  }) =>
+    request<{ success: boolean; data: { recorded: boolean } }>(
+      '/merchant/wallets/transfers/report',
+      { method: 'POST', body: JSON.stringify(body) }
+    ),
+
+  syncWallets: (wallets: Array<{ network: string; address: string }>) =>
+    request<{ success: boolean; data: { wallets: MerchantWallet[] } }>('/merchant/wallets/sync', {
+      method: 'POST',
+      body: JSON.stringify({ wallets }),
+    }),
+
+  registerPushToken: (body: { token: string; platform?: string }) =>
+    request<{ success: boolean; data: { registered: boolean } }>('/merchant/push-token', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  removePushToken: (body: { token: string }) =>
+    request<{ success: boolean; data: { removed: boolean } }>('/merchant/push-token', {
+      method: 'DELETE',
+      body: JSON.stringify(body),
+    }),
+
+  sendTestPush: () =>
+    request<{ success: boolean; data: { sent: number } }>('/merchant/push-token/test', {
+      method: 'POST',
+    }),
 };

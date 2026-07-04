@@ -1,10 +1,9 @@
 import { View, Text, TouchableOpacity, ScrollView } from "react-native";
 import React from "react";
 
-import { theme } from "../constants";
 import { USDT_NETWORKS, UsdtNetwork } from "../constants/usdtNetworks";
-import { getLocalizedNetworkLabel } from "../i18n/network";
 import { useTranslation } from "../hooks/useTranslation";
+import { useTheme } from "../hooks/useTheme";
 import NetworkLogo from "./NetworkLogo";
 
 type Props = {
@@ -14,15 +13,16 @@ type Props = {
 
 const NetworkSelector: React.FC<Props> = ({ value, onChange }) => {
     const { t } = useTranslation();
+    const { colors, FONTS } = useTheme();
 
     return (
-        <View style={{ marginBottom: 20 }}>
+        <View style={{ marginBottom: 12 }}>
             <Text
                 style={{
-                    ...theme.FONTS.Mulish_600SemiBold,
-                    fontSize: 13,
-                    color: theme.COLORS.mainDark,
-                    marginBottom: 10,
+                    ...FONTS.Mulish_600SemiBold,
+                    fontSize: 11,
+                    color: colors.mainDark,
+                    marginBottom: 6,
                 }}
             >
                 {t.network.usdtNetwork}
@@ -35,37 +35,30 @@ const NetworkSelector: React.FC<Props> = ({ value, onChange }) => {
                             key={network}
                             onPress={() => onChange(network)}
                             style={{
-                                paddingHorizontal: 16,
-                                paddingVertical: 12,
-                                borderRadius: 12,
-                                marginRight: 8,
-                                minWidth: 108,
-                                backgroundColor: selected ? theme.COLORS.mainDark : theme.COLORS.white,
+                                flexDirection: "row",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: 4,
+                                paddingHorizontal: 10,
+                                paddingVertical: 6,
+                                borderRadius: 8,
+                                marginRight: 6,
+                                minWidth: 68,
+                                backgroundColor: selected ? colors.headerBg : colors.white,
                                 borderWidth: selected ? 0 : 1,
-                                borderColor: "#E8ECF0",
+                                borderColor: colors.inputBorder,
                             }}
                         >
-                            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                                <NetworkLogo network={network} size={18} />
-                                <Text
-                                    style={{
-                                        ...theme.FONTS.Mulish_600SemiBold,
-                                        fontSize: 13,
-                                        color: selected ? theme.COLORS.white : theme.COLORS.mainDark,
-                                    }}
-                                >
-                                    {network}
-                                </Text>
-                            </View>
+                            <NetworkLogo network={network} size={12} />
                             <Text
                                 style={{
-                                    ...theme.FONTS.Mulish_400Regular,
-                                    fontSize: 11,
-                                    marginTop: 2,
-                                    color: selected ? "#CED6E1" : theme.COLORS.bodyTextColor,
+                                    ...FONTS.Mulish_600SemiBold,
+                                    fontSize: 10,
+                                    color: selected ? "#FFFFFF" : colors.mainDark,
+                                    textAlign: "center",
                                 }}
                             >
-                                {getLocalizedNetworkLabel(network, t)}
+                                {network}
                             </Text>
                         </TouchableOpacity>
                     );

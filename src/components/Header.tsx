@@ -1,11 +1,10 @@
-import { View, Text, TouchableOpacity, TextInput, Alert, StyleSheet } from "react-native";
-import React, { memo } from "react";
-import { useNavigation } from "@react-navigation/native";
+import { View, Text, TouchableOpacity, TextInput, StyleSheet } from "react-native";
+import React, { memo, useCallback, useMemo } from "react";
+import { useNavigation, useRoute } from "@react-navigation/native";
 
 import { svg } from "../svg";
-import { theme } from "../constants";
-import LanguageTrigger from "./LanguageTrigger";
-import type { LanguageSwitcherTone } from "../context/LanguageSwitcherToneContext";
+import { useTheme } from "../hooks/useTheme";
+import { navigateUp } from "../navigation/navigateUp";
 
 type Props = {
     containerStyle?: object;
@@ -20,8 +19,7 @@ type Props = {
     arrowColor?: string;
     fileIcon?: boolean;
     goBackColor?: string;
-    showLanguage?: boolean;
-    languageTone?: LanguageSwitcherTone;
+    onGoBack?: () => void;
 };
 
 const Header: React.FC<Props> = ({
@@ -33,10 +31,70 @@ const Header: React.FC<Props> = ({
     titleStyle,
     fileIcon,
     goBackColor,
-    showLanguage = true,
-    languageTone = "on-light",
+    onGoBack,
 }) => {
     const navigation: any = useNavigation();
+    const route = useRoute();
+    const { colors, FONTS } = useTheme();
+
+    const handleGoBack = useCallback(() => {
+        if (onGoBack) {
+            onGoBack();
+            return;
+        }
+        navigateUp(navigation, route.name, route.params as Record<string, unknown>);
+    }, [navigation, onGoBack, route.name, route.params]);
+
+    const styles = useMemo(
+        () =>
+            StyleSheet.create({
+                bar: {
+                    flexDirection: "row",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    height: 47,
+                    position: "relative",
+                },
+                barBorder: {
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.border,
+                },
+                backSlot: {
+                    position: "absolute",
+                    left: 0,
+                    alignItems: "center",
+                },
+                backButton: {
+                    paddingHorizontal: 20,
+                    paddingVertical: 12,
+                },
+                title: {
+                    textAlign: "center",
+                    ...FONTS.H4,
+                    color: colors.mainDark,
+                },
+                searchRow: {
+                    flex: 1,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginHorizontal: 72,
+                },
+                searchInput: {
+                    height: "100%",
+                    width: "100%",
+                    color: colors.mainDark,
+                },
+                fileSlot: {
+                    position: "absolute",
+                    right: 0,
+                    height: "100%",
+                    justifyContent: "center",
+                    paddingHorizontal: 20,
+                    paddingVertical: 6,
+                },
+            }),
+        [colors, FONTS]
+    );
 
     return (
         <View
@@ -50,9 +108,9 @@ const Header: React.FC<Props> = ({
                 <View style={styles.backSlot}>
                     <TouchableOpacity
                         style={styles.backButton}
-                        onPress={() => navigation.goBack()}
+                        onPress={handleGoBack}
                     >
-                        <svg.GoBackSvg goBackColor={goBackColor} />
+                        <svg.GoBackSvg goBackColor={goBackColor ?? colors.mainDark} />
                     </TouchableOpacity>
                 </View>
             )}
@@ -66,68 +124,11 @@ const Header: React.FC<Props> = ({
             )}
             {fileIcon && (
                 <TouchableOpacity style={styles.fileSlot}>
-                    <svg.FileTextSvg color={theme.COLORS.white} />
+                    <svg.FileTextSvg color={colors.mainDark} />
                 </TouchableOpacity>
             )}
-            {showLanguage ? (
-                <View style={styles.languageSlot}>
-                    <LanguageTrigger tone={languageTone} />
-                </View>
-            ) : null}
         </View>
     );
 };
-
-const styles = StyleSheet.create({
-    bar: {
-        flexDirection: "row",
-        justifyContent: "center",
-        alignItems: "center",
-        height: 47,
-        position: "relative",
-    },
-    barBorder: {
-        borderBottomWidth: 1,
-    },
-    backSlot: {
-        position: "absolute",
-        left: 0,
-        alignItems: "center",
-    },
-    backButton: {
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-    },
-    title: {
-        textAlign: "center",
-        ...theme.FONTS.H4,
-        color: theme.COLORS.mainDark,
-    },
-    searchRow: {
-        flex: 1,
-        flexDirection: "row",
-        alignItems: "center",
-        marginHorizontal: 72,
-    },
-    searchInput: {
-        height: "100%",
-        width: "100%",
-    },
-    fileSlot: {
-        position: "absolute",
-        right: 0,
-        height: "100%",
-        justifyContent: "center",
-        paddingHorizontal: 20,
-        paddingVertical: 6,
-    },
-    languageSlot: {
-        position: "absolute",
-        right: 8,
-        top: 0,
-        bottom: 0,
-        justifyContent: "center",
-    },
-});
 
 export default memo(Header);

@@ -2,9 +2,7 @@ import {
     View,
     TouchableOpacity,
     ScrollView,
-    Image,
     Text,
-    StyleSheet,
 } from "react-native";
 import React, { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -35,14 +33,6 @@ const FAQ: React.FC = () => {
                     </Text>
                 </View>
             </SafeAreaView>
-            <Image
-                source={require("../assets/bg-01.png")}
-                style={{
-                    height: 350,
-                    ...StyleSheet.absoluteFill,
-                    zIndex: -1,
-                }}
-            />
         </View>
     );
 

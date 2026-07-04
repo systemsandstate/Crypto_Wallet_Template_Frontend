@@ -1,12 +1,14 @@
-import { View, ActivityIndicator } from "react-native";
+import { View } from "react-native";
+import LoadingSpinner from "../components/LoadingSpinner";
 import React, { useEffect } from "react";
 
-import { theme } from "../constants";
+import { useTheme } from "../hooks/useTheme";
 
 type TabName = "Dashboard" | "History" | "Analytics" | "Profile";
 
 const MerchantTabRedirect: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
     const tab: TabName = route.params?.tab || "Dashboard";
+    const { colors } = useTheme();
 
     useEffect(() => {
         navigation.replace("TabNavigator", { screen: tab });
@@ -18,10 +20,10 @@ const MerchantTabRedirect: React.FC<{ navigation: any; route: any }> = ({ naviga
                 flex: 1,
                 justifyContent: "center",
                 alignItems: "center",
-                backgroundColor: theme.COLORS.bgColor,
+                backgroundColor: colors.bgColor,
             }}
         >
-            <ActivityIndicator size="large" color={theme.COLORS.mainDark} />
+            <LoadingSpinner size={48} />
         </View>
     );
 };

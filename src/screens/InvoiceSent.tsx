@@ -1,37 +1,41 @@
-import { View, Text, Image, ActivityIndicator, Alert, StyleSheet } from "react-native";
-import React, { useEffect, useState } from "react";
+import { View, Text, Image, Alert } from "react-native";
+import LoadingSpinner from "../components/LoadingSpinner";
+import React, { useEffect, useRef, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { theme } from "../constants";
 import { components } from "../components";
 import { api, PaymentRequest } from "../services/api";
+import { subscribePaymentStream } from "../services/paymentStream";
 import { useTranslation } from "../hooks/useTranslation";
+import { useTheme } from "../hooks/useTheme";
 import { getLocalizedNetworkLabel } from "../i18n/network";
 import { USDT_NETWORKS, UsdtNetwork } from "../constants/usdtNetworks";
+import { showToast } from "../utils/toast";
+import { triggerDashboardRefresh } from "../utils/dashboardRefresh";
 
 const InvoiceSent: React.FC = ({ navigation, route }: any) => {
     const { t } = useTranslation();
+    const { colors, FONTS } = useTheme();
     const initial: PaymentRequest = route.params?.payment;
     const [payment, setPayment] = useState<PaymentRequest | null>(initial || null);
     const [cancelling, setCancelling] = useState(false);
+    const notifiedPaid = useRef(initial?.status === "PAID");
 
     useEffect(() => {
-        if (!payment || !["PENDING"].includes(payment.status)) return;
+        if (!payment || payment.status !== "PENDING") return;
 
-        const interval = setInterval(async () => {
-            try {
-                const res = await api.getPayment(payment.id);
-                setPayment(res.data);
-                if (res.data.status !== "PENDING") {
-                    clearInterval(interval);
-                }
-            } catch {
-                // ignore poll errors
+        return subscribePaymentStream(payment.id, (updated) => {
+            setPayment(updated);
+            if (updated.status === "PAID" && !notifiedPaid.current) {
+                notifiedPaid.current = true;
+                showToast(
+                    `${t.payment.statusSuccess}: ${updated.amount} ${updated.currency}`,
+                    "success"
+                );
+                triggerDashboardRefresh();
             }
-        }, 4000);
-
-        return () => clearInterval(interval);
-    }, [payment?.id, payment?.status]);
+        });
+    }, [payment?.id, payment?.status, t.payment.statusSuccess]);
 
     const getStatusTitle = () => {
         if (!payment) return "";
@@ -66,7 +70,7 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
 
     if (!payment) {
         return (
-            <SafeAreaView style={{ flex: 1, backgroundColor: theme.COLORS.bgColor, justifyContent: "center", alignItems: "center" }}>
+            <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgColor, justifyContent: "center", alignItems: "center" }}>
                 <Text>{t.transaction.noPaymentData}</Text>
             </SafeAreaView>
         );
@@ -79,12 +83,11 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
         : payment.network;
 
     return (
-        <View style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
-            <Image source={require("../assets/bg/05.png")} style={styles.background} />
+        <View style={{ flex: 1, backgroundColor: colors.bgColor }}>
             <SafeAreaView style={{ flex: 1 }}>
                 <components.Header goBack={true} />
                 <components.ScreenScroll withTabBarInset={false}>
-                    <components.MerchantContent style={{ marginTop: 120, alignItems: "center", paddingBottom: 20 }}>
+                    <components.MerchantContent style={{ marginTop: 32, alignItems: "center", paddingBottom: 20 }}>
                         <Image
                             source={
                                 isPaid
@@ -103,8 +106,8 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                         <Text
                             style={{
                                 textAlign: "center",
-                                ...theme.FONTS.H2,
-                                color: isPaid ? theme.COLORS.green : theme.COLORS.mainDark,
+                                ...FONTS.H2,
+                                color: isPaid ? colors.green : colors.mainDark,
                                 marginBottom: 12,
                             }}
                         >
@@ -113,9 +116,9 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                         <Text
                             style={{
                                 textAlign: "center",
-                                ...theme.FONTS.Mulish_700Bold,
+                                ...FONTS.Mulish_700Bold,
                                 fontSize: 22,
-                                color: theme.COLORS.mainDark,
+                                color: colors.mainDark,
                                 marginBottom: 8,
                             }}
                         >
@@ -124,9 +127,9 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                         <Text
                             style={{
                                 textAlign: "center",
-                                ...theme.FONTS.Mulish_400Regular,
+                                ...FONTS.Mulish_400Regular,
                                 fontSize: 14,
-                                color: theme.COLORS.bodyTextColor,
+                                color: colors.bodyTextColor,
                                 marginBottom: 8,
                             }}
                         >
@@ -138,9 +141,9 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                             <Text
                                 style={{
                                     textAlign: "center",
-                                    ...theme.FONTS.Mulish_400Regular,
+                                    ...FONTS.Mulish_400Regular,
                                     fontSize: 16,
-                                    color: theme.COLORS.bodyTextColor,
+                                    color: colors.bodyTextColor,
                                     marginBottom: 16,
                                 }}
                             >
@@ -151,7 +154,7 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                             <Text
                                 style={{
                                     textAlign: "center",
-                                    ...theme.FONTS.Mulish_400Regular,
+                                    ...FONTS.Mulish_400Regular,
                                     fontSize: 14,
                                     color: "#FF8A71",
                                     marginBottom: 16,
@@ -169,17 +172,45 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                                     maxWidth: 220,
                                     aspectRatio: 1,
                                     marginBottom: 16,
-                                    backgroundColor: "#fff",
+                                    backgroundColor: colors.white,
                                     borderRadius: 8,
                                     alignSelf: "center",
                                 }}
                             />
                         )}
 
+                        {isPending && (payment.depositAddress || payment.paymentUrl) && (
+                            <View style={{ marginBottom: 16, width: "100%" }}>
+                                <Text
+                                    style={{
+                                        textAlign: "center",
+                                        ...FONTS.Mulish_400Regular,
+                                        fontSize: 13,
+                                        color: colors.bodyTextColor,
+                                        marginBottom: 6,
+                                    }}
+                                >
+                                    {t.wallet.sendToAddress}
+                                </Text>
+                                <Text
+                                    selectable
+                                    style={{
+                                        textAlign: "center",
+                                        ...FONTS.Mulish_600SemiBold,
+                                        fontSize: 12,
+                                        color: colors.mainDark,
+                                        lineHeight: 18,
+                                    }}
+                                >
+                                    {payment.depositAddress || payment.paymentUrl}
+                                </Text>
+                            </View>
+                        )}
+
                         {isPending && (
                             <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 24 }}>
-                                <ActivityIndicator size="small" color={theme.COLORS.mainDark} style={{ marginRight: 8 }} />
-                                <Text style={{ color: theme.COLORS.bodyTextColor }}>{t.transaction.checkingStatus}</Text>
+                                <LoadingSpinner size={28} style={{ marginRight: 8 }} />
+                                <Text style={{ color: colors.bodyTextColor }}>{t.transaction.checkingStatus}</Text>
                             </View>
                         )}
 
@@ -201,7 +232,7 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
 
                         <components.Button
                             title={isPaid ? t.transaction.backToDashboard : t.common.done}
-                            onPress={() => navigation.navigate("Dashboard")}
+                            onPress={() => navigation.navigate("Home")}
                             containerStyle={{ width: "100%", marginBottom: 20 }}
                         />
                     </components.MerchantContent>
@@ -210,13 +241,5 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
         </View>
     );
 };
-
-const styles = StyleSheet.create({
-    background: {
-        ...StyleSheet.absoluteFill,
-        height: 530,
-        top: 90,
-    },
-});
 
 export default InvoiceSent;

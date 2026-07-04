@@ -7,8 +7,8 @@ import {
     ViewStyle,
 } from "react-native";
 
-import { theme } from "../constants";
 import { useTabBarInset } from "../hooks/useTabBarInset";
+import { useTheme } from "../hooks/useTheme";
 
 type Props = ScrollViewProps & {
     children: React.ReactNode;
@@ -25,10 +25,11 @@ const ScreenScroll: React.FC<Props> = ({
     ...scrollProps
 }) => {
     const bottomInset = useTabBarInset();
+    const { colors } = useTheme();
 
     return (
         <ScrollView
-            style={[styles.scroll, style]}
+            style={[styles.scroll, { backgroundColor: colors.bgColor }, style]}
             contentContainerStyle={[
                 styles.content,
                 withTabBarInset ? { paddingBottom: bottomInset } : null,
@@ -46,7 +47,6 @@ const ScreenScroll: React.FC<Props> = ({
 const styles = StyleSheet.create({
     scroll: {
         flex: 1,
-        backgroundColor: theme.COLORS.bgColor,
     },
     content: {
         flexGrow: 1,

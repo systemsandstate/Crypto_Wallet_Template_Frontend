@@ -1,13 +1,16 @@
-import { useCallback, useMemo } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useDispatch } from "react-redux";
 
 import { AppLocale, getDictionary } from "../i18n";
 import { setLocale } from "../store/localeSlice";
-import type { RootState } from "../store/store";
+import store from "../store/store";
+
+const subscribe = (onStoreChange: () => void) => store.subscribe(onStoreChange);
+const getLocale = () => store.getState().locale.locale;
 
 export function useTranslation() {
     const dispatch = useDispatch();
-    const locale = useSelector((state: RootState) => state.locale.locale);
+    const locale = useSyncExternalStore(subscribe, getLocale, getLocale);
     const dictionary = useMemo(() => getDictionary(locale), [locale]);
 
     const changeLocale = useCallback(

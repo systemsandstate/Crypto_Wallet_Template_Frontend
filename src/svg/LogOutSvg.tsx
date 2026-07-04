@@ -1,16 +1,26 @@
 import * as React from "react";
 import Svg, { Path } from "react-native-svg";
 
+import { MENU_ICON_SIZE, MENU_ICON_STROKE } from "../constants/menuIcon";
+
 type Props = {
     color?: string;
+    size?: number;
 };
 
-const LogOutSvg: React.FC<Props> = ({ color = "#FF5887" }) => (
-    <Svg width={24} height={24} viewBox="0 0 16 18" fill="none">
+const LogOutSvg: React.FC<Props> = ({ color = "#FF5887", size = MENU_ICON_SIZE }) => (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
         <Path
-            d="M10.667 14.333 14 11l-3.333-3.333M14 11H6M6 17H3.333A1.334 1.334 0 0 1 2 15.667V6.333A1.333 1.333 0 0 1 3.333 5H6"
+            d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"
             stroke={color}
-            strokeWidth={1.5}
+            strokeWidth={MENU_ICON_STROKE}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+        <Path
+            d="m10 17 5-5-5-5M15 12H3"
+            stroke={color}
+            strokeWidth={MENU_ICON_STROKE}
             strokeLinecap="round"
             strokeLinejoin="round"
         />

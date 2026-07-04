@@ -1,4 +1,5 @@
-import { Text, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
+import { Text, TouchableOpacity, Alert } from "react-native";
+import LoadingSpinner from "../components/LoadingSpinner";
 import React, { useState } from "react";
 
 import { theme } from "../constants";
@@ -90,7 +91,7 @@ const NewPassword: React.FC = ({ navigation, route }: any) => {
                 }
             />
             {loading ? (
-                <ActivityIndicator size="large" color={theme.COLORS.mainDark} />
+                <LoadingSpinner size={48} />
             ) : (
                 <components.Button title={t.auth.changePasswordButton} onPress={handleReset} />
             )}

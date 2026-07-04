@@ -1,18 +1,20 @@
-import { Text, View, ActivityIndicator, Alert, Image, StyleSheet } from "react-native";
+import { Text, View, Alert } from "react-native";
+import LoadingSpinner from "../components/LoadingSpinner";
 import React, { useState, useCallback } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 
 import { components } from "../components";
 import { svg } from "../svg";
-import { theme } from "../constants";
 import { api, PaymentRequest } from "../services/api";
 import { UsdtNetwork, formatUsdtNetwork } from "../constants/usdtNetworks";
 import { useTranslation } from "../hooks/useTranslation";
+import { useTheme } from "../hooks/useTheme";
 
 const CreateInvoice: React.FC = () => {
     const navigation: any = useNavigation();
     const { t } = useTranslation();
+    const { colors, FONTS } = useTheme();
     const [amount, setAmount] = useState("");
     const [reference, setReference] = useState("");
     const [network, setNetwork] = useState<UsdtNetwork>("TRC20");
@@ -40,6 +42,20 @@ const CreateInvoice: React.FC = () => {
             Alert.alert(t.common.error, t.payment.invalidAmount);
             return;
         }
+
+        try {
+            const walletStatus = await api.getWalletStatus();
+            if (!walletStatus.data.hasWallet) {
+                Alert.alert(t.wallet.walletRequired, t.wallet.walletRequiredMessage, [
+                    { text: t.common.cancel, style: "cancel" },
+                    { text: t.wallet.setupWallet, onPress: () => navigation.navigate("WalletSetup") },
+                ]);
+                return;
+            }
+        } catch {
+            // proceed — backend will reject if no wallet
+        }
+
         setLoading(true);
         try {
             const res = await api.createPayment({
@@ -56,18 +72,11 @@ const CreateInvoice: React.FC = () => {
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
-            <Image
-                source={require("../assets/bg-01.png")}
-                style={styles.background}
-            />
+        <View style={{ flex: 1, backgroundColor: colors.bgColor }}>
             <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
                 <components.Header
                     title={t.payment.createTitle}
                     goBack={true}
-                    goBackColor={theme.COLORS.white}
-                    titleStyle={{ color: theme.COLORS.white }}
-                    languageTone="on-dark"
                 />
                 <components.FormScrollView
                     contentContainerStyle={{ flexGrow: 1 }}
@@ -77,8 +86,8 @@ const CreateInvoice: React.FC = () => {
                     <Text
                         style={{
                             textAlign: "center",
-                            ...theme.FONTS.H2,
-                            color: theme.COLORS.mainDark,
+                            ...FONTS.H2,
+                            color: colors.mainDark,
                             marginTop: 20,
                             marginBottom: 8,
                         }}
@@ -87,9 +96,9 @@ const CreateInvoice: React.FC = () => {
                     </Text>
                     <Text
                         style={{
-                            ...theme.FONTS.Mulish_400Regular,
+                            ...FONTS.Mulish_400Regular,
                             fontSize: 14,
-                            color: theme.COLORS.bodyTextColor,
+                            color: colors.bodyTextColor,
                             marginBottom: 24,
                             textAlign: "center",
                             lineHeight: 14 * 1.6,
@@ -114,22 +123,22 @@ const CreateInvoice: React.FC = () => {
                     />
                     <Text
                         style={{
-                            ...theme.FONTS.Mulish_400Regular,
+                            ...FONTS.Mulish_400Regular,
                             fontSize: 12,
-                            color: theme.COLORS.bodyTextColor,
+                            color: colors.bodyTextColor,
                             marginBottom: 24,
                         }}
                     >
                         {formatUsdtNetwork(network)}
                     </Text>
                     {loading ? (
-                        <ActivityIndicator size="large" color={theme.COLORS.mainDark} />
+                        <LoadingSpinner size={48} />
                     ) : (
                         <components.Button
                             title={t.payment.generateQr}
                             onPress={handleCreate}
                             containerStyle={{ marginBottom: 28 }}
-                            leading={<svg.QrCodeSvg size={20} color={theme.COLORS.white} />}
+                            leading={<svg.QrCodeSvg size={20} color={colors.white} />}
                         />
                     )}
 
@@ -140,15 +149,15 @@ const CreateInvoice: React.FC = () => {
                             paddingTop: 20,
                         }}
                     >
-                        <Text style={{ ...theme.FONTS.H4, color: theme.COLORS.mainDark, marginBottom: 12 }}>
+                        <Text style={{ ...FONTS.H4, color: colors.mainDark, marginBottom: 12 }}>
                             {t.payment.recentPayments}
                         </Text>
                         {loadingRecent ? (
-                            <ActivityIndicator color={theme.COLORS.mainDark} style={{ marginVertical: 16 }} />
+                            <LoadingSpinner size={40} style={{ marginVertical: 16 }} />
                         ) : recentPayments.length === 0 ? (
                             <Text
                                 style={{
-                                    color: theme.COLORS.bodyTextColor,
+                                    color: colors.bodyTextColor,
                                     textAlign: "center",
                                     paddingVertical: 16,
                                     fontSize: 14,
@@ -178,13 +187,5 @@ const CreateInvoice: React.FC = () => {
         </View>
     );
 };
-
-const styles = StyleSheet.create({
-    background: {
-        ...StyleSheet.absoluteFill,
-        height: 350,
-        zIndex: -1,
-    },
-});
 
 export default CreateInvoice;

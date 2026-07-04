@@ -1,60 +1,229 @@
-import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
-import React, { useState, useCallback } from "react";
-import { useFocusEffect } from "@react-navigation/native";
-import { useNavigation } from "@react-navigation/native";
-import { useSelector } from "react-redux";
+import { View, Text, StyleSheet } from "react-native";
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useAppSelector } from "../hooks/useAppSelector";
 
 import { svg } from "../svg";
-import { theme } from "../constants";
 import { components } from "../components";
-import { api, PaymentRequest } from "../services/api";
+import WalletDepositListItem from "../components/WalletDepositListItem";
+import { api, PaymentRequest, WalletTransfer } from "../services/api";
+import { resolveDisplayUsdtBalance } from "../utils/walletBalance";
 import { RootState } from "../store/store";
 import { useTranslation } from "../hooks/useTranslation";
+import { useTheme } from "../hooks/useTheme";
+import type { WalletQuickAction } from "../components/WalletQuickActions";
+import { registerDashboardRefresh } from "../utils/dashboardRefresh";
+import { syncDeviceWalletToServer } from "../services/wallet/syncDeviceWallet";
 
 const sumAmounts = (items: PaymentRequest[]) =>
     items.reduce((total, item) => total + (parseFloat(item.amount) || 0), 0);
 
+const usdtDeposits = (items: WalletTransfer[]) =>
+    items.filter((item) => item.type === "DEPOSIT" && item.currency === "USDT");
+
+const sumDepositAmounts = (items: WalletTransfer[]) =>
+    usdtDeposits(items).reduce((total, item) => total + (Number(item.amount) || 0), 0);
+
+type RecentRow =
+    | { kind: "payment"; key: string; sortAt: number; payment: PaymentRequest }
+    | { kind: "deposit"; key: string; sortAt: number; deposit: WalletTransfer };
+
 const Dashboard: React.FC = () => {
     const navigation: any = useNavigation();
     const { t } = useTranslation();
-    const merchant = useSelector((state: RootState) => state.auth.merchant);
-    const [payments, setPayments] = useState<PaymentRequest[]>([]);
+    const { colors, FONTS, isDark } = useTheme();
+    const merchant = useAppSelector((state: RootState) => state.auth.merchant);
+    const [recentRows, setRecentRows] = useState<RecentRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({
         pending: 0,
-        paid: 0,
         pendingAmount: 0,
-        totalReceived: 0,
+        depositCount: 0,
+        depositAmount: 0,
+        walletBalance: 0,
     });
+    const hasLoadedRef = useRef(false);
+    const lastBalanceRef = useRef<number | null>(null);
 
-    const loadPayments = useCallback(() => {
-        setLoading(true);
-        api.listPayments({ limit: 100 })
-            .then((res) => {
-                const items = res.data.items;
-                const recent = items.slice(0, 5);
-                const pendingItems = items.filter((p) => p.status === "PENDING");
-                const paidItems = items.filter((p) => p.status === "PAID");
+    const quickActionsShellStyle = useMemo(
+        () =>
+            StyleSheet.create({
+                shell: {
+                    marginTop: 12,
+                    borderRadius: 18,
+                    backgroundColor: isDark ? "#22222C" : "#12121C",
+                    borderWidth: isDark ? 1 : 0,
+                    borderColor: isDark ? colors.border : "transparent",
+                    paddingHorizontal: 12,
+                    paddingTop: 18,
+                    paddingBottom: 20,
+                },
+            }),
+        [colors.border, isDark]
+    );
 
-                setPayments(recent);
-                setStats({
-                    pending: pendingItems.length,
-                    paid: paidItems.length,
-                    pendingAmount: sumAmounts(pendingItems),
-                    totalReceived: sumAmounts(paidItems),
+    const iconColor = colors.pureWhite;
+
+    const handleReceive = useCallback(() => {
+        navigation.navigate("ReceiveSelect");
+    }, [navigation]);
+
+    const quickActions = useMemo<WalletQuickAction[]>(
+        () => [
+            {
+                key: "send",
+                label: t.common.send,
+                icon: <svg.SendSvg color={iconColor} size={22} />,
+                onPress: () => navigation.navigate("SendSelect"),
+            },
+            {
+                key: "receive",
+                label: t.wallet.receiveTitle,
+                icon: <svg.ReceiveSvg color={iconColor} size={22} />,
+                onPress: handleReceive,
+            },
+            {
+                key: "request",
+                label: t.dashboard.request,
+                icon: <svg.QrCodeSvg color={iconColor} size={22} />,
+                onPress: () => navigation.navigate("CreateInvoice"),
+            },
+            {
+                key: "history",
+                label: t.dashboard.history,
+                icon: <svg.HistorySvg color={iconColor} size={22} />,
+                onPress: () => navigation.getParent()?.navigate("History"),
+            },
+        ],
+        [handleReceive, iconColor, navigation, t]
+    );
+
+    const pageStyles = useMemo(
+        () =>
+            StyleSheet.create({
+                root: {
+                    flex: 1,
+                },
+                loadingOverlay: {
+                    ...StyleSheet.absoluteFillObject,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: isDark ? "rgba(14, 14, 19, 0.72)" : "rgba(237, 240, 242, 0.82)",
+                    zIndex: 100,
+                },
+            }),
+        [isDark]
+    );
+
+    const applyDashboardData = useCallback(
+        (
+            items: PaymentRequest[],
+            deposits: WalletTransfer[],
+            balances: Awaited<ReturnType<typeof api.getWalletBalances>>["data"]["balances"]
+        ) => {
+            const pendingItems = items.filter((p) => p.status === "PENDING");
+            const paymentRows: RecentRow[] = items.map((payment) => ({
+                kind: "payment",
+                key: `payment:${payment.id}`,
+                sortAt: new Date(payment.paidAt || payment.createdAt).getTime(),
+                payment,
+            }));
+            const depositRows: RecentRow[] = deposits.map((deposit) => ({
+                kind: "deposit",
+                key: deposit.id,
+                sortAt: new Date(deposit.timestamp).getTime(),
+                deposit,
+            }));
+            const merged = [...paymentRows, ...depositRows]
+                .sort((a, b) => b.sortAt - a.sortAt)
+                .slice(0, 5);
+
+            const walletBalance = resolveDisplayUsdtBalance(balances, deposits);
+            lastBalanceRef.current = walletBalance;
+
+            setRecentRows(merged);
+            setStats({
+                pending: pendingItems.length,
+                pendingAmount: sumAmounts(pendingItems),
+                depositCount: usdtDeposits(deposits).length,
+                depositAmount: sumDepositAmounts(deposits),
+                walletBalance,
+            });
+        },
+        []
+    );
+
+    const loadDashboard = useCallback(
+        (opts?: { silent?: boolean }) => {
+            const silent = Boolean(opts?.silent) && hasLoadedRef.current;
+            if (!silent) setLoading(true);
+
+            Promise.allSettled([
+                api.listPayments({ limit: 100 }),
+                api.getWalletBalances(),
+                api.getWalletTransfers(),
+            ])
+                .then(([paymentsResult, balancesResult, transfersResult]) => {
+                    const items =
+                        paymentsResult.status === "fulfilled"
+                            ? paymentsResult.value.data.items
+                            : [];
+                    const deposits =
+                        transfersResult.status === "fulfilled"
+                            ? transfersResult.value.data.transfers
+                            : [];
+                    const balances =
+                        balancesResult.status === "fulfilled"
+                            ? balancesResult.value.data.balances
+                            : [];
+
+                    applyDashboardData(items, deposits, balances);
+                    hasLoadedRef.current = true;
+                })
+                .finally(() => {
+                    if (!silent) setLoading(false);
                 });
-            })
-            .catch(() => {
-                setPayments([]);
-                setStats({ pending: 0, paid: 0, pendingAmount: 0, totalReceived: 0 });
-            })
-            .finally(() => setLoading(false));
-    }, []);
+        },
+        [applyDashboardData]
+    );
 
+    useEffect(() => {
+        return registerDashboardRefresh(() => loadDashboard({ silent: true }));
+    }, [loadDashboard]);
+
+    // Refresh when Home is shown (e.g. after Receive) so RECEIVED + activity match balance.
     useFocusEffect(
         useCallback(() => {
-            loadPayments();
-        }, [loadPayments])
+            void (async () => {
+                await syncDeviceWalletToServer();
+                loadDashboard({ silent: hasLoadedRef.current });
+            })();
+
+            const pollMs = 12_000;
+            const timer = setInterval(() => {
+                void Promise.allSettled([api.getWalletBalances(), api.getWalletTransfers()]).then(
+                    ([balancesResult, transfersResult]) => {
+                        const balances =
+                            balancesResult.status === "fulfilled"
+                                ? balancesResult.value.data.balances
+                                : [];
+                        const transfers =
+                            transfersResult.status === "fulfilled"
+                                ? transfersResult.value.data.transfers
+                                : [];
+                        const next = resolveDisplayUsdtBalance(balances, transfers);
+                        const prev = lastBalanceRef.current;
+                        if (prev == null || Math.abs(next - prev) > 0.0000001) {
+                            loadDashboard({ silent: true });
+                        } else {
+                            setStats((s) => ({ ...s, walletBalance: next }));
+                        }
+                    }
+                );
+            }, pollMs);
+
+            return () => clearInterval(timer);
+        }, [loadDashboard])
     );
 
     const accountLabel = merchant?.email
@@ -62,130 +231,81 @@ const Dashboard: React.FC = () => {
         : t.dashboard.merchantAccount;
 
     return (
-        <components.ScreenScroll>
-            <components.MerchantTabHeader
-                eyebrow={t.dashboard.welcomeBack}
-                title={merchant?.businessName || t.common.merchant}
-                subtitle={t.dashboard.subtitle}
-                paddingBottom={72}
-            />
-            <components.MerchantContent style={{ marginTop: -56, marginBottom: 20 }}>
-                <components.MerchantBalanceCard
-                    businessName={merchant?.businessName || t.common.merchant}
-                    totalReceived={stats.totalReceived}
-                    pendingCount={stats.pending}
-                    pendingAmount={stats.pendingAmount}
-                    paidCount={stats.paid}
-                    accountLabel={accountLabel}
+        <View style={pageStyles.root}>
+            <components.ScreenScroll>
+                <components.MerchantTabHeader
+                    eyebrow={t.dashboard.welcomeBack}
+                    title={merchant?.businessName || t.common.merchant}
+                    subtitle={t.dashboard.subtitle}
+                    paddingBottom={72}
                 />
-            </components.MerchantContent>
+                <components.MerchantContent style={{ marginTop: -56, marginBottom: 20 }}>
+                    <components.MerchantBalanceCard
+                        businessName={merchant?.businessName || t.common.merchant}
+                        walletBalance={stats.walletBalance}
+                        pendingCount={stats.pending}
+                        pendingAmount={stats.pendingAmount}
+                        depositCount={stats.depositCount}
+                        depositAmount={stats.depositAmount}
+                        accountLabel={accountLabel}
+                        onRefresh={loadDashboard}
+                        refreshing={loading}
+                        onBalancePress={() => navigation.navigate("BalanceDetail")}
+                    />
+                    <View style={quickActionsShellStyle.shell}>
+                        <components.WalletQuickActions actions={quickActions} variant="onDark" />
+                    </View>
+                </components.MerchantContent>
 
-            <components.MerchantContent style={{ marginBottom: 24 }}>
-                <View style={{ flexDirection: "row", gap: 12, marginBottom: 12 }}>
-                    <TouchableOpacity
-                        onPress={() => navigation.navigate("CreateInvoice")}
-                        style={actionCardStyle}
-                    >
-                        <View style={[actionIconStyle, { backgroundColor: "#EECC55" }]}>
-                            <svg.SafeDepositSvg color={theme.COLORS.white} />
-                        </View>
-                        <Text style={actionLabelStyle}>{t.dashboard.deposit}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={() => navigation.navigate("FundTransfer")}
-                        style={actionCardStyle}
-                    >
-                        <View style={actionIconPlain}>
-                            <svg.TransferSvg />
-                        </View>
-                        <Text style={actionLabelStyle}>{t.dashboard.makeTransfer}</Text>
-                    </TouchableOpacity>
-                </View>
-                <View style={{ flexDirection: "row", gap: 12 }}>
-                    <TouchableOpacity
-                        onPress={() => navigation.navigate("Withdraw")}
-                        style={actionCardStyle}
-                    >
-                        <View style={[actionIconStyle, { backgroundColor: "#3EB290" }]}>
-                            <svg.WalletSvg color={theme.COLORS.white} />
-                        </View>
-                        <Text style={actionLabelStyle}>{t.dashboard.withdraw}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={() => navigation.getParent()?.navigate("History")}
-                        style={actionCardStyle}
-                    >
-                        <View style={[actionIconStyle, { backgroundColor: "#8B7FD4" }]}>
-                            <svg.ReportSvg color={theme.COLORS.white} />
-                        </View>
-                        <Text style={actionLabelStyle}>{t.dashboard.viewHistory}</Text>
-                    </TouchableOpacity>
-                </View>
-            </components.MerchantContent>
-
-            <components.MerchantContent>
-                <Text style={{ ...theme.FONTS.H4, color: theme.COLORS.mainDark, marginBottom: 12 }}>
-                    {t.dashboard.recentPayments}
-                </Text>
-                {loading ? (
-                    <ActivityIndicator color={theme.COLORS.mainDark} />
-                ) : payments.length === 0 ? (
-                    <Text style={{ color: theme.COLORS.bodyTextColor, textAlign: "center", paddingVertical: 24 }}>
-                        {t.dashboard.noPayments}
+                <components.MerchantContent>
+                    <Text style={{ ...FONTS.H4, color: colors.mainDark, marginBottom: 12 }}>
+                        {t.dashboard.recentActivity}
                     </Text>
-                ) : (
-                    payments.map((item) => (
-                        <components.PaymentListItem
-                            key={item.id}
-                            item={item}
-                            onPress={() =>
-                                navigation.navigate("TransactionDetails", { payment: item, paymentId: item.id })
-                            }
-                        />
-                    ))
-                )}
-            </components.MerchantContent>
-        </components.ScreenScroll>
+                    {recentRows.length === 0 ? (
+                        <Text
+                            style={{
+                                color: colors.bodyTextColor,
+                                textAlign: "center",
+                                paddingVertical: 24,
+                            }}
+                        >
+                            {t.dashboard.noRecentActivity}
+                        </Text>
+                    ) : (
+                        recentRows.map((row) =>
+                            row.kind === "payment" ? (
+                                <components.PaymentListItem
+                                    key={row.key}
+                                    item={row.payment}
+                                    onPress={() =>
+                                        navigation.navigate("TransactionDetails", {
+                                            payment: row.payment,
+                                            paymentId: row.payment.id,
+                                        })
+                                    }
+                                />
+                            ) : (
+                                <WalletDepositListItem
+                                    key={row.key}
+                                    item={row.deposit}
+                                    onPress={() =>
+                                        navigation.navigate("WalletDepositDetails", {
+                                            deposit: row.deposit,
+                                        })
+                                    }
+                                />
+                            )
+                        )
+                    )}
+                </components.MerchantContent>
+            </components.ScreenScroll>
+            {loading ? (
+                <View style={pageStyles.loadingOverlay} pointerEvents="auto">
+                    <components.LoadingSpinner size={48} />
+                </View>
+            ) : null}
+        </View>
     );
 };
 
 export default Dashboard;
-
-const actionCardStyle = {
-    flex: 1,
-    minWidth: 0,
-    alignItems: "center" as const,
-    backgroundColor: theme.COLORS.white,
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 10,
-    elevation: 4,
-    shadowColor: "#062664",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-};
-
-const actionIconStyle = {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
-    marginBottom: 10,
-};
-
-const actionIconPlain = {
-    width: 48,
-    height: 48,
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
-    marginBottom: 10,
-};
-
-const actionLabelStyle = {
-    ...theme.FONTS.Mulish_600SemiBold,
-    fontSize: 12,
-    color: theme.COLORS.mainDark,
-    textAlign: "center" as const,
-};

@@ -1,7 +1,9 @@
 import { View, Text, TouchableOpacity, Platform, Pressable, StyleSheet } from "react-native";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Shadow } from "react-native-shadow-2";
-import { theme } from "../constants";
+
+import { useTheme } from "../hooks/useTheme";
+import { MENU_ICON_SIZE } from "../constants/menuIcon";
 
 type Props = {
     onPress?: () => void;
@@ -12,7 +14,7 @@ type Props = {
     toggleButton?: boolean;
 };
 
-const ICON_SIZE = 24;
+const ICON_SIZE = MENU_ICON_SIZE;
 
 const ProfileCategory: React.FC<Props> = ({
     onPress,
@@ -23,6 +25,7 @@ const ProfileCategory: React.FC<Props> = ({
     toggleButton,
 }) => {
     const [toggle, setToggle] = useState(false);
+    const { colors, FONTS } = useTheme();
 
     const rowStyle = {
         flex: 1,
@@ -34,6 +37,11 @@ const ProfileCategory: React.FC<Props> = ({
 
     const RowButton = Platform.OS === "web" ? Pressable : TouchableOpacity;
 
+    const shadowStart = useMemo(
+        () => (colors.bgColor === "#0E0E13" ? "rgba(0, 0, 0, 0.35)" : "rgba(6, 38, 100, 0.02)"),
+        [colors.bgColor]
+    );
+
     return (
         <View style={{ width: "100%", height: 62, marginBottom: 6 }}>
             <Shadow
@@ -41,17 +49,17 @@ const ProfileCategory: React.FC<Props> = ({
                     width: "100%",
                     height: "100%",
                     borderRadius: 10,
-                    backgroundColor: "white",
+                    backgroundColor: colors.white,
                 }}
                 containerStyle={{
                     width: "100%",
                     height: "100%",
                     borderRadius: 10,
-                    backgroundColor: "white",
+                    backgroundColor: colors.white,
                 }}
                 offset={[0, 0]}
                 distance={15}
-                startColor={"rgba(6, 38, 100, 0.02)"}
+                startColor={shadowStart}
                 endColor={"rgba(6, 38, 100, 0.0)"}
             >
                 <RowButton
@@ -59,15 +67,13 @@ const ProfileCategory: React.FC<Props> = ({
                     onPress={onPress}
                     accessibilityRole="button"
                 >
-                    <View
-                        style={{ flexDirection: "row", alignItems: "center" }}
-                    >
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
                         {icon ? <View style={styles.iconSlot}>{icon}</View> : null}
                         <Text
                             style={{
                                 marginLeft: 10,
-                                ...theme.FONTS.H5,
-                                color: theme.COLORS.mainDark,
+                                ...FONTS.H5,
+                                color: colors.mainDark,
                                 ...titleStyle,
                             }}
                             numberOfLines={1}
@@ -85,14 +91,10 @@ const ProfileCategory: React.FC<Props> = ({
                             style={{
                                 width: 40,
                                 marginLeft: "auto",
-                                backgroundColor: toggle
-                                    ? theme.COLORS.green
-                                    : theme.COLORS.grey1,
+                                backgroundColor: toggle ? colors.green : colors.grey1,
                                 flexDirection: "row",
                                 alignItems: "center",
-                                justifyContent: toggle
-                                    ? "flex-end"
-                                    : "flex-start",
+                                justifyContent: toggle ? "flex-end" : "flex-start",
                                 padding: 2,
                                 borderRadius: 20,
                             }}
@@ -104,7 +106,7 @@ const ProfileCategory: React.FC<Props> = ({
                                     width: 20,
                                     height: 20,
                                     borderRadius: 12,
-                                    backgroundColor: theme.COLORS.white,
+                                    backgroundColor: "#FFFFFF",
                                 }}
                             />
                         </TouchableOpacity>

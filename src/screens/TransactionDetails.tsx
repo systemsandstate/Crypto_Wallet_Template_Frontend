@@ -1,4 +1,5 @@
-import { Text, View, Image, ActivityIndicator, Alert, Platform, StyleSheet } from "react-native";
+import { Text, View, Image } from "react-native";
+import LoadingSpinner from "../components/LoadingSpinner";
 import React, { useEffect, useState, useCallback } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -8,6 +9,9 @@ import { api, PaymentRequest } from "../services/api";
 import { useTabBarInset } from "../hooks/useTabBarInset";
 import { useTranslation } from "../hooks/useTranslation";
 import { formatMessage } from "../i18n";
+import { copyToClipboard } from "../utils/copyToClipboard";
+import { showToast } from "../utils/toast";
+import { navigateUp } from "../navigation/navigateUp";
 
 const TransactionDetails: React.FC = ({ navigation, route }: any) => {
     const { t } = useTranslation();
@@ -27,19 +31,11 @@ const TransactionDetails: React.FC = ({ navigation, route }: any) => {
 
     const copyText = useCallback(
         async (label: string, value: string) => {
-            try {
-                if (Platform.OS === "web" && typeof navigator !== "undefined" && navigator.clipboard) {
-                    await navigator.clipboard.writeText(value);
-                } else {
-                    Alert.alert(label, value);
-                    return;
-                }
-                Alert.alert(
-                    t.transaction.copied,
-                    formatMessage(t.transaction.copiedToClipboard, { label })
-                );
-            } catch {
-                Alert.alert(t.transaction.copyFailed, t.transaction.couldNotCopy);
+            const copied = await copyToClipboard(value);
+            if (copied) {
+                showToast(formatMessage(t.transaction.copiedToClipboard, { label }));
+            } else {
+                showToast(t.transaction.couldNotCopy, "error");
             }
         },
         [t]
@@ -93,7 +89,7 @@ const TransactionDetails: React.FC = ({ navigation, route }: any) => {
     if (loading) {
         return (
             <SafeAreaView style={{ flex: 1, backgroundColor: theme.COLORS.bgColor, justifyContent: "center", alignItems: "center" }}>
-                <ActivityIndicator size="large" color={theme.COLORS.mainDark} />
+                <LoadingSpinner size={48} />
             </SafeAreaView>
         );
     }
@@ -116,7 +112,6 @@ const TransactionDetails: React.FC = ({ navigation, route }: any) => {
 
     return (
         <View style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
-            <Image source={require("../assets/bg/04.png")} style={styles.background} />
             <SafeAreaView style={{ flex: 1 }}>
                 <components.Header goBack={true} />
                 <components.ScreenScroll
@@ -228,7 +223,7 @@ const TransactionDetails: React.FC = ({ navigation, route }: any) => {
                         )}
                         <components.Button
                             title={t.common.back}
-                            onPress={() => navigation.goBack()}
+                            onPress={() => navigateUp(navigation, "TransactionDetails")}
                             containerStyle={{ marginBottom: 20 }}
                         />
                     </components.MerchantContent>
@@ -237,12 +232,5 @@ const TransactionDetails: React.FC = ({ navigation, route }: any) => {
         </View>
     );
 };
-
-const styles = StyleSheet.create({
-    background: {
-        ...StyleSheet.absoluteFill,
-        height: 400,
-    },
-});
 
 export default TransactionDetails;

@@ -1,23 +1,33 @@
 import * as React from "react";
 import Svg, { Path } from "react-native-svg";
 
+import { MENU_ICON_SIZE, MENU_ICON_STROKE } from "../constants/menuIcon";
+
 type Props = {
     color?: string;
+    size?: number;
 };
 
-const FileTextSvg: React.FC<Props> = ({ color = "#4C4C60" }) => (
-    <Svg width={24} height={24} viewBox="0 0 16 16" fill="none">
+const FileTextSvg: React.FC<Props> = ({ color = "#4C4C60", size = MENU_ICON_SIZE }) => (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
         <Path
-            d="M9.333 1.333H4a1.333 1.333 0 0 0-1.333 1.334v10.666A1.333 1.333 0 0 0 4 14.667h8a1.333 1.333 0 0 0 1.333-1.334v-8l-4-4ZM10.667 11.333H5.333M10.667 8.667H5.333M6.667 6H5.333"
+            d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z"
             stroke={color}
-            strokeWidth={1.5}
+            strokeWidth={MENU_ICON_STROKE}
             strokeLinecap="round"
             strokeLinejoin="round"
         />
         <Path
-            d="M9.333 1.333v4h4"
+            d="M14 2v6h6"
             stroke={color}
-            strokeWidth={1.5}
+            strokeWidth={MENU_ICON_STROKE}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+        <Path
+            d="M16 13H8M16 17H8M10 9H8"
+            stroke={color}
+            strokeWidth={MENU_ICON_STROKE}
             strokeLinecap="round"
             strokeLinejoin="round"
         />

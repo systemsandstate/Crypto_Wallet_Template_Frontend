@@ -1,4 +1,5 @@
-import { Text, Alert, ActivityIndicator } from "react-native";
+import { Text, Alert } from "react-native";
+import LoadingSpinner from "../components/LoadingSpinner";
 import React, { useState } from "react";
 
 import { theme } from "../constants";
@@ -6,6 +7,7 @@ import { components } from "../components";
 import { api } from "../services/api";
 import { useTabBarInset } from "../hooks/useTabBarInset";
 import { useTranslation } from "../hooks/useTranslation";
+import { navigateUp } from "../navigation/navigateUp";
 
 const ChangePassword: React.FC = ({ navigation }: any) => {
     const { t } = useTranslation();
@@ -24,7 +26,7 @@ const ChangePassword: React.FC = ({ navigation }: any) => {
         try {
             await api.changePassword({ currentPassword, newPassword });
             Alert.alert(t.common.success, t.account.passwordUpdated, [
-                { text: t.common.ok, onPress: () => navigation.goBack() },
+                { text: t.common.ok, onPress: () => navigateUp(navigation, "ChangePassword") },
             ]);
         } catch (err: any) {
             Alert.alert(t.common.error, err.message || t.account.couldNotChangePassword);
@@ -71,7 +73,7 @@ const ChangePassword: React.FC = ({ navigation }: any) => {
                 containerStyle={{ marginBottom: 20 }}
             />
             {loading ? (
-                <ActivityIndicator size="large" color={theme.COLORS.mainDark} />
+                <LoadingSpinner size={48} />
             ) : (
                 <components.Button title={t.account.updatePassword} onPress={handleSubmit} />
             )}

@@ -1,18 +1,14 @@
 import { configureStore } from "@reduxjs/toolkit";
 
-import cartReducer from "./cartSlice";
-import wishlistReducer from "./wishlistSlice";
-import tabReducer from "./tabSlice";
 import authReducer from "./authSlice";
 import localeReducer from "./localeSlice";
+import themeReducer from "./themeSlice";
 
 const store = configureStore({
     reducer: {
         auth: authReducer,
         locale: localeReducer,
-        cart: cartReducer,
-        wishlist: wishlistReducer,
-        tab: tabReducer,
+        theme: themeReducer,
     },
 });
 

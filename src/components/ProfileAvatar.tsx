@@ -1,14 +1,15 @@
 import { View, Image, TouchableOpacity, Text, Platform, Alert } from "react-native";
 import React from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
+import { useAppSelector } from "../hooks/useAppSelector";
 import * as ImagePicker from "expo-image-picker";
 
-import { theme } from "../constants";
 import { svg } from "../svg";
 import { RootState } from "../store/store";
 import { setAvatarUrl } from "../store/authSlice";
 import { readImageFileAsDataUrl, validateImageDataUrl } from "../utils/avatarStorage";
 import { useTranslation } from "../hooks/useTranslation";
+import { useTheme } from "../hooks/useTheme";
 import { pickWebImage } from "../utils/pickWebImage";
 
 const DEFAULT_AVATAR = require("../assets/users/07.png");
@@ -21,8 +22,9 @@ type Props = {
 const ProfileAvatar: React.FC<Props> = ({ size = 88, showEdit = true }) => {
     const dispatch = useDispatch();
     const { t } = useTranslation();
-    const merchant = useSelector((state: RootState) => state.auth.merchant);
-    const avatarUrl = useSelector((state: RootState) => state.auth.avatarUrl);
+    const { colors, isDark, FONTS } = useTheme();
+    const merchant = useAppSelector((state: RootState) => state.auth.merchant);
+    const avatarUrl = useAppSelector((state: RootState) => state.auth.avatarUrl);
 
     const applyDataUrl = (dataUrl: string) => {
         if (!merchant?.id) return;
@@ -96,7 +98,10 @@ const ProfileAvatar: React.FC<Props> = ({ size = 88, showEdit = true }) => {
                         width: size,
                         height: size,
                         borderRadius: size / 2,
-                        backgroundColor: "#E8ECF0",
+                        backgroundColor: colors.surfaceMuted,
+                        ...(isDark
+                            ? { borderWidth: 2, borderColor: colors.pureWhite }
+                            : null),
                     }}
                 />
                 {showEdit ? (
@@ -108,11 +113,11 @@ const ProfileAvatar: React.FC<Props> = ({ size = 88, showEdit = true }) => {
                             width: 28,
                             height: 28,
                             borderRadius: 14,
-                            backgroundColor: theme.COLORS.linkColor,
+                            backgroundColor: colors.linkColor,
                             alignItems: "center",
                             justifyContent: "center",
                             borderWidth: 2,
-                            borderColor: theme.COLORS.white,
+                            borderColor: colors.pureWhite,
                         }}
                     >
                         <View style={{ transform: [{ scale: 0.65 }] }}>
@@ -126,9 +131,9 @@ const ProfileAvatar: React.FC<Props> = ({ size = 88, showEdit = true }) => {
                     <Text
                         style={{
                             marginTop: 8,
-                            ...theme.FONTS.Mulish_600SemiBold,
+                            ...FONTS.Mulish_600SemiBold,
                             fontSize: 12,
-                            color: theme.COLORS.linkColor,
+                            color: colors.linkColor,
                         }}
                     >
                         {t.profile.changePhoto}

@@ -3,10 +3,11 @@ import React from "react";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { theme } from "../constants";
 import { svg } from "../svg";
 import { useTranslation } from "../hooks/useTranslation";
+import { useTheme } from "../hooks/useTheme";
 import { TAB_BAR_CONTENT_HEIGHT } from "../hooks/useTabBarInset";
+import { MENU_ICON_SIZE } from "../constants/menuIcon";
 
 export { TAB_BAR_HEIGHT, useTabBarInset } from "../hooks/useTabBarInset";
 
@@ -17,10 +18,11 @@ export enum Tab {
     Profile = "Profile",
 }
 
-const TAB_ICON_SIZE = 24;
+const TAB_ICON_SIZE = MENU_ICON_SIZE;
 
 const BottomTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
     const { t } = useTranslation();
+    const { colors, FONTS } = useTheme();
     const insets = useSafeAreaInsets();
     const bottomPadding = Math.max(insets.bottom, 8);
 
@@ -32,16 +34,16 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
     };
 
     const renderIcon = (name: Tab, active: boolean) => {
-        const color = active ? theme.COLORS.linkColor : theme.COLORS.bodyTextColor;
+        const color = active ? colors.linkColor : colors.bodyTextColor;
         switch (name) {
             case Tab.Dashboard:
-                return <svg.ReportSvg color={color} />;
+                return <svg.HomeSvg color={color} size={TAB_ICON_SIZE} />;
             case Tab.History:
-                return <svg.WalletSvg color={color} />;
+                return <svg.HistorySvg color={color} size={TAB_ICON_SIZE} />;
             case Tab.Analytics:
-                return <svg.AnalyticsSvg color={color} />;
+                return <svg.AnalyticsSvg color={color} size={TAB_ICON_SIZE} />;
             case Tab.Profile:
-                return <svg.UserOneSvg color={color} />;
+                return <svg.ProfileTabSvg color={color} size={TAB_ICON_SIZE} />;
             default:
                 return null;
         }
@@ -50,7 +52,7 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
     return (
         <View
             style={{
-                backgroundColor: theme.COLORS.white,
+                backgroundColor: colors.white,
                 borderTopLeftRadius: 10,
                 borderTopRightRadius: 10,
             }}
@@ -99,9 +101,9 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
                             </View>
                             <Text
                                 style={{
-                                    ...theme.FONTS.Mulish_600SemiBold,
+                                    ...FONTS.Mulish_600SemiBold,
                                     fontSize: 10,
-                                    color: isFocused ? theme.COLORS.linkColor : theme.COLORS.mainDark,
+                                    color: isFocused ? colors.linkColor : colors.mainDark,
                                 }}
                             >
                                 {labels[name]}

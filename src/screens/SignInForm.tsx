@@ -7,16 +7,17 @@ import {
     Keyboard,
     Platform,
 } from "react-native";
-import React, { useState, useCallback, memo, useRef } from "react";
+import React, { useState, useCallback, memo, useRef, useMemo } from "react";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useDispatch } from "react-redux";
 
-import { theme } from "../constants";
 import { components } from "../components";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
+import { useTheme } from "../hooks/useTheme";
 import { api } from "../services/api";
 import { setCredentials } from "../store/authSlice";
 import { safeReset } from "../utils/safeNavigation";
+import { syncPushTokenWithBackend } from "../services/pushNotifications";
 import type { getDictionary } from "../i18n";
 
 type TranslationDict = ReturnType<typeof getDictionary>;
@@ -26,37 +27,44 @@ type Props = {
     navigation: NativeStackNavigationProp<any>;
 };
 
+const readInputValue = (ref: React.RefObject<any>, fallback: string): string => {
+    const node = ref.current;
+    if (node && typeof node.value === "string" && node.value.length > 0) {
+        return node.value;
+    }
+    return fallback;
+};
+
 const SignInForm = memo(function SignInForm({ t, navigation }: Props) {
     const dispatch = useDispatch();
     const { isCompact } = useResponsiveLayout();
-    const emailRef = useRef("");
-    const passwordRef = useRef("");
+    const { colors, FONTS } = useTheme();
+    const emailValueRef = useRef("");
+    const passwordValueRef = useRef("");
+    const emailInputRef = useRef<any>(null);
+    const passwordInputRef = useRef<any>(null);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [rememberMe, setRememberMe] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    const useRefs = Platform.OS !== "web";
+    const onEmailChange = useCallback((text: string) => {
+        emailValueRef.current = text;
+        setEmail(text);
+    }, []);
 
-    const onEmailChange = useCallback(
-        (text: string) => {
-            emailRef.current = text;
-            if (!useRefs) setEmail(text);
-        },
-        [useRefs]
-    );
-
-    const onPasswordChange = useCallback(
-        (text: string) => {
-            passwordRef.current = text;
-            if (!useRefs) setPassword(text);
-        },
-        [useRefs]
-    );
+    const onPasswordChange = useCallback((text: string) => {
+        passwordValueRef.current = text;
+        setPassword(text);
+    }, []);
 
     const handleSignIn = useCallback(() => {
-        const trimmedEmail = (useRefs ? emailRef.current : email).trim();
-        const pwd = useRefs ? passwordRef.current : password;
+        // Prefer DOM/native values so browser autofill (which may skip onChange) still works.
+        const trimmedEmail = readInputValue(
+            emailInputRef,
+            emailValueRef.current || email
+        ).trim();
+        const pwd = readInputValue(passwordInputRef, passwordValueRef.current || password);
 
         if (!trimmedEmail || !pwd) {
             Alert.alert(t.common.error, t.auth.enterEmailPassword);
@@ -80,12 +88,93 @@ const SignInForm = memo(function SignInForm({ t, navigation }: Props) {
                     await new Promise((resolve) => setTimeout(resolve, 80));
                 }
                 safeReset([{ name: "TabNavigator" }]);
+                void syncPushTokenWithBackend();
             } catch (err: any) {
                 Alert.alert(t.auth.signInFailed, err.message || t.auth.invalidCredentials);
                 setLoading(false);
             }
         })();
-    }, [dispatch, email, loading, password, t, useRefs]);
+    }, [dispatch, email, loading, password, t]);
+
+    const styles = useMemo(
+        () =>
+            StyleSheet.create({
+                title: {
+                    textAlign: "center",
+                    ...FONTS.H1,
+                    color: colors.mainDark,
+                    marginBottom: 8,
+                },
+                titleCompact: {
+                    fontSize: 32,
+                    lineHeight: 38,
+                },
+                subtitle: {
+                    textAlign: "center",
+                    ...FONTS.Mulish_400Regular,
+                    fontSize: 14,
+                    color: colors.bodyTextColor,
+                    marginBottom: 24,
+                },
+                fieldGap: {
+                    marginBottom: 14,
+                },
+                fieldGapLarge: {
+                    marginBottom: 20,
+                },
+                row: {
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 24,
+                },
+                rememberRow: {
+                    flexDirection: "row",
+                    alignItems: "center",
+                },
+                checkbox: {
+                    width: 18,
+                    height: 18,
+                    borderWidth: 1.5,
+                    borderColor: colors.placeholder,
+                    borderRadius: 4,
+                    backgroundColor: colors.surfaceMuted,
+                    marginRight: 10,
+                    justifyContent: "center",
+                    alignItems: "center",
+                },
+                checkboxInner: {
+                    width: 10,
+                    height: 10,
+                    borderRadius: 2,
+                    backgroundColor: colors.accentBlue,
+                },
+                rememberText: {
+                    color: colors.bodyTextColor,
+                    ...FONTS.Mulish_400Regular,
+                    fontSize: 16,
+                },
+                linkText: {
+                    color: colors.linkColor,
+                    ...FONTS.Mulish_400Regular,
+                    fontSize: 16,
+                },
+                buttonGap: {
+                    marginBottom: 24,
+                },
+                footerRow: {
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                },
+                footerText: {
+                    ...FONTS.Mulish_400Regular,
+                    color: colors.bodyTextColor,
+                    fontSize: 16,
+                },
+            }),
+        [colors, FONTS]
+    );
 
     return (
         <>
@@ -93,16 +182,18 @@ const SignInForm = memo(function SignInForm({ t, navigation }: Props) {
             <Text style={styles.subtitle}>{t.auth.appSubtitle}</Text>
             <components.InputField
                 placeholder={t.auth.emailPlaceholder}
-                value={useRefs ? undefined : email}
+                value={email}
                 onChangeText={onEmailChange}
+                inputRef={emailInputRef}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 containerStyle={styles.fieldGap}
             />
             <components.InputField
                 placeholder={t.auth.passwordPlaceholder}
-                value={useRefs ? undefined : password}
+                value={password}
                 onChangeText={onPasswordChange}
+                inputRef={passwordInputRef}
                 secureTextEntry={true}
                 containerStyle={styles.fieldGapLarge}
             />
@@ -135,82 +226,6 @@ const SignInForm = memo(function SignInForm({ t, navigation }: Props) {
             </View>
         </>
     );
-});
-
-const styles = StyleSheet.create({
-    title: {
-        textAlign: "center",
-        ...theme.FONTS.H1,
-        color: theme.COLORS.mainDark,
-        marginBottom: 8,
-    },
-    titleCompact: {
-        fontSize: 32,
-        lineHeight: 38,
-    },
-    subtitle: {
-        textAlign: "center",
-        ...theme.FONTS.Mulish_400Regular,
-        fontSize: 14,
-        color: theme.COLORS.bodyTextColor,
-        marginBottom: 24,
-    },
-    fieldGap: {
-        marginBottom: 14,
-    },
-    fieldGapLarge: {
-        marginBottom: 20,
-    },
-    row: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        marginBottom: 24,
-    },
-    rememberRow: {
-        flexDirection: "row",
-        alignItems: "center",
-    },
-    checkbox: {
-        width: 16,
-        height: 16,
-        borderWidth: 1,
-        borderColor: "#868698",
-        borderRadius: 4,
-        backgroundColor: theme.COLORS.white,
-        marginRight: 10,
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    checkboxInner: {
-        width: 8,
-        height: 8,
-        borderRadius: 2,
-        backgroundColor: "#868698",
-    },
-    rememberText: {
-        color: theme.COLORS.bodyTextColor,
-        ...theme.FONTS.Mulish_400Regular,
-        fontSize: 16,
-    },
-    linkText: {
-        color: theme.COLORS.linkColor,
-        ...theme.FONTS.Mulish_400Regular,
-        fontSize: 16,
-    },
-    buttonGap: {
-        marginBottom: 24,
-    },
-    footerRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    footerText: {
-        ...theme.FONTS.Mulish_400Regular,
-        color: theme.COLORS.bodyTextColor,
-        fontSize: 16,
-    },
 });
 
 export default SignInForm;

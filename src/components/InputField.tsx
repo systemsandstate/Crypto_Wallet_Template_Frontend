@@ -1,7 +1,7 @@
 import { View, Text, TextInput, Platform, StyleSheet } from "react-native";
-import React, { memo, useCallback, useEffect, useRef, useState } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { theme } from "../constants";
+import { useTheme } from "../hooks/useTheme";
 
 export type Props = {
     placeholder: string;
@@ -16,9 +16,12 @@ export type Props = {
     autoCapitalize?: "none" | "sentences" | "words" | "characters";
     /** Shown below the field; use for long hints instead of truncating the placeholder. */
     hint?: string;
+    /** Keep long values (e.g. wallet addresses) on one horizontal scroll line. */
+    singleLine?: boolean;
+    /** Native/DOM input ref — used on web to read autofilled values on submit. */
+    inputRef?: React.Ref<TextInput>;
 };
 
-const BORDER_IDLE = "#E2E8F0";
 const IS_WEB = Platform.OS === "web";
 
 /**
@@ -36,7 +39,10 @@ const InputField: React.FC<Props> = ({
     rightIcon,
     autoCapitalize,
     hint,
+    singleLine = false,
+    inputRef,
 }) => {
+    const { colors, FONTS } = useTheme();
     const isEmail = keyboardType === "email-address";
     const nativeKeyboardType =
         Platform.OS === "android" && isEmail ? undefined : keyboardType;
@@ -44,6 +50,72 @@ const InputField: React.FC<Props> = ({
     const focusedRef = useRef(false);
     const notifyFrameRef = useRef<number | null>(null);
     const [nativeText, setNativeText] = useState(value ?? "");
+
+    const styles = useMemo(
+        () =>
+            StyleSheet.create({
+                container: {
+                    height: 50,
+                    width: "100%",
+                    backgroundColor: colors.white,
+                    paddingHorizontal: IS_WEB ? 0 : 20,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: colors.inputBorder,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    overflow: "hidden",
+                },
+                input: {
+                    flex: 1,
+                    minWidth: 0,
+                    fontSize: 16,
+                    color: colors.mainDark,
+                    backgroundColor: "transparent",
+                    padding: 0,
+                    margin: 0,
+                    ...(Platform.OS === "android" ? { textAlignVertical: "center" as const } : {}),
+                    ...(IS_WEB
+                        ? {
+                              paddingHorizontal: 16,
+                              paddingVertical: 12,
+                              height: "100%" as unknown as number,
+                          }
+                        : {}),
+                },
+                inputWeb: {
+                    borderWidth: 0,
+                    outlineWidth: 0,
+                    outlineStyle: "none",
+                    boxShadow: "none",
+                    backgroundColor: "transparent",
+                    ...FONTS.Mulish_400Regular,
+                } as object,
+                inputSingleLine: {
+                    fontSize: 14,
+                },
+                inputWebSingleLine: {
+                    whiteSpace: "nowrap",
+                    overflowX: "auto",
+                } as object,
+                hint: {
+                    ...FONTS.Mulish_400Regular,
+                    fontSize: 12,
+                    lineHeight: 12 * 1.5,
+                    color: colors.bodyTextColor,
+                    marginTop: 6,
+                },
+                iconLeft: {
+                    marginLeft: IS_WEB ? 16 : 0,
+                    marginRight: 8,
+                },
+                iconRight: {
+                    marginRight: IS_WEB ? 16 : 0,
+                    marginLeft: 8,
+                },
+            }),
+        [colors, FONTS]
+    );
 
     useEffect(() => {
         if (IS_WEB || focusedRef.current) return;
@@ -98,11 +170,16 @@ const InputField: React.FC<Props> = ({
     }, []);
 
     const displayValue = IS_WEB ? value : nativeText;
+    const isPassword = Boolean(secureTextEntry);
 
     const field = (
-        <View style={[styles.container, !hint && containerStyle]}>
-            {leftIcon && leftIcon}
+        <View
+            style={[styles.container, !hint && containerStyle]}
+            {...(IS_WEB ? ({ dataSet: { mpInputShell: "true" } } as object) : {})}
+        >
+            {leftIcon ? <View style={styles.iconLeft}>{leftIcon}</View> : null}
             <TextInput
+                ref={inputRef}
                 placeholder={placeholder}
                 value={displayValue}
                 onChangeText={handleChange}
@@ -111,25 +188,40 @@ const InputField: React.FC<Props> = ({
                 autoCapitalize={autoCapitalize ?? (isEmail ? "none" : undefined)}
                 autoCorrect={false}
                 spellCheck={false}
-                style={[styles.input, IS_WEB && styles.inputWeb]}
+                style={[
+                    styles.input,
+                    singleLine && styles.inputSingleLine,
+                    IS_WEB && styles.inputWeb,
+                    IS_WEB && singleLine && styles.inputWebSingleLine,
+                ]}
                 secureTextEntry={secureTextEntry}
-                placeholderTextColor="#868698"
+                placeholderTextColor={colors.placeholder}
                 keyboardType={nativeKeyboardType}
                 underlineColorAndroid="transparent"
+                multiline={!singleLine && !isPassword}
+                numberOfLines={singleLine || isPassword ? 1 : undefined}
+                scrollEnabled={singleLine}
+                textContentType={isPassword ? "password" : isEmail ? "emailAddress" : undefined}
                 {...(Platform.OS === "android"
                     ? {
                           importantForAutofill: "no" as const,
-                          autoComplete: "off" as const,
+                          autoComplete: isPassword ? ("password" as const) : ("off" as const),
                       }
                     : IS_WEB
                       ? {
                             ...(isEmail ? { autoComplete: "email" as const } : {}),
+                            ...(isPassword
+                                ? {
+                                      type: "password" as const,
+                                      autoComplete: "current-password" as const,
+                                  }
+                                : {}),
                             outlineStyle: "none",
                             outlineWidth: 0,
                         }
                       : {})}
             />
-            {rightIcon && rightIcon}
+            {rightIcon ? <View style={styles.iconRight}>{rightIcon}</View> : null}
         </View>
     );
 
@@ -144,41 +236,5 @@ const InputField: React.FC<Props> = ({
 
     return field;
 };
-
-const styles = StyleSheet.create({
-    container: {
-        height: 50,
-        width: "100%",
-        backgroundColor: theme.COLORS.white,
-        paddingHorizontal: 20,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: BORDER_IDLE,
-        flexDirection: "row",
-        alignItems: "center",
-    },
-    input: {
-        flex: 1,
-        fontSize: 16,
-        color: theme.COLORS.mainDark,
-        backgroundColor: "transparent",
-        padding: 0,
-        margin: 0,
-        ...(Platform.OS === "android" ? { textAlignVertical: "center" as const } : {}),
-    },
-    inputWeb: {
-        borderWidth: 0,
-        outlineWidth: 0,
-        boxShadow: "none",
-        ...theme.FONTS.Mulish_400Regular,
-    } as object,
-    hint: {
-        ...theme.FONTS.Mulish_400Regular,
-        fontSize: 12,
-        lineHeight: 12 * 1.5,
-        color: theme.COLORS.bodyTextColor,
-        marginTop: 6,
-    },
-});
 
 export default memo(InputField);

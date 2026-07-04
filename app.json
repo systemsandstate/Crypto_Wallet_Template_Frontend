@@ -22,17 +22,36 @@
         {
           "photosPermission": "Allow access to your photos to set a profile picture."
         }
-      ]
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow camera access to scan wallet QR codes."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#1B1D4D",
+          "sounds": []
+        }
+      ],
+      "expo-secure-store"
     ],
     "updates": {
       "fallbackToCacheTimeout": 0
     },
     "assetBundlePatterns": [
-      "**/*"
+      "assets/**/*",
+      "src/assets/**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "xyz.mohsinraza.merchantpayments"
+      "bundleIdentifier": "xyz.mohsinraza.merchantpayments",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Use Face ID to confirm sending USDT."
+      }
     },
     "newArchEnabled": false,
     "android": {

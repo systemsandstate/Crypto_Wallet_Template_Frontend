@@ -2,6 +2,16 @@ export const USDT_NETWORKS = ['TRC20', 'ERC20', 'BEP20', 'SOL', 'POLYGON'] as co
 
 export type UsdtNetwork = (typeof USDT_NETWORKS)[number];
 
+export type ReceiveAsset = 'USDT' | 'NATIVE';
+
+export const NATIVE_SYMBOLS: Record<UsdtNetwork, string> = {
+    TRC20: 'TRX',
+    ERC20: 'ETH',
+    BEP20: 'BNB',
+    SOL: 'SOL',
+    POLYGON: 'POL',
+};
+
 export const NETWORK_LABELS: Record<UsdtNetwork, string> = {
     TRC20: 'TRON',
     ERC20: 'Ethereum',

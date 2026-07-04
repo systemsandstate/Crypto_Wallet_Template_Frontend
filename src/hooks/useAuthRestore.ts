@@ -5,7 +5,10 @@ import { DEFAULT_LOCALE } from "../i18n";
 import { api, hydrateAuthToken, setAuthToken } from "../services/api";
 import { logout, setCredentials } from "../store/authSlice";
 import { hydrateLocale, loadStoredLocale } from "../store/localeSlice";
+import { hydrateTheme, loadStoredTheme } from "../store/themeSlice";
 import { safeReset } from "../utils/safeNavigation";
+import { syncPushTokenWithBackend } from "../services/pushNotifications";
+import { syncDeviceWalletToServer } from "../services/wallet/syncDeviceWallet";
 
 function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
     return Promise.race([
@@ -31,6 +34,9 @@ export function useAuthRestore() {
             const locale = await withTimeout(loadStoredLocale(), 3000, DEFAULT_LOCALE);
             if (!cancelled) dispatch(hydrateLocale(locale));
 
+            const isDark = await withTimeout(loadStoredTheme(), 3000, false);
+            if (!cancelled) dispatch(hydrateTheme(isDark));
+
             const token = await withTimeout(hydrateAuthToken(), 3000, null);
             if (!token || cancelled || restoredRef.current) return;
 
@@ -53,7 +59,10 @@ export function useAuthRestore() {
                     })
                 );
                 restoredRef.current = true;
+                // Device wallet is source of truth for balance/history on this browser.
+                await syncDeviceWalletToServer();
                 safeReset([{ name: "TabNavigator" }]);
+                void syncPushTokenWithBackend();
             } catch {
                 if (cancelled) return;
                 setAuthToken(null);

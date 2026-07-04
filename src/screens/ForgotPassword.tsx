@@ -1,4 +1,5 @@
-import { Text, Alert, ActivityIndicator } from "react-native";
+import { Text, Alert } from "react-native";
+import LoadingSpinner from "../components/LoadingSpinner";
 import React, { useState } from "react";
 
 import { theme } from "../constants";
@@ -64,7 +65,7 @@ const ForgotPassword: React.FC = ({ navigation }: any) => {
                 rightIcon={<svg.CheckSvg />}
             />
             {loading ? (
-                <ActivityIndicator size="large" color={theme.COLORS.mainDark} />
+                <LoadingSpinner size={48} />
             ) : (
                 <components.Button title={t.common.send} onPress={handleSend} />
             )}

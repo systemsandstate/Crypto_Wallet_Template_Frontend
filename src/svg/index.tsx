@@ -24,6 +24,7 @@ import MoreSvg from "./MoreSvg";
 import UserSvg from "./UserSvg";
 import CreditCardSvg from "./CreditCardSvg";
 import TransferSvg from "./TransferSvg";
+import WithdrawSvg from "./WithdrawSvg";
 import AmazonSvg from "./AmazonSvg";
 import TypeCardSvg from "./TypeCardSvg";
 import PiggyBankSvg from "./PiggyBankSvg";
@@ -32,6 +33,21 @@ import AnalyticsSvg from "./AnalyticsSvg";
 import LoanWalletSvg from "./LoanWalletSvg";
 import QuestionOpenSvg from "./QuestionOpenSvg";
 import QuestionCloseSvg from "./QuestionCloseSvg";
+import SettingsGearSvg from "./SettingsGearSvg";
+import MoonSvg from "./MoonSvg";
+import AddressBookSvg from "./AddressBookSvg";
+import HelpQuestionSvg from "./HelpQuestionSvg";
+import EditSvg from "./EditSvg";
+import HomeSvg from "./HomeSvg";
+import HistorySvg from "./HistorySvg";
+import ProfileTabSvg from "./ProfileTabSvg";
+import MyWalletSvg from "./MyWalletSvg";
+import RefreshSvg from "./RefreshSvg";
+import CopySvg from "./CopySvg";
+import ShareSvg from "./ShareSvg";
+import SetAmountSvg from "./SetAmountSvg";
+import SendSvg from "./SendSvg";
+import ReceiveSvg from "./ReceiveSvg";
 
 const svg = {
     GoBackSvg,
@@ -60,6 +76,7 @@ const svg = {
     UserSvg,
     CreditCardSvg,
     TransferSvg,
+    WithdrawSvg,
     AmazonSvg,
     TypeCardSvg,
     PiggyBankSvg,
@@ -68,6 +85,21 @@ const svg = {
     LoanWalletSvg,
     QuestionOpenSvg,
     QuestionCloseSvg,
+    SettingsGearSvg,
+    MoonSvg,
+    AddressBookSvg,
+    HelpQuestionSvg,
+    EditSvg,
+    HomeSvg,
+    HistorySvg,
+    ProfileTabSvg,
+    MyWalletSvg,
+    CopySvg,
+    RefreshSvg,
+    ShareSvg,
+    SetAmountSvg,
+    SendSvg,
+    ReceiveSvg,
 };
 
 export { svg };
