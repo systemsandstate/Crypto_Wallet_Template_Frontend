@@ -1,15 +1,18 @@
 import { Text, TouchableOpacity, ScrollView, View, StyleSheet, Platform } from "react-native";
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { useAppSelector } from "../hooks/useAppSelector";
 
 import { components } from "../components";
 import LoadingSpinner from "../components/LoadingSpinner";
 import WalletDepositListItem from "../components/WalletDepositListItem";
-import { api, PaymentRequest, WalletTransfer } from "../services/api";
+import { api, PaymentRequest, WalletTransfer, invalidateCachedGet } from "../services/api";
 import { RootState } from "../store/store";
 import { useTranslation } from "../hooks/useTranslation";
 import { useTheme } from "../hooks/useTheme";
+import { filterTransfersForActiveWallet, filterTransfersForDisplay } from "../utils/walletBalance";
+import { resolveWalletAddressesForFilter, syncDeviceWalletInBackground } from "../services/wallet/syncDeviceWallet";
+import { createMerchantTabPageStyles } from "../styles/merchantTabPageChrome";
 
 type HistoryRow =
     | { kind: "payment"; key: string; sortAt: number; payment: PaymentRequest }
@@ -23,11 +26,13 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
     const [payments, setPayments] = useState<PaymentRequest[]>([]);
     const [deposits, setDeposits] = useState<WalletTransfer[]>([]);
     const [loading, setLoading] = useState(true);
+    const hasLoadedRef = useRef(false);
     const [filter, setFilter] = useState("");
 
     const filters = [
         { label: t.payment.filterAll, value: "" },
         { label: t.payment.filterReceived, value: "DEPOSIT" },
+        { label: t.payment.filterSent, value: "SEND" },
         { label: t.payment.filterPending, value: "PENDING" },
         { label: t.payment.filterPaid, value: "PAID" },
         { label: t.payment.filterExpired, value: "EXPIRED" },
@@ -36,31 +41,10 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
     ];
 
     // Header uses borderBottomRadius 24 — overlay extends under those curves to fill gaps.
-    const headerCurve = 24;
-
     const pageStyles = useMemo(
         () =>
             StyleSheet.create({
-                root: {
-                    flex: 1,
-                    backgroundColor: colors.bgColor,
-                },
-                headerWrap: {
-                    zIndex: 30,
-                    elevation: 30,
-                },
-                contentArea: {
-                    flex: 1,
-                    minHeight: 0,
-                    position: "relative",
-                    overflow: "hidden",
-                    // Sit under the header’s rounded bottom corners.
-                    marginTop: -headerCurve,
-                    paddingTop: headerCurve,
-                    ...(Platform.OS === "web"
-                        ? ({ height: "100%", display: "flex" } as object)
-                        : {}),
-                },
+                ...createMerchantTabPageStyles(colors),
                 // Covers list region + the two corner gaps under the header curve.
                 loadingOverlay: {
                     position: "absolute",
@@ -82,57 +66,114 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                           } as object)
                         : {}),
                 },
+                emptyContent: {
+                    flex: 1,
+                    justifyContent: "center",
+                    paddingTop: 0,
+                    paddingBottom: embedded ? 24 : 24,
+                },
+                emptyWrap: {
+                    alignItems: "center",
+                    paddingHorizontal: 24,
+                },
+                emptyTitle: {
+                    ...FONTS.Mulish_400Regular,
+                    fontSize: 15,
+                    color: colors.bodyTextColor,
+                    textAlign: "center",
+                    marginBottom: 20,
+                },
+                emptyLink: {
+                    ...FONTS.Mulish_600SemiBold,
+                    fontSize: 15,
+                    color: colors.accentBlue,
+                    textDecorationLine: "underline",
+                },
             }),
-        [colors.bgColor, isDark]
+        [FONTS, colors, embedded, isDark]
     );
 
-    const load = useCallback(() => {
-        setLoading(true);
+    const load = useCallback((opts?: { force?: boolean }) => {
+        const silent = hasLoadedRef.current;
+        if (!silent) setLoading(true);
 
-        if (filter === "DEPOSIT") {
-            api.getWalletTransfers()
-                .then((res) => {
+        void (async () => {
+            try {
+                syncDeviceWalletInBackground();
+                if (opts?.force) {
+                    invalidateCachedGet("/merchant/wallets/transfers");
+                    if (
+                        filter === "" ||
+                        filter === "PENDING" ||
+                        filter === "PAID" ||
+                        filter === "EXPIRED" ||
+                        filter === "FAILED" ||
+                        filter === "CANCELLED"
+                    ) {
+                        invalidateCachedGet("/payments/requests");
+                    }
+                }
+                const activeAddresses = await resolveWalletAddressesForFilter();
+
+                const needsTransfers =
+                    filter === "" || filter === "DEPOSIT" || filter === "SEND";
+                const transfersPromise = needsTransfers ? api.getWalletTransfers() : null;
+
+                if (filter === "DEPOSIT" || filter === "SEND") {
+                    const res = await transfersPromise!;
+                    const type = filter === "DEPOSIT" ? "DEPOSIT" : "SEND";
+                    const transfers = filterTransfersForDisplay(
+                        filterTransfersForActiveWallet(
+                            res.data.transfers.filter((row) => row.type === type),
+                            activeAddresses
+                        )
+                    );
                     setPayments([]);
-                    setDeposits(res.data.transfers.filter((row) => row.type === "DEPOSIT"));
-                })
-                .catch(() => {
-                    setPayments([]);
-                    setDeposits([]);
-                })
-                .finally(() => setLoading(false));
-            return;
-        }
+                    setDeposits(transfers);
+                    return;
+                }
 
-        const paymentsPromise =
-            filter === ""
-                ? api.listPayments({ limit: 50 })
-                : api.listPayments({ status: filter, limit: 50 });
+                const paymentsPromise =
+                    filter === ""
+                        ? api.listPayments({ limit: 50 })
+                        : api.listPayments({ status: filter, limit: 50 });
 
-        if (filter === "") {
-            Promise.allSettled([paymentsPromise, api.getWalletTransfers()])
-                .then(([paymentsResult, transfersResult]) => {
+                if (filter === "") {
+                    const [paymentsResult, transfersResult] = await Promise.allSettled([
+                        paymentsPromise,
+                        transfersPromise!,
+                    ]);
                     setPayments(
                         paymentsResult.status === "fulfilled" ? paymentsResult.value.data.items : []
                     );
+                    const transfersRaw =
+                        transfersResult.status === "fulfilled"
+                            ? transfersResult.value.data.transfers
+                            : [];
                     setDeposits(
-                        transfersResult.status === "fulfilled" ? transfersResult.value.data.transfers : []
+                        filterTransfersForDisplay(
+                            filterTransfersForActiveWallet(transfersRaw, activeAddresses)
+                        )
                     );
-                })
-                .finally(() => setLoading(false));
-            return;
-        }
+                    return;
+                }
 
-        paymentsPromise
-            .then((res) => {
+                const res = await paymentsPromise;
                 setPayments(res.data.items);
                 setDeposits([]);
-            })
-            .catch(() => {
-                setPayments([]);
-                setDeposits([]);
-            })
-            .finally(() => setLoading(false));
+            } catch {
+                if (!hasLoadedRef.current) {
+                    setPayments([]);
+                    setDeposits([]);
+                }
+            } finally {
+                hasLoadedRef.current = true;
+                setLoading(false);
+            }
+        })();
     }, [filter]);
+
+    const prevFilterRef = useRef(filter);
 
     useFocusEffect(
         useCallback(() => {
@@ -140,7 +181,15 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
         }, [load])
     );
 
+    useEffect(() => {
+        if (prevFilterRef.current === filter) return;
+        prevFilterRef.current = filter;
+        if (hasLoadedRef.current) load();
+    }, [filter, load]);
+
     const rows = useMemo((): HistoryRow[] => {
+        const byTime = (a: HistoryRow, b: HistoryRow) => b.sortAt - a.sortAt;
+
         const paymentRows: HistoryRow[] = payments.map((payment) => ({
             kind: "payment",
             key: `payment:${payment.id}`,
@@ -155,11 +204,45 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
             deposit,
         }));
 
-        return [...paymentRows, ...depositRows].sort((a, b) => b.sortAt - a.sortAt);
-    }, [payments, deposits]);
+        if (filter === "DEPOSIT") {
+            return depositRows
+                .filter((row) => row.deposit?.type === "DEPOSIT")
+                .sort(byTime);
+        }
+        if (filter === "SEND") {
+            return depositRows
+                .filter((row) => row.deposit?.type === "SEND")
+                .sort(byTime);
+        }
+        if (filter === "") {
+            return [...paymentRows, ...depositRows].sort(byTime);
+        }
+        return paymentRows
+            .filter((row) => row.payment?.status === filter)
+            .sort(byTime);
+    }, [payments, deposits, filter]);
 
-    const emptyMessage =
-        filter === "DEPOSIT" ? t.payment.noDeposits : filter === "" ? t.payment.noHistoryAny : t.payment.noHistory;
+    const isEmptyFilter = filter === "";
+    const emptyMessage = isEmptyFilter
+        ? t.payment.noHistoryAny
+        : filter === "DEPOSIT"
+          ? t.payment.noDeposits
+          : filter === "SEND"
+            ? t.payment.noSends
+            : t.payment.noHistory;
+    const emptyActionLabel = isEmptyFilter ? t.dashboard.createPayment : t.payment.showAllHistory;
+    const onEmptyAction = useCallback(() => {
+        if (isEmptyFilter) {
+            const parent = navigation.getParent();
+            if (parent) {
+                parent.navigate("Dashboard", { screen: "CreateInvoice" });
+            } else {
+                navigation.navigate("CreateInvoice");
+            }
+            return;
+        }
+        setFilter("");
+    }, [isEmptyFilter, navigation]);
 
     const filterChips = (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 8 }}>
@@ -189,26 +272,22 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
         </ScrollView>
     );
 
+    const showEmptyState = !loading && rows.length === 0;
+
     const listBody = (
-        <components.MerchantContent style={{ paddingTop: 16, paddingBottom: embedded ? 0 : 24 }}>
-            {!loading && rows.length === 0 ? (
-                <View
-                    style={{
-                        backgroundColor: colors.white,
-                        borderRadius: 14,
-                        paddingVertical: 32,
-                        paddingHorizontal: 20,
-                        alignItems: "center",
-                        shadowColor: "#062664",
-                        shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.06,
-                        shadowRadius: 12,
-                        elevation: 3,
-                    }}
-                >
-                    <Text style={{ textAlign: "center", color: colors.bodyTextColor, fontSize: 14 }}>
-                        {emptyMessage}
-                    </Text>
+        <components.MerchantContent
+            style={
+                showEmptyState
+                    ? pageStyles.emptyContent
+                    : { paddingTop: 16, paddingBottom: embedded ? 0 : 24 }
+            }
+        >
+            {showEmptyState ? (
+                <View style={pageStyles.emptyWrap}>
+                    <Text style={pageStyles.emptyTitle}>{emptyMessage}</Text>
+                    <TouchableOpacity onPress={onEmptyAction} accessibilityRole="link">
+                        <Text style={pageStyles.emptyLink}>{emptyActionLabel}</Text>
+                    </TouchableOpacity>
                 </View>
             ) : (
                 rows.map((row) =>
@@ -252,8 +331,12 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                     </components.MerchantTabHeader>
                 </View>
                 <View style={pageStyles.contentArea}>
-                    <components.ScreenScroll>{listBody}</components.ScreenScroll>
-                    {loading ? (
+                    <components.ScreenScroll
+                        contentStyle={showEmptyState ? { flex: 1 } : undefined}
+                    >
+                        {listBody}
+                    </components.ScreenScroll>
+                    {loading && !hasLoadedRef.current ? (
                         <View style={pageStyles.loadingOverlay} pointerEvents="auto">
                             <LoadingSpinner size={48} />
                         </View>
@@ -267,7 +350,10 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
         <View style={pageStyles.root}>
             <components.Header title={t.payment.historyTitle} goBack={true} />
             <View style={pageStyles.contentArea}>
-                <components.ScreenScroll withTabBarInset={false}>
+                <components.ScreenScroll
+                    withTabBarInset={false}
+                    contentStyle={showEmptyState ? { flex: 1 } : undefined}
+                >
                     <components.MerchantContent style={{ paddingTop: 8 }}>
                         <ScrollView
                             horizontal
@@ -302,7 +388,7 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                     </components.MerchantContent>
                     {listBody}
                 </components.ScreenScroll>
-                {loading ? (
+                {loading && !hasLoadedRef.current ? (
                     <View style={pageStyles.loadingOverlay} pointerEvents="auto">
                         <LoadingSpinner size={48} />
                     </View>

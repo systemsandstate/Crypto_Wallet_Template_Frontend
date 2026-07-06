@@ -47,26 +47,18 @@ const evmAddressFromPrivateKey = (privateKeyHex: string): string => {
   return new Wallet(privateKeyHex).address;
 };
 
-const solanaAddressFromMnemonic = (mnemonic: string): string => {
-  try {
-    const root = HDKey.fromMasterSeed(seedFromMnemonic(mnemonic));
-    const child = root.derive(DERIVATION_PATHS.SOL);
-    if (!child.privateKey) return '';
-    const keypair = Keypair.fromSeed(child.privateKey.slice(0, 32));
-    return keypair.publicKey.toBase58();
-  } catch {
-    return '';
-  }
-};
-
-const privateKeyHexAtPath = (mnemonic: string, path: string): string => {
-  const root = HDKey.fromMasterSeed(seedFromMnemonic(mnemonic));
+const privateKeyHexFromRoot = (root: HDKey, path: string): string => {
   const child = root.derive(path);
   if (!child.privateKey) throw new Error('Failed to derive key');
   const hex = Array.from(child.privateKey)
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
   return `0x${hex}`;
+};
+
+const privateKeyHexAtPath = (mnemonic: string, path: string): string => {
+  const root = HDKey.fromMasterSeed(seedFromMnemonic(mnemonic));
+  return privateKeyHexFromRoot(root, path);
 };
 
 export const createMnemonic = (): string => {
@@ -85,15 +77,27 @@ export const isValidMnemonic = (phrase: string): boolean => {
 };
 
 export const deriveAllAddresses = (mnemonic: string): DerivedWalletAddresses => {
-  const tronKey = privateKeyHexAtPath(mnemonic, DERIVATION_PATHS.TRC20);
-  const evmKey = privateKeyHexAtPath(mnemonic, DERIVATION_PATHS.ERC20);
+  const root = HDKey.fromMasterSeed(seedFromMnemonic(mnemonic));
+  const tronKey = privateKeyHexFromRoot(root, DERIVATION_PATHS.TRC20);
+  const evmKey = privateKeyHexFromRoot(root, DERIVATION_PATHS.ERC20);
+
+  let solAddress = '';
+  try {
+    const solChild = root.derive(DERIVATION_PATHS.SOL);
+    if (solChild.privateKey) {
+      const keypair = Keypair.fromSeed(solChild.privateKey.slice(0, 32));
+      solAddress = keypair.publicKey.toBase58();
+    }
+  } catch {
+    solAddress = '';
+  }
 
   return {
     TRC20: tronAddressFromPrivateKey(tronKey),
     ERC20: evmAddressFromPrivateKey(evmKey),
     BEP20: evmAddressFromPrivateKey(evmKey),
     POLYGON: evmAddressFromPrivateKey(evmKey),
-    SOL: solanaAddressFromMnemonic(mnemonic),
+    SOL: solAddress,
   };
 };
 

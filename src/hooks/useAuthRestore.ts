@@ -2,13 +2,14 @@ import { useEffect, useRef } from "react";
 import { useDispatch } from "react-redux";
 
 import { DEFAULT_LOCALE } from "../i18n";
-import { api, hydrateAuthToken, setAuthToken } from "../services/api";
+import { api, hydrateAuthToken, persistAuthToken, setAuthToken } from "../services/api";
 import { logout, setCredentials } from "../store/authSlice";
 import { hydrateLocale, loadStoredLocale } from "../store/localeSlice";
 import { hydrateTheme, loadStoredTheme } from "../store/themeSlice";
 import { safeReset } from "../utils/safeNavigation";
 import { syncPushTokenWithBackend } from "../services/pushNotifications";
-import { syncDeviceWalletToServer } from "../services/wallet/syncDeviceWallet";
+import { syncDeviceWalletInBackground } from "../services/wallet/syncDeviceWallet";
+import { setWalletMerchantContext } from "../services/wallet/walletStorage";
 
 function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
     return Promise.race([
@@ -31,19 +32,23 @@ export function useAuthRestore() {
         let cancelled = false;
 
         (async () => {
-            const locale = await withTimeout(loadStoredLocale(), 3000, DEFAULT_LOCALE);
-            if (!cancelled) dispatch(hydrateLocale(locale));
+            const [locale, isDark, token] = await Promise.all([
+                withTimeout(loadStoredLocale(), 1500, DEFAULT_LOCALE),
+                withTimeout(loadStoredTheme(), 1500, false),
+                withTimeout(hydrateAuthToken(), 1500, null),
+            ]);
 
-            const isDark = await withTimeout(loadStoredTheme(), 3000, false);
-            if (!cancelled) dispatch(hydrateTheme(isDark));
+            if (!cancelled) {
+                dispatch(hydrateLocale(locale));
+                dispatch(hydrateTheme(isDark));
+            }
 
-            const token = await withTimeout(hydrateAuthToken(), 3000, null);
             if (!token || cancelled || restoredRef.current) return;
 
             try {
                 const res = await withTimeout(
                     api.getProfile(),
-                    5000,
+                    4000,
                     null as Awaited<ReturnType<typeof api.getProfile>> | null
                 );
                 if (!res || cancelled || restoredRef.current) {
@@ -58,10 +63,11 @@ export function useAuthRestore() {
                         accessToken: token,
                     })
                 );
+                await persistAuthToken(token);
                 restoredRef.current = true;
-                // Device wallet is source of truth for balance/history on this browser.
-                await syncDeviceWalletToServer();
                 safeReset([{ name: "TabNavigator" }]);
+                void setWalletMerchantContext(res.data.id);
+                syncDeviceWalletInBackground();
                 void syncPushTokenWithBackend();
             } catch {
                 if (cancelled) return;

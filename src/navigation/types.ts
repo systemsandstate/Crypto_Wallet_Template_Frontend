@@ -17,7 +17,8 @@ export type RootStackParamList = {
     PrivacyPolicy: undefined;
     WalletHelp: undefined;
     AddressBook: undefined;
-    WalletSetup: { startAction?: "create" | "import" } | undefined;
+    WalletSetup: { startAction?: "create" | "import"; addWallet?: boolean } | undefined;
+    Wallets: undefined;
     MyWallet: undefined;
     WalletReceive: { network: string; address: string; asset?: "USDT" | "NATIVE" };
 };

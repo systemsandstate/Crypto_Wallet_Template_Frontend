@@ -1,9 +1,10 @@
-import { Alert, Platform } from "react-native";
+import { Platform } from "react-native";
 import React, { useEffect, useMemo } from "react";
 
 import { components } from "../components";
 import { useTranslation } from "../hooks/useTranslation";
 import SignInForm from "./SignInForm";
+import { appAlert } from '../utils/appAlert';
 
 const SignIn: React.FC = ({ navigation, route }: any) => {
     const { t } = useTranslation();
@@ -18,7 +19,7 @@ const SignIn: React.FC = ({ navigation, route }: any) => {
             }
         }
         if (route.params?.sessionExpired) {
-            Alert.alert(t.common.sessionExpired, route.params.sessionExpired);
+            appAlert.alert(t.common.sessionExpired, route.params.sessionExpired);
             navigation.setParams({ sessionExpired: undefined });
         }
     }, [route.params?.sessionExpired, navigation, t.common.sessionExpired]);

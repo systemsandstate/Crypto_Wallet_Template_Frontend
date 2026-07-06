@@ -19,6 +19,7 @@ import { useTheme } from "../hooks/useTheme";
 import { getLocalizedNetworkLabel } from "../i18n/network";
 import { formatMessage } from "../i18n";
 import { api, MerchantWallet } from "../services/api";
+import { syncDeviceWalletInBackground } from "../services/wallet/syncDeviceWallet";
 import { copyToClipboard } from "../utils/copyToClipboard";
 import { showToast } from "../utils/toast";
 import { svg } from "../svg";
@@ -74,6 +75,7 @@ const ReceiveSelect: React.FC = ({ navigation }: any) => {
 
     const loadWallets = useCallback(() => {
         setLoading(true);
+        syncDeviceWalletInBackground();
         api.getWallets()
             .then((res) => setWallets(res.data.wallets))
             .catch(() => setWallets([]))
@@ -351,6 +353,12 @@ const ReceiveSelect: React.FC = ({ navigation }: any) => {
                     borderWidth: 1,
                     borderColor: colors.border,
                 },
+                loadingWrap: {
+                    flex: 1,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minHeight: 240,
+                },
                 emptyWrap: {
                     alignItems: "center",
                     paddingTop: 48,
@@ -450,7 +458,9 @@ const ReceiveSelect: React.FC = ({ navigation }: any) => {
                         showsVerticalScrollIndicator
                     >
                         {loading ? (
-                            <LoadingSpinner size={40} style={{ marginTop: 12 }} />
+                            <View style={styles.loadingWrap}>
+                                <LoadingSpinner size={48} />
+                            </View>
                         ) : showEmptyState ? (
                             <View style={styles.emptyWrap}>
                                 <Text style={styles.emptyTitle}>

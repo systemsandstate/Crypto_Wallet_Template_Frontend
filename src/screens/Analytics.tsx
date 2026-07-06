@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from "react";
-import { View, Text } from "react-native";
+import React, { useCallback, useMemo, useState } from "react";
+import { View, Text, StyleSheet } from "react-native";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { useFocusEffect } from "@react-navigation/native";
 import { useAppSelector } from "../hooks/useAppSelector";
@@ -10,6 +10,7 @@ import { sumWalletBalances } from "../utils/walletBalance";
 import { RootState } from "../store/store";
 import { useTranslation } from "../hooks/useTranslation";
 import { useTheme } from "../hooks/useTheme";
+import { createMerchantTabPageStyles } from "../styles/merchantTabPageChrome";
 
 const sumAmounts = (items: PaymentRequest[]) =>
     items.reduce((total, item) => total + (parseFloat(item.amount) || 0), 0);
@@ -85,6 +86,8 @@ const Analytics: React.FC = () => {
     const formatAmount = (value: number) =>
         value.toLocaleString(dateLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+    const pageStyles = useMemo(() => createMerchantTabPageStyles(colors), [colors]);
+
     const statCard = (label: string, value: string) => (
         <View
             style={{
@@ -107,42 +110,46 @@ const Analytics: React.FC = () => {
     );
 
     return (
-        <View style={{ flex: 1 }}>
-            <components.ScreenScroll>
+        <View style={pageStyles.root}>
+            <View style={pageStyles.headerWrap}>
                 <components.MerchantTabHeader
                     eyebrow={merchant?.businessName || t.common.merchant}
                     title={t.analytics.title}
                     subtitle={t.analytics.subtitle}
                 />
-                <components.MerchantContent style={{ paddingTop: 16, paddingBottom: 24 }}>
+            </View>
+            <View style={pageStyles.contentArea}>
                 {loading ? (
-                    <LoadingSpinner size={40} style={{ marginTop: 24 }} />
+                    <View style={pageStyles.loadingWrap}>
+                        <LoadingSpinner size={48} />
+                    </View>
                 ) : (
-                    <>
-                        <components.MerchantBalanceCard
-                            businessName={merchant?.businessName || t.common.merchant}
-                            walletBalance={stats.walletBalance}
-                            pendingCount={stats.pending}
-                            pendingAmount={stats.pendingAmount}
-                            depositCount={stats.depositCount}
-                            depositAmount={stats.depositAmount}
-                            onRefresh={() => load(true)}
-                            refreshing={refreshing}
-                        />
-                        <View style={{ flexDirection: "row", gap: 12, marginTop: 16 }}>
-                            {statCard(
-                                t.analytics.receivedSummary,
-                                `${stats.depositCount} · ${formatAmount(stats.depositAmount)} USDT`
-                            )}
-                            {statCard(
-                                t.analytics.pendingSummary,
-                                `${stats.pending} · ${formatAmount(stats.pendingAmount)} USDT`
-                            )}
-                        </View>
-                    </>
+                    <components.ScreenScroll>
+                        <components.MerchantContent style={{ paddingTop: 16, paddingBottom: 24 }}>
+                            <components.MerchantBalanceCard
+                                businessName={merchant?.businessName || t.common.merchant}
+                                walletBalance={stats.walletBalance}
+                                pendingCount={stats.pending}
+                                pendingAmount={stats.pendingAmount}
+                                depositCount={stats.depositCount}
+                                depositAmount={stats.depositAmount}
+                                onRefresh={() => load(true)}
+                                refreshing={refreshing}
+                            />
+                            <View style={{ flexDirection: "row", gap: 12, marginTop: 16 }}>
+                                {statCard(
+                                    t.analytics.receivedSummary,
+                                    `${stats.depositCount} · ${formatAmount(stats.depositAmount)} USDT`
+                                )}
+                                {statCard(
+                                    t.analytics.pendingSummary,
+                                    `${stats.pending} · ${formatAmount(stats.pendingAmount)} USDT`
+                                )}
+                            </View>
+                        </components.MerchantContent>
+                    </components.ScreenScroll>
                 )}
-            </components.MerchantContent>
-            </components.ScreenScroll>
+            </View>
         </View>
     );
 };

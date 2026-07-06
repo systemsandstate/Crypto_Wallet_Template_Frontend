@@ -4,9 +4,7 @@ import {
     Image,
     StyleSheet,
     Linking,
-    TouchableOpacity,
-    Alert,
-} from "react-native";
+    TouchableOpacity} from "react-native";
 import React, { useCallback, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
@@ -15,12 +13,13 @@ import { useAppSelector } from "../hooks/useAppSelector";
 import AddressBookFormModal, { AddressBookFormValues } from "../components/AddressBookFormModal";
 import { components } from "../components";
 import { theme } from "../constants";
-import { api, WalletTransfer } from "../services/api";
+import { api, WalletTransfer, invalidateCachedGet, isCachedGetFresh } from "../services/api";
 import { useTabBarInset } from "../hooks/useTabBarInset";
 import { useTranslation } from "../hooks/useTranslation";
 import { useTheme } from "../hooks/useTheme";
 import { formatMessage } from "../i18n";
 import { copyToClipboard } from "../utils/copyToClipboard";
+import { appAlert } from '../utils/appAlert';
 import { formatUsdtAmount, formatNativeAmount } from "../utils/formatAmount";
 import { showToast } from "../utils/toast";
 import { getTxExplorerUrl } from "../utils/explorerUrl";
@@ -31,8 +30,7 @@ import {
     addAddressBookEntry,
     loadAddressBook,
     updateAddressBookEntry,
-    type AddressBookEntry,
-} from "../services/addressBookStorage";
+    type AddressBookEntry} from "../services/addressBookStorage";
 import { findAddressBookEntry } from "../utils/addressBookMatch";
 import { RootState } from "../store/store";
 import { navigateUp } from "../navigation/navigateUp";
@@ -55,8 +53,7 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
     const [formValues, setFormValues] = useState<AddressBookFormValues>({
         name: "",
         address: "",
-        network: "BEP20",
-    });
+        network: "BEP20"});
     const [savingContact, setSavingContact] = useState(false);
 
     const reloadAddressBook = useCallback(async () => {
@@ -72,6 +69,9 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
         useCallback(() => {
             void reloadAddressBook();
             if (!initialDeposit?.id) return;
+            if (!isCachedGetFresh("/merchant/wallets/transfers", 15_000)) {
+                invalidateCachedGet("/merchant/wallets/transfers");
+            }
             api.getWalletTransfers()
                 .then((res) => {
                     const fresh = res.data.transfers.find((row) => row.id === initialDeposit.id);
@@ -112,8 +112,7 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
         setFormValues({
             name: entry.name,
             address: entry.address,
-            network: entry.network,
-        });
+            network: entry.network});
         setModalVisible(true);
     }, []);
 
@@ -121,15 +120,14 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
         async (values: AddressBookFormValues) => {
             if (!merchant?.id) return;
             if (!values.name) {
-                Alert.alert(t.common.error, t.addressBook.nameRequired);
+                appAlert.alert(t.common.error, t.addressBook.nameRequired);
                 return;
             }
             setSavingContact(true);
             try {
                 if (modalMode === "edit" && editingEntryId) {
                     await updateAddressBookEntry(merchant.id, editingEntryId, {
-                        name: values.name,
-                    });
+                        name: values.name});
                     showToast(t.addressBook.updatedToast);
                 } else {
                     await addAddressBookEntry(merchant.id, values);
@@ -182,8 +180,7 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
         leftTitle,
         address,
         allowAddressBook = false,
-        savedEntry,
-    }: {
+        savedEntry}: {
         leftTitle: string;
         address: string;
         allowAddressBook?: boolean;
@@ -193,8 +190,7 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
             style={{
                 paddingVertical: 17,
                 borderBottomWidth: 1,
-                borderBottomColor: "#CED6E1",
-            }}
+                borderBottomColor: "#CED6E1"}}
         >
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
                 <Text
@@ -204,8 +200,7 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
                         lineHeight: 16 * 1.6,
                         color: theme.COLORS.bodyTextColor,
                         flex: 1,
-                        marginRight: 12,
-                    }}
+                        marginRight: 12}}
                 >
                     {leftTitle}
                 </Text>
@@ -222,16 +217,14 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
                                         backgroundColor: colors.surfaceMuted,
                                         borderRadius: 8,
                                         paddingHorizontal: 8,
-                                        paddingVertical: 4,
-                                    }}
+                                        paddingVertical: 4}}
                                 >
                                     <Text
                                         numberOfLines={1}
                                         style={{
                                             ...FONTS.Mulish_600SemiBold,
                                             fontSize: 12,
-                                            color: colors.mainDark,
-                                        }}
+                                            color: colors.mainDark}}
                                     >
                                         {savedEntry.name}
                                     </Text>
@@ -262,8 +255,7 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
                     fontSize: 12,
                     lineHeight: 18,
                     color: theme.COLORS.mainDark,
-                    marginTop: 8,
-                }}
+                    marginTop: 8}}
             >
                 {address || t.payment.senderUnavailable}
             </Text>
@@ -278,8 +270,7 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
                 justifyContent: "space-between",
                 paddingVertical: 17,
                 borderBottomWidth: 1,
-                borderBottomColor: "#CED6E1",
-            }}
+                borderBottomColor: "#CED6E1"}}
         >
             <Text
                 style={{
@@ -288,8 +279,7 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
                     lineHeight: 16 * 1.6,
                     color: theme.COLORS.bodyTextColor,
                     flex: 1,
-                    marginRight: 12,
-                }}
+                    marginRight: 12}}
             >
                 {leftTitle}
             </Text>
@@ -298,8 +288,7 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
                     ...theme.FONTS.H6,
                     color: theme.COLORS.mainDark,
                     textAlign: "right",
-                    flexShrink: 1,
-                }}
+                    flexShrink: 1}}
             >
                 {rightTitle}
             </Text>
@@ -325,8 +314,7 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
                                 ...theme.FONTS.Mulish_400Regular,
                                 fontSize: 12,
                                 color: theme.COLORS.bodyTextColor,
-                                marginBottom: 10,
-                            }}
+                                marginBottom: 10}}
                         >
                             {dateStr}
                         </Text>
@@ -337,8 +325,7 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
                                 fontSize: 28,
                                 lineHeight: 28 * 1.1,
                                 color: theme.COLORS.mainDark,
-                                marginBottom: 10,
-                            }}
+                                marginBottom: 10}}
                         >
                             {isSend ? "−" : "+"} {formattedAmount} {deposit.currency}
                         </Text>
@@ -348,16 +335,11 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
                                 ...theme.FONTS.Mulish_400Regular,
                                 fontSize: 16,
                                 color: theme.COLORS.bodyTextColor,
-                                marginBottom: 9,
-                            }}
+                                marginBottom: 9}}
                         >
                             {isSend
-                                ? deposit.currency === "USDT"
-                                    ? t.payment.walletSend
-                                    : `${deposit.currency} ${t.payment.walletSend}`
-                                : deposit.currency === "USDT"
-                                  ? t.payment.walletDeposit
-                                  : `${deposit.currency} ${t.payment.walletDeposit}`}
+                                ? `${t.payment.walletSend} · ${deposit.currency}`
+                                : `${t.payment.walletReceive} · ${deposit.currency}`}
                         </Text>
                         <View
                             style={{
@@ -366,16 +348,14 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
                                 justifyContent: "center",
                                 paddingBottom: 30,
                                 borderBottomWidth: 1,
-                                borderBottomColor: "#CED6E1",
-                            }}
+                                borderBottomColor: "#CED6E1"}}
                         >
                             <Text
                                 style={{
                                     ...theme.FONTS.Mulish_600SemiBold,
                                     fontSize: 14,
                                     lineHeight: 14 * 1.3,
-                                    color: isSend ? theme.COLORS.mainDark : theme.COLORS.green,
-                                }}
+                                    color: isSend ? theme.COLORS.mainDark : theme.COLORS.green}}
                             >
                                 {isSend ? t.payment.sentOnChain : t.payment.depositReceived}
                             </Text>

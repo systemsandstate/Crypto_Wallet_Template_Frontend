@@ -12,6 +12,7 @@ import ForgotPassword from "../screens/ForgotPassword";
 import ForgotPasswordSentEmail from "../screens/ForgotPasswordSentEmail";
 import NewPassword from "../screens/NewPassword";
 import WalletSetup from "../screens/WalletSetup";
+import Wallets from "../screens/Wallets";
 import MyWallet from "../screens/MyWallet";
 import WalletReceive from "../screens/WalletReceive";
 import WalletHelp from "../screens/WalletHelp";
@@ -52,6 +53,7 @@ const StackNavigator: React.FC<{ initialRoute?: "SignIn" | "TabNavigator" }> = (
             />
             <Stack.Screen name="NewPassword" component={NewPassword} options={{ headerShown: false }} />
             <Stack.Screen name="WalletSetup" component={WalletSetup} options={{ headerShown: false }} />
+            <Stack.Screen name="Wallets" component={Wallets} options={{ headerShown: false }} />
             <Stack.Screen name="MyWallet" component={MyWallet} options={{ headerShown: false }} />
             <Stack.Screen name="WalletReceive" component={WalletReceive} options={{ headerShown: false }} />
             <Stack.Screen name="WalletHelp" component={WalletHelp} options={{ headerShown: false }} />

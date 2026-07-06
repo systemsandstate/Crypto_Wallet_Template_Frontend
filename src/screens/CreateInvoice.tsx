@@ -1,4 +1,4 @@
-import { Text, View, Alert } from "react-native";
+import { Text, View} from "react-native";
 import LoadingSpinner from "../components/LoadingSpinner";
 import React, { useState, useCallback } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -10,6 +10,7 @@ import { api, PaymentRequest } from "../services/api";
 import { UsdtNetwork, formatUsdtNetwork } from "../constants/usdtNetworks";
 import { useTranslation } from "../hooks/useTranslation";
 import { useTheme } from "../hooks/useTheme";
+import { appAlert } from '../utils/appAlert';
 
 const CreateInvoice: React.FC = () => {
     const navigation: any = useNavigation();
@@ -39,14 +40,14 @@ const CreateInvoice: React.FC = () => {
     const handleCreate = async () => {
         const num = parseFloat(amount);
         if (!num || num <= 0) {
-            Alert.alert(t.common.error, t.payment.invalidAmount);
+            appAlert.alert(t.common.error, t.payment.invalidAmount);
             return;
         }
 
         try {
             const walletStatus = await api.getWalletStatus();
             if (!walletStatus.data.hasWallet) {
-                Alert.alert(t.wallet.walletRequired, t.wallet.walletRequiredMessage, [
+                appAlert.alert(t.wallet.walletRequired, t.wallet.walletRequiredMessage, [
                     { text: t.common.cancel, style: "cancel" },
                     { text: t.wallet.setupWallet, onPress: () => navigation.navigate("WalletSetup") },
                 ]);
@@ -61,11 +62,10 @@ const CreateInvoice: React.FC = () => {
             const res = await api.createPayment({
                 amount: num,
                 reference: reference.trim() || undefined,
-                network,
-            });
+                network});
             navigation.navigate("InvoiceSent", { payment: res.data });
         } catch (err: any) {
-            Alert.alert(t.payment.paymentFailed, err.message || t.payment.createFailed);
+            appAlert.alert(t.payment.paymentFailed, err.message || t.payment.createFailed);
         } finally {
             setLoading(false);
         }
@@ -89,8 +89,7 @@ const CreateInvoice: React.FC = () => {
                             ...FONTS.H2,
                             color: colors.mainDark,
                             marginTop: 20,
-                            marginBottom: 8,
-                        }}
+                            marginBottom: 8}}
                     >
                         {t.payment.newPayment}
                     </Text>
@@ -101,8 +100,7 @@ const CreateInvoice: React.FC = () => {
                             color: colors.bodyTextColor,
                             marginBottom: 24,
                             textAlign: "center",
-                            lineHeight: 14 * 1.6,
-                        }}
+                            lineHeight: 14 * 1.6}}
                     >
                         {t.payment.createDescription}
                     </Text>
@@ -126,8 +124,7 @@ const CreateInvoice: React.FC = () => {
                             ...FONTS.Mulish_400Regular,
                             fontSize: 12,
                             color: colors.bodyTextColor,
-                            marginBottom: 24,
-                        }}
+                            marginBottom: 24}}
                     >
                         {formatUsdtNetwork(network)}
                     </Text>
@@ -146,8 +143,7 @@ const CreateInvoice: React.FC = () => {
                         style={{
                             borderTopWidth: 1,
                             borderTopColor: "#E8ECF0",
-                            paddingTop: 20,
-                        }}
+                            paddingTop: 20}}
                     >
                         <Text style={{ ...FONTS.H4, color: colors.mainDark, marginBottom: 12 }}>
                             {t.payment.recentPayments}
@@ -160,8 +156,7 @@ const CreateInvoice: React.FC = () => {
                                     color: colors.bodyTextColor,
                                     textAlign: "center",
                                     paddingVertical: 16,
-                                    fontSize: 14,
-                                }}
+                                    fontSize: 14}}
                             >
                                 {t.payment.noRecentPayments}
                             </Text>
@@ -174,8 +169,7 @@ const CreateInvoice: React.FC = () => {
                                     onPress={() =>
                                         navigation.navigate("TransactionDetails", {
                                             payment: item,
-                                            paymentId: item.id,
-                                        })
+                                            paymentId: item.id})
                                     }
                                 />
                             ))

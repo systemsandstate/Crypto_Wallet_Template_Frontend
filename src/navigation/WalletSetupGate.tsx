@@ -6,6 +6,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import WalletSetupPromptModal from '../components/WalletSetupPromptModal';
 import { useWalletSetupPrompt } from '../hooks/useWalletSetupPrompt';
+import { navigationRef } from './navigationRef';
 import type { MerchantTabParamList } from './TabNavigator';
 import type { RootStackParamList } from './types';
 
@@ -20,9 +21,14 @@ type Props = {
 
 const WalletSetupGate: React.FC<Props> = ({ children }) => {
   const navigation = useNavigation<TabNav>();
-  const { visible } = useWalletSetupPrompt();
+  const { visible, dismiss } = useWalletSetupPrompt();
 
   const openSetup = (startAction: 'create' | 'import') => {
+    dismiss();
+    if (navigationRef.isReady()) {
+      navigationRef.navigate('WalletSetup', { startAction });
+      return;
+    }
     navigation.navigate('WalletSetup', { startAction });
   };
 

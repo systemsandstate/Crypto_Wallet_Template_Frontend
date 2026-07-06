@@ -3,9 +3,7 @@ import {
     Text,
     ScrollView,
     TouchableOpacity,
-        StyleSheet,
-    Alert,
-} from "react-native";
+        StyleSheet} from "react-native";
 import LoadingSpinner from "../components/LoadingSpinner";
 import React, { useCallback, useMemo, useState } from "react";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -24,19 +22,18 @@ import {
     removeAddressBookEntries,
     updateAddressBookEntry,
     updateAddressBookEntriesBatch,
-    type AddressBookEntry,
-} from "../services/addressBookStorage";
+    type AddressBookEntry} from "../services/addressBookStorage";
 import { UsdtNetwork } from "../constants/usdtNetworks";
 import { getLocalizedNetworkLabel } from "../i18n/network";
 import { formatMessage } from "../i18n";
 import { confirmAction } from "../utils/confirm";
+import { appAlert } from '../utils/appAlert';
 import { showToast } from "../utils/toast";
 
 const emptyForm = (network: UsdtNetwork = "TRC20"): AddressBookFormValues => ({
     name: "",
     address: "",
-    network,
-});
+    network});
 
 const AddressBook: React.FC = () => {
     const { t } = useTranslation();
@@ -128,8 +125,7 @@ const AddressBook: React.FC = () => {
         setFormValues({
             name: entry.name,
             address: entry.address,
-            network: entry.network,
-        });
+            network: entry.network});
         setModalVisible(true);
     };
 
@@ -156,8 +152,7 @@ const AddressBook: React.FC = () => {
         confirmAction({
             title: t.addressBook.batchDeleteTitle,
             message: formatMessage(t.addressBook.batchDeleteMessage, {
-                count: String(selectedCount),
-            }),
+                count: String(selectedCount)}),
             confirmLabel: t.addressBook.batchDelete,
             cancelLabel: t.common.cancel,
             destructive: true,
@@ -167,12 +162,10 @@ const AddressBook: React.FC = () => {
                     exitSelectionMode();
                     showToast(
                         formatMessage(t.addressBook.batchDeletedToast, {
-                            count: String(selectedCount),
-                        })
+                            count: String(selectedCount)})
                     );
                 });
-            },
-        });
+            }});
     };
 
     const handleBatchEditSubmit = async (network: UsdtNetwork) => {
@@ -185,8 +178,7 @@ const AddressBook: React.FC = () => {
             exitSelectionMode();
             showToast(
                 formatMessage(t.addressBook.batchUpdatedToast, {
-                    count: String(selectedCount),
-                })
+                    count: String(selectedCount)})
             );
         } finally {
             setSaving(false);
@@ -196,11 +188,11 @@ const AddressBook: React.FC = () => {
     const handleSubmit = async (values: AddressBookFormValues) => {
         if (!merchant?.id) return;
         if (!values.name) {
-            Alert.alert(t.common.error, t.addressBook.nameRequired);
+            appAlert.alert(t.common.error, t.addressBook.nameRequired);
             return;
         }
         if (!values.address) {
-            Alert.alert(t.common.error, t.addressBook.addressRequired);
+            appAlert.alert(t.common.error, t.addressBook.addressRequired);
             return;
         }
         setSaving(true);
@@ -237,8 +229,7 @@ const AddressBook: React.FC = () => {
                     closeModal();
                     exitSelectionMode();
                 });
-            },
-        });
+            }});
     };
 
     const styles = useMemo(
@@ -249,20 +240,17 @@ const AddressBook: React.FC = () => {
                     alignItems: "center",
                     justifyContent: "space-between",
                     marginBottom: 12,
-                    gap: 8,
-                },
+                    gap: 8},
                 selectionAction: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 13,
-                    color: colors.linkColor,
-                },
+                    color: colors.linkColor},
                 selectionMeta: {
                     ...FONTS.Mulish_400Regular,
                     fontSize: 12,
                     color: colors.bodyTextColor,
                     textAlign: "center",
-                    flex: 1,
-                },
+                    flex: 1},
                 card: {
                     backgroundColor: colors.white,
                     borderRadius: 12,
@@ -271,12 +259,10 @@ const AddressBook: React.FC = () => {
                     flexDirection: "row",
                     alignItems: "flex-start",
                     borderWidth: 2,
-                    borderColor: "transparent",
-                },
+                    borderColor: "transparent"},
                 cardSelected: {
                     borderColor: colors.linkColor,
-                    backgroundColor: colors.surfaceMuted,
-                },
+                    backgroundColor: colors.surfaceMuted},
                 checkbox: {
                     width: 22,
                     height: 22,
@@ -287,54 +273,45 @@ const AddressBook: React.FC = () => {
                     marginTop: 2,
                     alignItems: "center",
                     justifyContent: "center",
-                    backgroundColor: colors.white,
-                },
+                    backgroundColor: colors.white},
                 checkboxChecked: {
                     borderColor: colors.linkColor,
-                    backgroundColor: colors.linkColor,
-                },
+                    backgroundColor: colors.linkColor},
                 checkboxMark: {
                     color: colors.white,
                     fontSize: 14,
                     lineHeight: 16,
-                    fontWeight: "700",
-                },
+                    fontWeight: "700"},
                 cardBody: {
                     flex: 1,
-                    minWidth: 0,
-                },
+                    minWidth: 0},
                 name: {
                     ...FONTS.H6,
                     color: colors.mainDark,
-                    marginBottom: 4,
-                },
+                    marginBottom: 4},
                 network: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 12,
                     color: colors.linkColor,
-                    marginBottom: 6,
-                },
+                    marginBottom: 6},
                 address: {
                     ...FONTS.Mulish_400Regular,
                     fontSize: 12,
                     color: colors.bodyTextColor,
-                    lineHeight: 18,
-                },
+                    lineHeight: 18},
                 empty: {
                     ...FONTS.Mulish_400Regular,
                     fontSize: 14,
                     color: colors.bodyTextColor,
                     textAlign: "center",
                     lineHeight: 14 * 1.6,
-                    paddingHorizontal: 12,
-                },
+                    paddingHorizontal: 12},
                 emptyWrap: {
                     flex: 1,
                     justifyContent: "center",
                     alignItems: "center",
                     minHeight: 160,
-                    paddingHorizontal: 12,
-                },
+                    paddingHorizontal: 12},
                 batchFooter: {
                     flexDirection: "row",
                     gap: 10,
@@ -342,22 +319,17 @@ const AddressBook: React.FC = () => {
                     paddingTop: 10,
                     borderTopWidth: 1,
                     borderTopColor: colors.border,
-                    backgroundColor: colors.bgColor,
-                },
+                    backgroundColor: colors.bgColor},
                 batchBtn: {
-                    flex: 1,
-                },
+                    flex: 1},
                 deleteBtn: {
-                    backgroundColor: colors.linkColor,
-                },
+                    backgroundColor: colors.linkColor},
                 addFooter: {
                     paddingHorizontal: 20,
                     paddingTop: 10,
                     borderTopWidth: 1,
                     borderTopColor: colors.border,
-                    backgroundColor: colors.bgColor,
-                },
-            }),
+                    backgroundColor: colors.bgColor}}),
         [colors, FONTS]
     );
 
@@ -379,8 +351,7 @@ const AddressBook: React.FC = () => {
                                 color: colors.bodyTextColor,
                                 lineHeight: 14 * 1.6,
                                 marginBottom: 16,
-                                textAlign: "center",
-                            }}
+                                textAlign: "center"}}
                         >
                             {t.addressBook.subtitle}
                         </Text>
@@ -398,8 +369,7 @@ const AddressBook: React.FC = () => {
                                 lineHeight: 14 * 1.6,
                                 marginBottom: 12,
                                 marginTop: -8,
-                                textAlign: "center",
-                            }}
+                                textAlign: "center"}}
                         >
                             {formatMessage(t.withdraw.addressBookForNetwork, { network: networkLabel })}
                         </Text>
@@ -416,8 +386,7 @@ const AddressBook: React.FC = () => {
                                         <Text style={styles.selectionMeta}>
                                             {selectedCount > 0
                                                 ? formatMessage(t.addressBook.selectedCount, {
-                                                      count: String(selectedCount),
-                                                  })
+                                                      count: String(selectedCount)})
                                                 : t.addressBook.selectHint}
                                         </Text>
                                         <TouchableOpacity onPress={handleSelectAll}>

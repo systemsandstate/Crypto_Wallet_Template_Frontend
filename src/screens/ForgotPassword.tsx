@@ -1,4 +1,4 @@
-import { Text, Alert } from "react-native";
+import { Text} from "react-native";
 import LoadingSpinner from "../components/LoadingSpinner";
 import React, { useState } from "react";
 
@@ -7,6 +7,7 @@ import { components } from "../components";
 import { svg } from "../svg";
 import { api } from "../services/api";
 import { useTranslation } from "../hooks/useTranslation";
+import { appAlert } from '../utils/appAlert';
 
 const ForgotPassword: React.FC = ({ navigation }: any) => {
     const { t } = useTranslation();
@@ -15,7 +16,7 @@ const ForgotPassword: React.FC = ({ navigation }: any) => {
 
     const handleSend = async () => {
         if (!email.trim()) {
-            Alert.alert(t.common.error, t.auth.enterEmail);
+            appAlert.alert(t.common.error, t.auth.enterEmail);
             return;
         }
         setLoading(true);
@@ -23,7 +24,7 @@ const ForgotPassword: React.FC = ({ navigation }: any) => {
             await api.forgotPassword({ email: email.trim() });
             navigation.navigate("ForgotPasswordSentEmail", { mode: "email_sent" });
         } catch (err: any) {
-            Alert.alert(t.common.error, err.message || t.auth.couldNotSendReset);
+            appAlert.alert(t.common.error, err.message || t.auth.couldNotSendReset);
         } finally {
             setLoading(false);
         }
@@ -38,8 +39,7 @@ const ForgotPassword: React.FC = ({ navigation }: any) => {
                     ...theme.FONTS.H3,
                     color: theme.COLORS.mainDark,
                     marginBottom: 12,
-                    textAlign: "center",
-                }}
+                    textAlign: "center"}}
             >
                 {t.auth.resetPassword}
             </Text>
@@ -50,8 +50,7 @@ const ForgotPassword: React.FC = ({ navigation }: any) => {
                     color: theme.COLORS.bodyTextColor,
                     lineHeight: 16 * 1.7,
                     marginBottom: 24,
-                    textAlign: "center",
-                }}
+                    textAlign: "center"}}
             >
                 {t.auth.resetPasswordInstructions}
             </Text>

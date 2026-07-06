@@ -1,4 +1,4 @@
-import { Text, TouchableOpacity, Alert } from "react-native";
+import { Text, TouchableOpacity} from "react-native";
 import LoadingSpinner from "../components/LoadingSpinner";
 import React, { useState } from "react";
 
@@ -7,6 +7,7 @@ import { components } from "../components";
 import { svg } from "../svg";
 import { api } from "../services/api";
 import { useTranslation } from "../hooks/useTranslation";
+import { appAlert } from '../utils/appAlert';
 
 const NewPassword: React.FC = ({ navigation, route }: any) => {
     const { t } = useTranslation();
@@ -18,15 +19,15 @@ const NewPassword: React.FC = ({ navigation, route }: any) => {
 
     const handleReset = async () => {
         if (!resetToken) {
-            Alert.alert(t.common.error, t.auth.invalidResetLink);
+            appAlert.alert(t.common.error, t.auth.invalidResetLink);
             return;
         }
         if (password.length < 8) {
-            Alert.alert(t.common.error, t.auth.passwordMin8);
+            appAlert.alert(t.common.error, t.auth.passwordMin8);
             return;
         }
         if (password !== confirm) {
-            Alert.alert(t.common.error, t.auth.passwordsNotMatch);
+            appAlert.alert(t.common.error, t.auth.passwordsNotMatch);
             return;
         }
         setLoading(true);
@@ -34,7 +35,7 @@ const NewPassword: React.FC = ({ navigation, route }: any) => {
             await api.resetPassword({ token: resetToken, newPassword: password });
             navigation.navigate("ForgotPasswordSentEmail", { mode: "success" });
         } catch (err: any) {
-            Alert.alert(t.common.error, err.message || t.auth.couldNotResetPassword);
+            appAlert.alert(t.common.error, err.message || t.auth.couldNotResetPassword);
         } finally {
             setLoading(false);
         }
@@ -49,8 +50,7 @@ const NewPassword: React.FC = ({ navigation, route }: any) => {
                     ...theme.FONTS.H3,
                     color: theme.COLORS.mainDark,
                     marginBottom: 12,
-                    textAlign: "center",
-                }}
+                    textAlign: "center"}}
             >
                 {t.auth.chooseNewPassword}
             </Text>
@@ -61,8 +61,7 @@ const NewPassword: React.FC = ({ navigation, route }: any) => {
                     color: theme.COLORS.bodyTextColor,
                     lineHeight: 16 * 1.7,
                     marginBottom: 24,
-                    textAlign: "center",
-                }}
+                    textAlign: "center"}}
             >
                 {t.auth.enterNewPasswordConfirm}
             </Text>

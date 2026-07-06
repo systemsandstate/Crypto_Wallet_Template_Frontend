@@ -4,6 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Shadow } from "react-native-shadow-2";
 
 import { svg } from "../svg";
+import LoadingSpinner from "./LoadingSpinner";
 import { useTranslation } from "../hooks/useTranslation";
 import { useTheme } from "../hooks/useTheme";
 
@@ -18,6 +19,8 @@ type Props = {
     onRefresh?: () => void;
     refreshing?: boolean;
     onBalancePress?: () => void;
+    /** Opens wallet list when the compact balance chip is pressed. */
+    onWalletPress?: () => void;
 };
 
 const formatAmount = (value: number, locale: string) => {
@@ -36,10 +39,12 @@ const MerchantBalanceCard: React.FC<Props> = ({
     onRefresh,
     refreshing = false,
     onBalancePress,
+    onWalletPress,
 }) => {
     const { t, dateLocale } = useTranslation();
     const { colors, isDark, FONTS } = useTheme();
     const [whole, fraction = "00"] = formatAmount(walletBalance, dateLocale).split(".");
+    const compactBalance = formatAmount(walletBalance, dateLocale);
 
     const styles = useMemo(
         () =>
@@ -263,23 +268,63 @@ const MerchantBalanceCard: React.FC<Props> = ({
                     color: colors.pureWhite,
                     letterSpacing: 0.8,
                 },
+                walletChip: {
+                    flexDirection: "row",
+                    alignItems: "center",
+                    alignSelf: "flex-end",
+                    gap: 6,
+                    marginBottom: 10,
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                    borderRadius: 16,
+                    paddingVertical: 6,
+                    paddingHorizontal: 10,
+                },
+                walletChipIcon: {
+                    width: 18,
+                    height: 18,
+                    borderRadius: 9,
+                    backgroundColor: colors.accentBlue,
+                    alignItems: "center",
+                    justifyContent: "center",
+                },
+                walletChipText: {
+                    ...FONTS.Mulish_700Bold,
+                    fontSize: 13,
+                    color: colors.pureWhite,
+                },
             }),
-        [FONTS, colors.border, colors.pureWhite, isDark]
+        [FONTS, colors.accentBlue, colors.border, colors.pureWhite, isDark]
     );
+
+    const walletChip = onWalletPress ? (
+        <TouchableOpacity
+            style={styles.walletChip}
+            onPress={onWalletPress}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={t.wallet.walletsTitle}
+        >
+            <View style={styles.walletChipIcon}>
+                <svg.WalletSvg color="#FFFFFF" size={11} variant="outline" />
+            </View>
+            <Text style={styles.walletChipText}>${compactBalance}</Text>
+        </TouchableOpacity>
+    ) : null;
 
     const statsPanel = (
         <View style={styles.statsCol}>
+            {walletChip}
             <View style={styles.statsRow}>
                 <View style={styles.statBlock}>
                     <Text style={styles.metaLabel}>{t.balance.pending}</Text>
                     <Text style={styles.statValue}>{pendingCount}</Text>
-                    <Text style={styles.statSub}>{formatAmount(pendingAmount, dateLocale)}</Text>
+                    <Text style={styles.statSub}>${formatAmount(pendingAmount, dateLocale)}</Text>
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.statBlock}>
                     <Text style={styles.metaLabel}>{t.balance.received}</Text>
                     <Text style={[styles.statValue, { color: "#7BE0B8" }]}>{depositCount}</Text>
-                    <Text style={styles.statSub}>{formatAmount(depositAmount, dateLocale)}</Text>
+                    <Text style={styles.statSub}>${formatAmount(depositAmount, dateLocale)}</Text>
                 </View>
             </View>
             <View style={styles.brandMark}>
@@ -297,9 +342,8 @@ const MerchantBalanceCard: React.FC<Props> = ({
             accessibilityLabel={t.balance.viewBalanceDetails}
         >
             <View style={styles.balanceRow}>
-                <Text style={styles.balanceWhole}>{whole}</Text>
+                <Text style={styles.balanceWhole}>${whole}</Text>
                 <Text style={styles.balanceFraction}>.{fraction}</Text>
-                <Text style={styles.balanceCurrency}>USDT</Text>
             </View>
             <Text style={styles.balanceLabel}>{t.balance.walletBalance}</Text>
             <Text style={styles.balanceHint}>{t.balance.onChainAllNetworks}</Text>
@@ -308,9 +352,8 @@ const MerchantBalanceCard: React.FC<Props> = ({
     ) : (
         <>
             <View style={styles.balanceRow}>
-                <Text style={styles.balanceWhole}>{whole}</Text>
+                <Text style={styles.balanceWhole}>${whole}</Text>
                 <Text style={styles.balanceFraction}>.{fraction}</Text>
-                <Text style={styles.balanceCurrency}>USDT</Text>
             </View>
             <Text style={styles.balanceLabel}>{t.balance.walletBalance}</Text>
             <Text style={styles.balanceHint}>{t.balance.onChainAllNetworks}</Text>
@@ -347,7 +390,11 @@ const MerchantBalanceCard: React.FC<Props> = ({
                         accessibilityRole="button"
                         accessibilityLabel={t.common.refresh}
                     >
-                        <svg.RefreshSvg size={18} />
+                        {refreshing ? (
+                            <LoadingSpinner size={22} shellColor="rgba(255,255,255,0.95)" arcColor="#4A7CFF" />
+                        ) : (
+                            <svg.RefreshSvg size={18} />
+                        )}
                     </TouchableOpacity>
                 ) : null}
             </View>

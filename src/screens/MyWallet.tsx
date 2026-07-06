@@ -1,4 +1,4 @@
-import { View, Text, Alert, ScrollView, StyleSheet, TouchableOpacity, Platform } from "react-native";
+import { View, Text,  ScrollView, StyleSheet, TouchableOpacity, Platform } from "react-native";
 import LoadingSpinner from "../components/LoadingSpinner";
 import React, { useCallback, useState, useMemo } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -13,6 +13,7 @@ import { getLocalizedNetworkLabel } from "../i18n/network";
 import { formatMessage } from "../i18n";
 import { isWalletSetupLocally } from "../services/wallet/walletStorage";
 import { copyToClipboard } from "../utils/copyToClipboard";
+import { appAlert } from '../utils/appAlert';
 import { showToast } from "../utils/toast";
 import { svg } from "../svg";
 
@@ -30,8 +31,7 @@ const MyWallet: React.FC = ({ navigation }: any) => {
     const formatDate = (iso: string) =>
         new Date(iso).toLocaleString(dateLocale, {
             dateStyle: "medium",
-            timeStyle: "short",
-        });
+            timeStyle: "short"});
 
     const styles = useMemo(
         () =>
@@ -42,8 +42,7 @@ const MyWallet: React.FC = ({ navigation }: any) => {
                     color: colors.bodyTextColor,
                     lineHeight: 14 * 1.6,
                     marginBottom: 16,
-                    textAlign: "center",
-                },
+                    textAlign: "center"},
                 statusCard: {
                     backgroundColor: colors.white,
                     borderRadius: 12,
@@ -58,31 +57,24 @@ const MyWallet: React.FC = ({ navigation }: any) => {
                               shadowColor: colors.mainDark,
                               shadowOffset: { width: 0, height: 2 },
                               shadowOpacity: 0.08,
-                              shadowRadius: 6,
-                          }),
-                },
+                              shadowRadius: 6})},
                 statusRow: {
                     flexDirection: "row",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    marginBottom: 8,
-                },
+                    marginBottom: 8},
                 statusLabel: {
                     ...FONTS.Mulish_400Regular,
                     fontSize: 13,
-                    color: colors.bodyTextColor,
-                },
+                    color: colors.bodyTextColor},
                 statusValue: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 13,
-                    color: colors.mainDark,
-                },
+                    color: colors.mainDark},
                 statusOk: {
-                    color: colors.green,
-                },
+                    color: colors.green},
                 statusWarn: {
-                    color: colors.linkColor,
-                },
+                    color: colors.linkColor},
                 card: {
                     backgroundColor: colors.white,
                     borderRadius: 12,
@@ -97,59 +89,48 @@ const MyWallet: React.FC = ({ navigation }: any) => {
                               shadowColor: colors.mainDark,
                               shadowOffset: { width: 0, height: 2 },
                               shadowOpacity: 0.08,
-                              shadowRadius: 6,
-                          }),
-                },
+                              shadowRadius: 6})},
                 networkRow: {
                     flexDirection: "row",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    marginBottom: 6,
-                },
+                    marginBottom: 6},
                 networkTitleRow: {
                     flexDirection: "row",
                     alignItems: "center",
                     gap: 8,
                     flex: 1,
                     minWidth: 0,
-                    paddingRight: 8,
-                },
+                    paddingRight: 8},
                 networkLabel: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 14,
                     color: colors.mainDark,
-                    flexShrink: 1,
-                },
+                    flexShrink: 1},
                 configuredBadge: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 11,
-                    color: colors.green,
-                },
+                    color: colors.green},
                 notConfiguredBadge: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 11,
-                    color: colors.linkColor,
-                },
+                    color: colors.linkColor},
                 address: {
                     ...FONTS.Mulish_400Regular,
                     fontSize: 12,
                     color: colors.bodyTextColor,
-                    lineHeight: 18,
-                },
+                    lineHeight: 18},
                 addressRow: {
-                    marginBottom: 4,
-                },
+                    marginBottom: 4},
                 cardFooter: {
                     flexDirection: "row",
                     alignItems: "flex-end",
                     justifyContent: "space-between",
-                    marginTop: 8,
-                },
+                    marginTop: 8},
                 cardFooterLeft: {
                     flex: 1,
                     minWidth: 0,
-                    paddingRight: 8,
-                },
+                    paddingRight: 8},
                 copyButton: {
                     width: 40,
                     height: 40,
@@ -158,20 +139,16 @@ const MyWallet: React.FC = ({ navigation }: any) => {
                     justifyContent: "center",
                     backgroundColor: colors.surfaceMuted,
                     borderWidth: 1,
-                    borderColor: colors.border,
-                },
+                    borderColor: colors.border},
                 balanceText: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 13,
-                    color: colors.green,
-                },
+                    color: colors.green},
                 meta: {
                     ...FONTS.Mulish_400Regular,
                     fontSize: 11,
                     color: colors.bodyTextColor,
-                    marginTop: 6,
-                },
-            }),
+                    marginTop: 6}}),
         [colors, FONTS]
     );
 
@@ -188,7 +165,7 @@ const MyWallet: React.FC = ({ navigation }: any) => {
                 }
                 setBalances(map);
             })
-            .catch((err) => Alert.alert(t.common.error, err.message))
+            .catch((err) => appAlert.alert(t.common.error, err.message))
             .finally(() => setLoading(false));
     }, [t.common.error]);
 
@@ -207,8 +184,7 @@ const MyWallet: React.FC = ({ navigation }: any) => {
             if (copied) {
                 showToast(
                     formatMessage(t.transaction.copiedToClipboard, {
-                        label: getLocalizedNetworkLabel(network, t),
-                    })
+                        label: getLocalizedNetworkLabel(network, t)})
                 );
             } else {
                 showToast(t.transaction.couldNotCopy, "error");
@@ -223,7 +199,7 @@ const MyWallet: React.FC = ({ navigation }: any) => {
                 navigation.navigate("WalletReceive", { network, address: wallet.address });
                 return;
             }
-            Alert.alert(t.wallet.networkNotSetupTitle, t.wallet.networkNotSetupMessage, [
+            appAlert.alert(t.wallet.networkNotSetupTitle, t.wallet.networkNotSetupMessage, [
                 { text: t.common.cancel, style: "cancel" },
                 { text: t.wallet.setupWallet, onPress: () => navigation.navigate("WalletSetup") },
             ]);
@@ -235,41 +211,46 @@ const MyWallet: React.FC = ({ navigation }: any) => {
         <View style={{ flex: 1, backgroundColor: colors.bgColor }}>
             <SafeAreaView style={{ flex: 1 }}>
                 <components.Header title={t.wallet.myWalletTitle} goBack={true} />
+                {loading ? (
+                    <View
+                        style={{
+                            flex: 1,
+                            alignItems: "center",
+                            justifyContent: "center"}}
+                    >
+                        <LoadingSpinner size={48} />
+                    </View>
+                ) : (
                 <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
                     <components.MerchantContent style={{ paddingTop: 16 }}>
                         <Text style={styles.subtitle}>{t.wallet.myWalletDescription}</Text>
 
-                        {!loading && (
-                            <View style={styles.statusCard}>
-                                <View style={styles.statusRow}>
-                                    <Text style={styles.statusLabel}>{t.wallet.deviceWalletStatus}</Text>
-                                    <Text
-                                        style={[
-                                            styles.statusValue,
-                                            localSetup ? styles.statusOk : styles.statusWarn,
-                                        ]}
-                                    >
-                                        {localSetup ? t.wallet.statusReady : t.wallet.statusNotSetup}
-                                    </Text>
-                                </View>
-                                <View style={styles.statusRow}>
-                                    <Text style={styles.statusLabel}>{t.wallet.serverSyncStatus}</Text>
-                                    <Text
-                                        style={[
-                                            styles.statusValue,
-                                            hasServerWallet ? styles.statusOk : styles.statusWarn,
-                                        ]}
-                                    >
-                                        {hasServerWallet ? t.wallet.statusSynced : t.wallet.statusNotSynced}
-                                    </Text>
-                                </View>
+                        <View style={styles.statusCard}>
+                            <View style={styles.statusRow}>
+                                <Text style={styles.statusLabel}>{t.wallet.deviceWalletStatus}</Text>
+                                <Text
+                                    style={[
+                                        styles.statusValue,
+                                        localSetup ? styles.statusOk : styles.statusWarn,
+                                    ]}
+                                >
+                                    {localSetup ? t.wallet.statusReady : t.wallet.statusNotSetup}
+                                </Text>
                             </View>
-                        )}
+                            <View style={styles.statusRow}>
+                                <Text style={styles.statusLabel}>{t.wallet.serverSyncStatus}</Text>
+                                <Text
+                                    style={[
+                                        styles.statusValue,
+                                        hasServerWallet ? styles.statusOk : styles.statusWarn,
+                                    ]}
+                                >
+                                    {hasServerWallet ? t.wallet.statusSynced : t.wallet.statusNotSynced}
+                                </Text>
+                            </View>
+                        </View>
 
-                        {loading ? (
-                            <LoadingSpinner size={40} style={{ marginVertical: 24 }} />
-                        ) : (
-                            USDT_NETWORKS.map((network) => {
+                        {USDT_NETWORKS.map((network) => {
                                 const wallet = getWallet(network);
                                 const configured = Boolean(wallet?.address);
                                 return (
@@ -317,8 +298,7 @@ const MyWallet: React.FC = ({ navigation }: any) => {
                                                             ? t.wallet.balanceUnavailable
                                                             : `${balances[network]!.toLocaleString(dateLocale, {
                                                                   minimumFractionDigits: 2,
-                                                                  maximumFractionDigits: 6,
-                                                              })} USDT`}
+                                                                  maximumFractionDigits: 6})} USDT`}
                                                     </Text>
                                                     {wallet?.updatedAt && (
                                                         <Text style={styles.meta}>
@@ -348,16 +328,23 @@ const MyWallet: React.FC = ({ navigation }: any) => {
                                         )}
                                     </TouchableOpacity>
                                 );
-                            })
-                        )}
+                            })}
 
                         <components.Button
-                            title={t.wallet.reconfigureWallet}
-                            onPress={() => navigation.navigate("WalletSetup")}
+                            title={t.wallet.manageWallets}
+                            onPress={() => navigation.navigate("Wallets")}
                             containerStyle={{ marginTop: 20 }}
+                        />
+                        <components.Button
+                            title={t.wallet.addWallet}
+                            onPress={() =>
+                                navigation.navigate("WalletSetup", { addWallet: true })
+                            }
+                            containerStyle={{ marginTop: 12 }}
                         />
                     </components.MerchantContent>
                 </ScrollView>
+                )}
             </SafeAreaView>
         </View>
     );

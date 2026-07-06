@@ -52,6 +52,7 @@ export interface WalletTransfer {
   toAddress: string;
   timestamp: string;
   blockNumber: number;
+  source?: string;
 }
 
 export interface AuthResponse {
@@ -105,6 +106,7 @@ const writeNativeToken = (token: string | null) => {
 };
 
 export async function hydrateAuthToken(): Promise<string | null> {
+  if (authToken) return authToken;
   if (Platform.OS === 'web') {
     authToken = readWebToken();
     return authToken;
@@ -113,33 +115,168 @@ export async function hydrateAuthToken(): Promise<string | null> {
   return authToken;
 }
 
+/** Persist token to memory + storage (await on native so send cannot race AsyncStorage). */
+export async function persistAuthToken(token: string | null): Promise<void> {
+  authToken = token;
+  writeWebToken(token);
+  if (Platform.OS === 'web') return;
+  try {
+    if (token) await AsyncStorage.setItem(TOKEN_STORAGE_KEY, token);
+    else await AsyncStorage.removeItem(TOKEN_STORAGE_KEY);
+  } catch {
+    // Memory token remains valid for this session if storage fails.
+  }
+}
+
+export async function ensureAuthToken(): Promise<string> {
+  const token = await hydrateAuthToken();
+  if (!token) throw new Error('Session expired');
+  return token;
+}
+
 export const setAuthToken = (token: string | null) => {
   authToken = token;
   writeWebToken(token);
   writeNativeToken(token);
+  if (!token) clearApiCache();
 };
 
 export const getAuthToken = (): string | null => authToken;
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = getAuthToken();
+const GET_CACHE_TTL_MS: Record<string, number> = {
+  '/merchant/wallets/balances': 12_000,
+  '/merchant/wallets/transfers': 20_000,
+  '/payments/requests': 20_000,
+  '/merchant/wallets': 60_000,
+};
+
+const getCacheTtl = (path: string): number | null => {
+  if (/live=1|live=true/i.test(path)) return null;
+  for (const [prefix, ttl] of Object.entries(GET_CACHE_TTL_MS)) {
+    if (path.startsWith(prefix)) return ttl;
+  }
+  return null;
+};
+
+type CacheEntry = { at: number; data: unknown };
+const responseCache = new Map<string, CacheEntry>();
+const inflightGets = new Map<string, Promise<unknown>>();
+
+export function clearApiCache(): void {
+  responseCache.clear();
+  inflightGets.clear();
+}
+
+/** Drop cached GET responses so history/balances refetch (e.g. after a receive). */
+export function invalidateCachedGet(pathPrefix: string): void {
+  for (const key of [...responseCache.keys()]) {
+    if (key.startsWith(pathPrefix)) responseCache.delete(key);
+  }
+  for (const key of [...inflightGets.keys()]) {
+    if (key.startsWith(pathPrefix)) inflightGets.delete(key);
+  }
+}
+
+/** True when a cached GET response exists and is younger than maxAgeMs. */
+export function isCachedGetFresh(path: string, maxAgeMs: number): boolean {
+  const hit = responseCache.get(path);
+  return Boolean(hit && Date.now() - hit.at < maxAgeMs);
+}
+
+async function cachedGet<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const ttl = getCacheTtl(path);
+  if (ttl == null) return request<T>(path, options);
+
+  const hit = responseCache.get(path);
+  if (hit && Date.now() - hit.at < ttl) return hit.data as T;
+
+  const pending = inflightGets.get(path);
+  if (pending) return pending as Promise<T>;
+
+  const promise = request<T>(path, options)
+    .then((data) => {
+      responseCache.set(path, { at: Date.now(), data });
+      inflightGets.delete(path);
+      return data;
+    })
+    .catch((err) => {
+      inflightGets.delete(path);
+      throw err;
+    });
+
+  inflightGets.set(path, promise);
+  return promise;
+}
+
+const API_TIMEOUT_MS = Platform.OS === 'web' ? 25_000 : 30_000;
+
+const PUBLIC_AUTH_PATHS = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+];
+
+const isPublicAuthPath = (path: string): boolean =>
+  PUBLIC_AUTH_PATHS.some((prefix) => path.startsWith(prefix));
+
+type RequestOptions = RequestInit & { suppressSessionExpired?: boolean };
+
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const { suppressSessionExpired, ...fetchOptions } = options;
+  let token = getAuthToken();
+  if (!token && !isPublicAuthPath(path)) {
+    token = await hydrateAuthToken();
+  }
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
+    Accept: 'application/json',
+    ...(fetchOptions.headers as Record<string, string>),
   };
-  if (token) headers.Authorization = `Bearer ${token}`;
+  // Never attach a stale session token to login/register — avoids false "session expired".
+  if (token && !isPublicAuthPath(path)) {
+    headers.Authorization = `Bearer ${token}`;
+  }
 
-  const res = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      ...fetchOptions,
+      headers,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err || '');
+    if (/aborted|abort/i.test(message)) {
+      throw new Error('Request timed out. Check your connection and try again.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+
   const data = await res.json().catch(() => ({}));
 
-  if (res.status === 401 && token) {
-    setAuthToken(null);
-    onUnauthorized?.('Your session has expired. Please sign in again.');
+  if (res.status === 401 && token && !isPublicAuthPath(path)) {
+    if (!suppressSessionExpired) {
+      setAuthToken(null);
+      onUnauthorized?.('Your session has expired. Please sign in again.');
+    }
     throw new Error('Session expired');
   }
 
   if (!res.ok || data.success === false) {
-    throw new Error(data.error || `Request failed (${res.status})`);
+    const message =
+      data.error ||
+      (res.status === 503 || res.status === 504
+        ? 'Service temporarily unavailable. Please try again.'
+        : res.status === 401
+          ? 'Invalid email or password'
+          : `Request failed (${res.status})`);
+    throw new Error(message);
   }
   return data as T;
 }
@@ -167,7 +304,10 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  getProfile: () => request<{ success: boolean; data: Merchant }>('/merchant/profile'),
+  getProfile: () =>
+    request<{ success: boolean; data: Merchant }>('/merchant/profile', {
+      suppressSessionExpired: true,
+    }),
 
   updateProfile: (body: { businessName?: string; phone?: string | null }) =>
     request<{ success: boolean; data: Merchant }>('/merchant/profile', {
@@ -212,21 +352,22 @@ export const api = {
     if (params?.status) q.set('status', params.status);
     if (params?.limit) q.set('limit', String(params.limit));
     const qs = q.toString();
-    return request<{ success: boolean; data: { items: PaymentRequest[]; total: number } }>(
+    return cachedGet<{ success: boolean; data: { items: PaymentRequest[]; total: number } }>(
       `/payments/requests${qs ? `?${qs}` : ''}`
     );
   },
 
   getWalletStatus: () =>
-    request<{ success: boolean; data: { hasWallet: boolean } }>('/merchant/wallets/status'),
+    cachedGet<{ success: boolean; data: { hasWallet: boolean } }>('/merchant/wallets/status'),
 
   getWallets: () =>
-    request<{ success: boolean; data: { wallets: MerchantWallet[]; hasWallet: boolean } }>(
+    cachedGet<{ success: boolean; data: { wallets: MerchantWallet[]; hasWallet: boolean } }>(
       '/merchant/wallets'
     ),
 
-  getWalletBalances: () =>
-    request<{
+  getWalletBalances: (params?: { live?: boolean }) => {
+    const q = params?.live ? '?live=1' : '';
+    return cachedGet<{
       success: boolean;
       data: {
         balances: Array<{
@@ -237,10 +378,11 @@ export const api = {
           nativeSymbol: string;
         }>;
       };
-    }>('/merchant/wallets/balances'),
+    }>(`/merchant/wallets/balances${q}`);
+  },
 
   getWalletTransfers: () =>
-    request<{ success: boolean; data: { transfers: WalletTransfer[] } }>(
+    cachedGet<{ success: boolean; data: { transfers: WalletTransfer[] } }>(
       '/merchant/wallets/transfers'
     ),
 
@@ -255,7 +397,11 @@ export const api = {
   }) =>
     request<{ success: boolean; data: { recorded: boolean } }>(
       '/merchant/wallets/transfers/report',
-      { method: 'POST', body: JSON.stringify(body) }
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+        suppressSessionExpired: true,
+      }
     ),
 
   syncWallets: (wallets: Array<{ network: string; address: string }>) =>

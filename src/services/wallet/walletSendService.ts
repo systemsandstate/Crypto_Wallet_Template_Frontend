@@ -6,6 +6,7 @@ import {
   EVM_SEND_NETWORKS,
   WalletSendError,
   mapSendError,
+  resolveTxFeeOverrides,
   toTokenAmountString,
   unlockWalletSigner,
   withWalletRpc,
@@ -42,19 +43,26 @@ export async function sendUsdt(params: {
 
   try {
     return await withWalletRpc(network, async (provider) => {
-      const signer = await unlockWalletSigner(network, pin, provider);
-      const contract = new Contract(meta.contractAddress, ERC20_TRANSFER_ABI, signer);
+      const contract = new Contract(meta.contractAddress, ERC20_TRANSFER_ABI, provider);
+      const [signer, feeOverrides] = await Promise.all([
+        unlockWalletSigner(network, pin, provider),
+        resolveTxFeeOverrides(provider),
+      ]);
+      const connected = contract.connect(signer) as Contract;
 
       onProgress?.('signing');
-      const tx = await contract.transfer(checksumTo, amountRaw);
+      const tx = await connected.transfer(checksumTo, amountRaw, {
+        gasLimit: 120_000n,
+        ...feeOverrides,
+      });
 
       onProgress?.('broadcasting');
-      const receipt = await tx.wait();
-      const txHash = receipt?.hash ?? tx?.hash;
+      const txHash = tx.hash;
       if (!txHash) {
         throw new WalletSendError('Transaction failed');
       }
 
+      void tx.wait(1).catch(() => {});
       return { txHash, fromAddress: signer.address };
     });
   } catch (err) {

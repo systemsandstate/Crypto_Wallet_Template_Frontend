@@ -1,6 +1,5 @@
-import { Alert, Platform } from "react-native";
-
 import { blurActiveElement } from "./blurActiveElement";
+import { dismissDialog, showDialog } from "./dialog";
 
 type ConfirmOptions = {
     title: string;
@@ -19,20 +18,24 @@ export function confirmAction({
     destructive = false,
     onConfirm,
 }: ConfirmOptions) {
-    if (Platform.OS === "web") {
-        blurActiveElement();
-        if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
-            onConfirm();
-        }
-        return;
-    }
-
-    Alert.alert(title, message, [
-        { text: cancelLabel, style: "cancel" },
-        {
-            text: confirmLabel,
-            style: destructive ? "destructive" : "default",
-            onPress: onConfirm,
-        },
-    ]);
+    blurActiveElement();
+    showDialog({
+        title,
+        message,
+        buttons: [
+            {
+                text: cancelLabel,
+                style: "cancel",
+                onPress: () => dismissDialog(),
+            },
+            {
+                text: confirmLabel,
+                style: destructive ? "destructive" : "default",
+                onPress: () => {
+                    dismissDialog();
+                    onConfirm();
+                },
+            },
+        ],
+    });
 }

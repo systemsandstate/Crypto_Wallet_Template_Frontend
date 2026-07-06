@@ -1,6 +1,6 @@
 /** Format crypto amounts with enough precision for native gas tokens (BNB, ETH, etc.). */
 export function formatNativeAmount(value: number | string | null | undefined, locale = "en-US"): string {
-    if (value == null || !Number.isFinite(Number(value))) return "—";
+    if (value == null || !Number.isFinite(Number(value))) return "0";
     const num = typeof value === "string" ? parseFloat(value) : value;
     const abs = Math.abs(num);
     const maxDecimals = abs >= 1 ? 6 : abs >= 0.001 ? 8 : 12;

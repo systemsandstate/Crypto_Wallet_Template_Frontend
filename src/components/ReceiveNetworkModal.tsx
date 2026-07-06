@@ -4,11 +4,9 @@ import {
     Modal,
     StyleSheet,
     TouchableOpacity,
-    ScrollView,
-        Alert,
+    ScrollView, 
     Platform,
-    Share,
-} from "react-native";
+    Share} from "react-native";
 import LoadingSpinner from "./LoadingSpinner";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import QRCode from "react-native-qrcode-svg";
@@ -22,6 +20,7 @@ import { getLocalizedNetworkLabel } from "../i18n/network";
 import { formatMessage } from "../i18n";
 import { api, MerchantWallet } from "../services/api";
 import { copyToClipboard } from "../utils/copyToClipboard";
+import { appAlert } from '../utils/appAlert';
 import { showToast } from "../utils/toast";
 import { buildWalletQrPayload, splitAddressLines } from "../utils/walletQrPayload";
 import { svg } from "../svg";
@@ -62,7 +61,7 @@ const ReceiveNetworkModal: React.FC<Props> = ({ visible, onClose, onSetupWallet 
         setLoading(true);
         api.getWallets()
             .then((res) => setWallets(res.data.wallets))
-            .catch((err) => Alert.alert(t.common.error, err.message))
+            .catch((err) => appAlert.alert(t.common.error, err.message))
             .finally(() => setLoading(false));
     }, [t.common.error]);
 
@@ -110,15 +109,14 @@ const ReceiveNetworkModal: React.FC<Props> = ({ visible, onClose, onSetupWallet 
         (network: UsdtNetwork) => {
             const wallet = getWallet(network);
             if (!wallet?.address) {
-                Alert.alert(t.wallet.networkNotSetupTitle, t.wallet.networkNotSetupMessage, [
+                appAlert.alert(t.wallet.networkNotSetupTitle, t.wallet.networkNotSetupMessage, [
                     { text: t.common.cancel, style: "cancel" },
                     {
                         text: t.wallet.setupWallet,
                         onPress: () => {
                             handleClose();
                             onSetupWallet?.();
-                        },
-                    },
+                        }},
                 ]);
                 return;
             }
@@ -151,8 +149,7 @@ const ReceiveNetworkModal: React.FC<Props> = ({ visible, onClose, onSetupWallet 
         if (!selectedAddress) return;
         const message = formatMessage(t.wallet.shareMessage, {
             network: selectedNetwork,
-            address: selectedAddress,
-        });
+            address: selectedAddress});
         try {
             if (Platform.OS === "web" && typeof navigator !== "undefined" && navigator.share) {
                 await navigator.share({ title: t.wallet.receiveTitle, text: message });
@@ -176,8 +173,7 @@ const ReceiveNetworkModal: React.FC<Props> = ({ visible, onClose, onSetupWallet 
               ? t.wallet.balanceUnavailable
               : `${onChainBalance.toLocaleString(dateLocale, {
                     minimumFractionDigits: 2,
-                    maximumFractionDigits: 6,
-                })} USDT`;
+                    maximumFractionDigits: 6})} USDT`;
 
     const styles = useMemo(
         () =>
@@ -187,29 +183,24 @@ const ReceiveNetworkModal: React.FC<Props> = ({ visible, onClose, onSetupWallet 
                     width: "100%",
                     backgroundColor: colors.bgColor,
                     paddingTop: insets.top,
-                    paddingBottom: Math.max(insets.bottom, 16),
-                },
+                    paddingBottom: Math.max(insets.bottom, 16)},
                 header: {
                     flexDirection: "row",
                     alignItems: "center",
                     justifyContent: "space-between",
                     paddingHorizontal: 20,
                     paddingTop: 8,
-                    paddingBottom: 8,
-                },
+                    paddingBottom: 8},
                 networkSelectorWrap: {
                     paddingHorizontal: 20,
-                    marginBottom: 4,
-                },
+                    marginBottom: 4},
                 headerSide: {
-                    width: 36,
-                },
+                    width: 36},
                 title: {
                     ...FONTS.H4,
                     color: colors.mainDark,
                     flex: 1,
-                    textAlign: "center",
-                },
+                    textAlign: "center"},
                 description: {
                     ...FONTS.Mulish_400Regular,
                     fontSize: 14,
@@ -217,11 +208,9 @@ const ReceiveNetworkModal: React.FC<Props> = ({ visible, onClose, onSetupWallet 
                     textAlign: "center",
                     paddingHorizontal: 24,
                     marginBottom: 16,
-                    lineHeight: 14 * 1.5,
-                },
+                    lineHeight: 14 * 1.5},
                 body: {
-                    paddingHorizontal: 20,
-                },
+                    paddingHorizontal: 20},
                 warningBox: {
                     flexDirection: "row",
                     alignItems: "flex-start",
@@ -230,8 +219,7 @@ const ReceiveNetworkModal: React.FC<Props> = ({ visible, onClose, onSetupWallet 
                     padding: 12,
                     marginBottom: 16,
                     borderWidth: 1,
-                    borderColor: colors.border,
-                },
+                    borderColor: colors.border},
                 warningIcon: {
                     width: 18,
                     height: 18,
@@ -240,88 +228,73 @@ const ReceiveNetworkModal: React.FC<Props> = ({ visible, onClose, onSetupWallet 
                     alignItems: "center",
                     justifyContent: "center",
                     marginRight: 8,
-                    marginTop: 1,
-                },
+                    marginTop: 1},
                 warningIconText: {
                     ...FONTS.Mulish_700Bold,
                     fontSize: 11,
-                    color: colors.white,
-                },
+                    color: colors.white},
                 warningText: {
                     flex: 1,
                     ...FONTS.Mulish_400Regular,
                     fontSize: 12,
                     color: colors.bodyTextColor,
-                    lineHeight: 12 * 1.5,
-                },
+                    lineHeight: 12 * 1.5},
                 assetRow: {
                     flexDirection: "row",
                     alignItems: "center",
                     justifyContent: "center",
-                    marginBottom: 12,
-                },
+                    marginBottom: 12},
                 assetName: {
                     ...FONTS.Mulish_700Bold,
                     fontSize: 17,
                     color: colors.mainDark,
                     marginLeft: 8,
-                    marginRight: 8,
-                },
+                    marginRight: 8},
                 networkPill: {
                     backgroundColor: colors.border,
                     borderRadius: 6,
                     paddingHorizontal: 8,
-                    paddingVertical: 3,
-                },
+                    paddingVertical: 3},
                 networkPillText: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 11,
-                    color: colors.bodyTextColor,
-                },
+                    color: colors.bodyTextColor},
                 balanceRow: {
                     alignItems: "center",
-                    marginBottom: 14,
-                },
+                    marginBottom: 14},
                 balanceValue: {
                     ...FONTS.Mulish_700Bold,
                     fontSize: 20,
-                    color: colors.green,
-                },
+                    color: colors.green},
                 balanceLabel: {
                     ...FONTS.Mulish_400Regular,
                     fontSize: 12,
                     color: colors.bodyTextColor,
-                    marginTop: 4,
-                },
+                    marginTop: 4},
                 qrWrap: {
                     alignSelf: "center",
                     backgroundColor: colors.white,
                     padding: 10,
                     borderRadius: 14,
-                    marginBottom: 14,
-                },
+                    marginBottom: 14},
                 addressBlock: {
                     alignItems: "center",
                     marginBottom: 18,
-                    paddingHorizontal: 4,
-                },
+                    paddingHorizontal: 4},
                 addressLine: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 12,
                     color: colors.mainDark,
                     textAlign: "center",
-                    lineHeight: 18,
-                },
+                    lineHeight: 18},
                 actionsRow: {
                     flexDirection: "row",
                     justifyContent: "space-evenly",
                     paddingHorizontal: 8,
-                    marginBottom: 8,
-                },
+                    marginBottom: 8},
                 actionItem: {
                     alignItems: "center",
-                    minWidth: 72,
-                },
+                    minWidth: 72},
                 actionCircle: {
                     width: 48,
                     height: 48,
@@ -329,29 +302,24 @@ const ReceiveNetworkModal: React.FC<Props> = ({ visible, onClose, onSetupWallet 
                     backgroundColor: colors.surfaceMuted,
                     alignItems: "center",
                     justifyContent: "center",
-                    marginBottom: 6,
-                },
+                    marginBottom: 6},
                 actionLabel: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 11,
                     color: colors.mainDark,
-                    textAlign: "center",
-                },
+                    textAlign: "center"},
                 closeButton: {
                     width: 36,
                     height: 36,
                     borderRadius: 18,
                     alignItems: "center",
                     justifyContent: "center",
-                    backgroundColor: colors.surfaceMuted,
-                },
+                    backgroundColor: colors.surfaceMuted},
                 closeButtonText: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 18,
                     color: colors.bodyTextColor,
-                    lineHeight: 20,
-                },
-            }),
+                    lineHeight: 20}}),
         [FONTS, colors, insets.top, insets.bottom, RECEIVE_MODAL_VERSION]
     );
 

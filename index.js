@@ -1,4 +1,6 @@
 import 'react-native-get-random-values';
+import { setupTextEncodingPolyfills } from './src/polyfills/textEncoding';
+setupTextEncodingPolyfills();
 import { setupCryptoPolyfills } from './src/polyfills/crypto';
 setupCryptoPolyfills();
 import 'react-native-gesture-handler';

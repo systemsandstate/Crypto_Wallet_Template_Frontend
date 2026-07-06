@@ -37,7 +37,7 @@ const QrScanModal: React.FC<Props> = ({ visible, onClose, onScan }) => {
             setPasteValue("");
             return;
         }
-        if (Platform.OS !== "web" && !permission?.granted) {
+        if (!permission?.granted) {
             void requestPermission();
         }
     }, [visible, permission?.granted, requestPermission]);
@@ -159,7 +159,7 @@ const QrScanModal: React.FC<Props> = ({ visible, onClose, onScan }) => {
         [FONTS, colors, insets.bottom, insets.top]
     );
 
-    const canUseCamera = Platform.OS !== "web" && permission?.granted;
+    const canUseCamera = permission?.granted;
 
     return (
         <Modal visible={visible} animationType="slide" onRequestClose={onClose}>

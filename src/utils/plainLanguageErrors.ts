@@ -4,6 +4,8 @@ import type { TranslationDict } from "../i18n";
 export function toPlainLanguageError(message: string, t: TranslationDict): string {
     const lower = message.toLowerCase();
 
+    if (/session expired/i.test(lower)) return t.common.sessionExpiredMessage;
+    if (/does not hold your funds|restore your recovery phrase/i.test(lower)) return message;
     if (/invalid amount/i.test(lower)) return t.payment.invalidAmount;
     if (/wallet not set up|wallet not found/i.test(lower)) return t.wallet.walletRequiredMessage;
     if (/invalid wallet pin|invalid pin/i.test(lower)) return t.ux.wrongWalletPin;
@@ -12,8 +14,11 @@ export function toPlainLanguageError(message: string, t: TranslationDict): strin
     if (/exceeds balance|insufficient balance|transfer amount exceeds|insufficient usdt/i.test(lower)) {
         return t.ux.insufficientUsdt;
     }
-    if (/network rpc|not configured|too many|rate limit|detect network|failed to fetch/i.test(lower)) {
+    if (/network rpc|not configured|too many|rate limit|detect network|failed to fetch|network request failed|network request timed out/i.test(lower)) {
         return t.ux.networkUnavailable;
+    }
+    if (/missing secure crypto|getrandomvalues|textencoder|textdecoder/i.test(lower)) {
+        return t.ux.somethingWentWrong;
     }
     if (/does not match your registered/i.test(lower)) return t.ux.walletMismatch;
     if (/only supported on|not supported/i.test(lower)) return t.withdraw.networkSendUnsupported;

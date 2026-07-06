@@ -5,19 +5,18 @@ import {
     Pressable,
     StyleSheet,
     TouchableOpacity,
-    ScrollView,
-    Alert,
-} from "react-native";
-import React, { useEffect, useMemo, useState } from "react";
+    ScrollView} from "react-native";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Button from "./Button";
-import InputField from "./InputField";
+import InputField, { InputFieldHandle } from "./InputField";
 import { useTranslation } from "../hooks/useTranslation";
 import { useTheme } from "../hooks/useTheme";
 import { UsdtNetwork } from "../constants/usdtNetworks";
 import { getLocalizedNetworkLabel } from "../i18n/network";
 import { splitAddressLines } from "../utils/walletQrPayload";
+import { appAlert } from '../utils/appAlert';
 
 type Props = {
     visible: boolean;
@@ -38,11 +37,11 @@ const WithdrawConfirmModal: React.FC<Props> = ({
     currency = "USDT",
     submitting = false,
     onClose,
-    onConfirm,
-}) => {
+    onConfirm}) => {
     const { t, dateLocale } = useTranslation();
     const { colors, FONTS } = useTheme();
     const insets = useSafeAreaInsets();
+    const pinInputRef = useRef<InputFieldHandle | null>(null);
     const [pin, setPin] = useState("");
 
     useEffect(() => {
@@ -54,17 +53,17 @@ const WithdrawConfirmModal: React.FC<Props> = ({
     const networkLabel = getLocalizedNetworkLabel(network, t);
     const amountLabel = amount.toLocaleString(dateLocale, {
         minimumFractionDigits: 2,
-        maximumFractionDigits: 6,
-    });
+        maximumFractionDigits: 6});
     const addressLines = useMemo(() => splitAddressLines(address), [address]);
 
     const handleConfirm = () => {
         if (submitting) return;
-        if (pin.trim().length < 4) {
-            Alert.alert(t.common.error, t.withdraw.walletPinRequired);
+        const pinValue = (pinInputRef.current?.getValue?.() ?? pin).trim();
+        if (pinValue.length < 4) {
+            appAlert.alert(t.common.error, t.withdraw.walletPinRequired);
             return;
         }
-        onConfirm(pin.trim());
+        onConfirm(pinValue);
     };
 
     const styles = useMemo(
@@ -73,15 +72,13 @@ const WithdrawConfirmModal: React.FC<Props> = ({
                 backdrop: {
                     flex: 1,
                     backgroundColor: "rgba(0,0,0,0.5)",
-                    justifyContent: "flex-end",
-                },
+                    justifyContent: "flex-end"},
                 sheet: {
                     backgroundColor: colors.bgColor,
                     borderTopLeftRadius: 20,
                     borderTopRightRadius: 20,
                     maxHeight: "88%",
-                    paddingBottom: Math.max(insets.bottom, 16),
-                },
+                    paddingBottom: Math.max(insets.bottom, 16)},
                 handle: {
                     alignSelf: "center",
                     width: 40,
@@ -89,101 +86,85 @@ const WithdrawConfirmModal: React.FC<Props> = ({
                     borderRadius: 2,
                     backgroundColor: colors.border,
                     marginTop: 10,
-                    marginBottom: 8,
-                },
+                    marginBottom: 8},
                 header: {
                     flexDirection: "row",
                     alignItems: "center",
                     justifyContent: "space-between",
                     paddingHorizontal: 20,
-                    paddingBottom: 8,
-                },
+                    paddingBottom: 8},
                 title: {
                     ...FONTS.H4,
                     color: colors.mainDark,
                     flex: 1,
-                    textAlign: "center",
-                },
+                    textAlign: "center"},
                 closeButton: {
                     width: 36,
                     height: 36,
                     borderRadius: 18,
                     alignItems: "center",
                     justifyContent: "center",
-                    backgroundColor: colors.surfaceMuted,
-                },
+                    backgroundColor: colors.surfaceMuted},
                 closeButtonText: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 18,
                     color: colors.bodyTextColor,
-                    lineHeight: 20,
-                },
+                    lineHeight: 20},
                 body: {
-                    paddingHorizontal: 20,
-                },
+                    paddingHorizontal: 20},
                 description: {
                     ...FONTS.Mulish_400Regular,
                     fontSize: 14,
                     color: colors.bodyTextColor,
                     lineHeight: 14 * 1.6,
                     marginBottom: 16,
-                    textAlign: "center",
-                },
+                    textAlign: "center"},
                 summaryCard: {
                     backgroundColor: colors.surfaceMuted,
                     borderRadius: 12,
                     padding: 14,
                     marginBottom: 16,
                     borderWidth: 1,
-                    borderColor: colors.border,
-                },
+                    borderColor: colors.border},
                 fieldBlock: {
-                    marginBottom: 12,
-                },
+                    marginBottom: 12},
                 fieldLabel: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 11,
                     letterSpacing: 0.4,
                     textTransform: "uppercase",
                     color: colors.bodyTextColor,
-                    marginBottom: 4,
-                },
+                    marginBottom: 4},
                 fieldValue: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 14,
                     color: colors.mainDark,
                     lineHeight: 20,
-                    paddingLeft: 14,
-                },
+                    paddingLeft: 14},
                 addressLine: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 13,
                     color: colors.mainDark,
                     lineHeight: 20,
                     letterSpacing: 0.2,
-                    paddingLeft: 14,
-                },
+                    paddingLeft: 14},
                 feeNote: {
                     ...FONTS.Mulish_400Regular,
                     fontSize: 13,
                     color: colors.bodyTextColor,
                     lineHeight: 13 * 1.5,
-                    marginBottom: 16,
-                },
+                    marginBottom: 16},
                 pinLabel: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 12,
                     color: colors.bodyTextColor,
-                    marginBottom: 8,
-                },
+                    marginBottom: 8},
                 actions: {
                     flexDirection: "row",
                     gap: 10,
-                    paddingHorizontal: 20,
-                },
+                    paddingHorizontal: 20},
                 actionBtn: {
-                    flex: 1,
-                },
+                    flex: 1},
                 cancelButton: {
                     flex: 1,
                     height: 50,
@@ -192,14 +173,11 @@ const WithdrawConfirmModal: React.FC<Props> = ({
                     borderColor: colors.border,
                     backgroundColor: colors.white,
                     alignItems: "center",
-                    justifyContent: "center",
-                },
+                    justifyContent: "center"},
                 cancelLabel: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 16,
-                    color: colors.mainDark,
-                },
-            }),
+                    color: colors.mainDark}}),
         [FONTS, colors, insets.bottom]
     );
 
@@ -253,8 +231,12 @@ const WithdrawConfirmModal: React.FC<Props> = ({
                             placeholder={t.withdraw.walletPinPlaceholder}
                             value={pin}
                             onChangeText={setPin}
+                            inputRef={pinInputRef}
                             secureTextEntry
                             keyboardType="numeric"
+                            authRole="password"
+                            syncImmediately
+                            singleLine
                             containerStyle={{ marginBottom: 20 }}
                         />
                     </ScrollView>

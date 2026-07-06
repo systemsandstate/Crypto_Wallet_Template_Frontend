@@ -1,5 +1,5 @@
-import { View, Text, TextInput, Platform, StyleSheet } from "react-native";
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { View, Text, TextInput, Platform, StyleSheet, NativeSyntheticEvent, TextInputEndEditingEventData } from "react-native";
+import React, { memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 
 import { useTheme } from "../hooks/useTheme";
 
@@ -18,8 +18,20 @@ export type Props = {
     hint?: string;
     /** Keep long values (e.g. wallet addresses) on one horizontal scroll line. */
     singleLine?: boolean;
+    /** Login/sign-up fields: enable OS autofill and sync values on blur. */
+    authRole?: "email" | "password";
+    /** Notify parent on every keystroke without rAF (auth forms). */
+    syncImmediately?: boolean;
     /** Native/DOM input ref — used on web to read autofilled values on submit. */
-    inputRef?: React.Ref<TextInput>;
+    inputRef?: React.Ref<TextInput | InputFieldHandle>;
+};
+
+export type InputFieldHandle = {
+    getValue: () => string;
+    focus: () => void;
+    blur: () => void;
+    clear: () => void;
+    isFocused: () => boolean;
 };
 
 const IS_WEB = Platform.OS === "web";
@@ -40,6 +52,8 @@ const InputField: React.FC<Props> = ({
     autoCapitalize,
     hint,
     singleLine = false,
+    authRole,
+    syncImmediately = false,
     inputRef,
 }) => {
     const { colors, FONTS } = useTheme();
@@ -49,6 +63,8 @@ const InputField: React.FC<Props> = ({
 
     const focusedRef = useRef(false);
     const notifyFrameRef = useRef<number | null>(null);
+    const textInputRef = useRef<TextInput>(null);
+    const latestTextRef = useRef(value ?? "");
     const [nativeText, setNativeText] = useState(value ?? "");
 
     const styles = useMemo(
@@ -120,14 +136,23 @@ const InputField: React.FC<Props> = ({
     useEffect(() => {
         if (IS_WEB || focusedRef.current) return;
         if (value !== undefined && value !== nativeText) {
+            latestTextRef.current = value;
             setNativeText(value);
         }
     }, [value, nativeText]);
 
+    useImperativeHandle(inputRef, () => ({
+        getValue: () => latestTextRef.current,
+        focus: () => textInputRef.current?.focus(),
+        blur: () => textInputRef.current?.blur(),
+        clear: () => textInputRef.current?.clear(),
+        isFocused: () => textInputRef.current?.isFocused?.() ?? false,
+    }));
+
     const notifyParent = useCallback(
         (text: string) => {
             if (!onChangeText) return;
-            if (IS_WEB) {
+            if (IS_WEB || syncImmediately) {
                 onChangeText(text);
                 return;
             }
@@ -139,15 +164,30 @@ const InputField: React.FC<Props> = ({
                 onChangeText(text);
             });
         },
-        [onChangeText]
+        [onChangeText, syncImmediately]
     );
 
-    const handleChange = useCallback(
+    const syncFromNative = useCallback(
         (text: string) => {
+            latestTextRef.current = text;
             if (!IS_WEB) setNativeText(text);
             notifyParent(text);
         },
         [notifyParent]
+    );
+
+    const handleChange = useCallback(
+        (text: string) => {
+            syncFromNative(text);
+        },
+        [syncFromNative]
+    );
+
+    const handleEndEditing = useCallback(
+        (event: NativeSyntheticEvent<TextInputEndEditingEventData>) => {
+            syncFromNative(event.nativeEvent.text ?? latestTextRef.current);
+        },
+        [syncFromNative]
     );
 
     const handleFocus = useCallback(() => {
@@ -156,10 +196,24 @@ const InputField: React.FC<Props> = ({
 
     const handleBlur = useCallback(() => {
         focusedRef.current = false;
-        if (!IS_WEB && value !== undefined && value !== nativeText) {
-            setNativeText(value);
+        if (!IS_WEB && onChangeText) {
+            onChangeText(latestTextRef.current);
         }
-    }, [nativeText, value]);
+    }, [onChangeText]);
+
+    const androidAutofillProps =
+        Platform.OS === "android"
+            ? authRole
+                ? {
+                      importantForAutofill: "yes" as const,
+                      autoComplete:
+                          authRole === "password" ? ("password" as const) : ("username" as const),
+                  }
+                : {
+                      importantForAutofill: "no" as const,
+                      autoComplete: isPassword ? ("password" as const) : ("off" as const),
+                  }
+            : {};
 
     useEffect(() => {
         return () => {
@@ -179,12 +233,13 @@ const InputField: React.FC<Props> = ({
         >
             {leftIcon ? <View style={styles.iconLeft}>{leftIcon}</View> : null}
             <TextInput
-                ref={inputRef}
+                ref={textInputRef}
                 placeholder={placeholder}
                 value={displayValue}
                 onChangeText={handleChange}
                 onFocus={handleFocus}
                 onBlur={handleBlur}
+                onEndEditing={handleEndEditing}
                 autoCapitalize={autoCapitalize ?? (isEmail ? "none" : undefined)}
                 autoCorrect={false}
                 spellCheck={false}
@@ -201,16 +256,14 @@ const InputField: React.FC<Props> = ({
                 multiline={!singleLine && !isPassword}
                 numberOfLines={singleLine || isPassword ? 1 : undefined}
                 scrollEnabled={singleLine}
-                textContentType={isPassword ? "password" : isEmail ? "emailAddress" : undefined}
-                {...(Platform.OS === "android"
-                    ? {
-                          importantForAutofill: "no" as const,
-                          autoComplete: isPassword ? ("password" as const) : ("off" as const),
-                      }
-                    : IS_WEB
+                textContentType={
+                    isPassword ? "password" : isEmail || authRole === "email" ? "username" : undefined
+                }
+                {...androidAutofillProps}
+                {...(Platform.OS === "web"
                       ? {
-                            ...(isEmail ? { autoComplete: "email" as const } : {}),
-                            ...(isPassword
+                            ...(isEmail || authRole === "email" ? { autoComplete: "email" as const } : {}),
+                            ...(isPassword || authRole === "password"
                                 ? {
                                       type: "password" as const,
                                       autoComplete: "current-password" as const,

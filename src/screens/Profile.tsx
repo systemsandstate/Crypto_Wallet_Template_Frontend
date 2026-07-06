@@ -1,5 +1,5 @@
 import { View, Text } from "react-native";
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch } from "react-redux";
 import { useAppSelector } from "../hooks/useAppSelector";
@@ -16,12 +16,14 @@ import { confirmAction } from "../utils/confirm";
 import { useTranslation } from "../hooks/useTranslation";
 import { useTheme } from "../hooks/useTheme";
 import { MENU_ICON_SIZE } from "../constants/menuIcon";
+import { createMerchantTabPageStyles } from "../styles/merchantTabPageChrome";
 
 const Profile: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
     const navigation: any = useNavigation();
     const dispatch = useDispatch();
     const { t } = useTranslation();
     const { colors, isDark, FONTS } = useTheme();
+    const pageStyles = useMemo(() => createMerchantTabPageStyles(colors), [colors]);
     const merchant = useAppSelector((state: RootState) => state.auth.merchant);
     const avatarUrl = useAppSelector((state: RootState) => state.auth.avatarUrl);
 
@@ -53,10 +55,10 @@ const Profile: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
     const menu = (
         <components.MerchantContent style={{ paddingVertical: 20 }}>
             <components.ProfileCategory
-                title={t.wallet.myWalletTitle}
+                title={t.wallet.walletsTitle}
                 icon={<svg.MyWalletSvg size={MENU_ICON_SIZE} color={menuIconColor} />}
                 rightElement={<svg.ArrowOneSvg />}
-                onPress={() => navigation.navigate("MyWallet")}
+                onPress={() => navigation.navigate("Wallets")}
             />
             <components.ProfileCategory
                 title={t.profile.editBusinessInfo}
@@ -111,16 +113,20 @@ const Profile: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
 
     if (embedded) {
         return (
-            <View style={{ flex: 1, backgroundColor: colors.bgColor }}>
-                <components.MerchantTabHeader
-                    eyebrow={t.profile.yourAccount}
-                    title={merchant?.businessName || t.common.merchant}
-                    subtitle={merchant?.email}
-                />
-                <components.ScreenScroll>
-                    {avatarSection}
-                    {menu}
-                </components.ScreenScroll>
+            <View style={pageStyles.root}>
+                <View style={pageStyles.headerWrap}>
+                    <components.MerchantTabHeader
+                        eyebrow={t.profile.yourAccount}
+                        title={merchant?.businessName || t.common.merchant}
+                        subtitle={merchant?.email}
+                    />
+                </View>
+                <View style={pageStyles.contentArea}>
+                    <components.ScreenScroll>
+                        {avatarSection}
+                        {menu}
+                    </components.ScreenScroll>
+                </View>
             </View>
         );
     }

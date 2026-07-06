@@ -1,4 +1,4 @@
-import { View, StyleSheet, Platform } from "react-native";
+import { View, StyleSheet } from "react-native";
 import React from "react";
 
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
@@ -8,13 +8,15 @@ type Props = {
     children: React.ReactNode;
 };
 
-/** Responsive app column on web — stretches with viewport, centered with side margins. */
+/** Responsive app column on web — same bg as mobile, centered on wide viewports. */
 const AppShell: React.FC<Props> = ({ children }) => {
     const { centerAppOnWeb, appMaxWidth, width } = useResponsiveLayout();
     const { colors } = useTheme();
 
+    const flexRoot = [styles.flex, { backgroundColor: colors.bgColor }];
+
     if (!centerAppOnWeb || !appMaxWidth) {
-        return <View style={styles.flex}>{children}</View>;
+        return <View style={flexRoot}>{children}</View>;
     }
 
     const sidePad = Math.max(16, Math.round((width - appMaxWidth) / 2));
@@ -24,8 +26,8 @@ const AppShell: React.FC<Props> = ({ children }) => {
             style={[
                 styles.wideRoot,
                 {
-                    backgroundColor: Platform.OS === "web" ? colors.shellBg : colors.bgColor,
-                    paddingHorizontal: Platform.OS === "web" ? Math.min(sidePad, 48) : 0,
+                    backgroundColor: colors.bgColor,
+                    paddingHorizontal: Math.min(sidePad, 48),
                 },
             ]}
         >
@@ -55,11 +57,6 @@ const styles = StyleSheet.create({
     },
     wideColumn: {
         overflow: "hidden",
-        ...(Platform.OS === "web"
-            ? ({
-                  boxShadow: "0 0 48px rgba(6, 38, 100, 0.12)",
-              } as object)
-            : {}),
     },
 });
 

@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "start": "bash scripts/expo-start-public.sh",
+    "start:clear": "bash scripts/expo-start-public.sh --clear",
     "start:local": "expo start",
     "start:tunnel": "bash scripts/expo-start-public.sh --tunnel",
     "android": "expo run:android",

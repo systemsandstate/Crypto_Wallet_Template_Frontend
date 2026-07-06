@@ -1,4 +1,4 @@
-import { View, TouchableOpacity, Text, Alert } from "react-native";
+import { View, TouchableOpacity, Text} from "react-native";
 import React, { useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 
@@ -7,6 +7,7 @@ import { components } from "../components";
 import { api } from "../services/api";
 import { setCredentials } from "../store/authSlice";
 import { useTranslation } from "../hooks/useTranslation";
+import { appAlert } from '../utils/appAlert';
 
 const SignUp: React.FC = ({ navigation }: any) => {
     const dispatch = useDispatch();
@@ -23,11 +24,11 @@ const SignUp: React.FC = ({ navigation }: any) => {
 
     const handleSignUp = async () => {
         if (!businessName || !email || !password) {
-            Alert.alert(t.common.error, t.auth.fillAllFields);
+            appAlert.alert(t.common.error, t.auth.fillAllFields);
             return;
         }
         if (password.length < 8) {
-            Alert.alert(t.common.error, t.auth.passwordMinLength);
+            appAlert.alert(t.common.error, t.auth.passwordMinLength);
             return;
         }
         setLoading(true);
@@ -35,15 +36,13 @@ const SignUp: React.FC = ({ navigation }: any) => {
             const res = await api.register({
                 email: email.trim(),
                 password,
-                businessName: businessName.trim(),
-            });
+                businessName: businessName.trim()});
             dispatch(setCredentials({
                 merchant: res.data.merchant,
-                accessToken: res.data.accessToken,
-            }));
+                accessToken: res.data.accessToken}));
             navigation.navigate("SignUpAccountCreated");
         } catch (err: any) {
-            Alert.alert(t.auth.registrationFailed, err.message || t.auth.registrationFailed);
+            appAlert.alert(t.auth.registrationFailed, err.message || t.auth.registrationFailed);
         } finally {
             setLoading(false);
         }
@@ -56,8 +55,7 @@ const SignUp: React.FC = ({ navigation }: any) => {
                     textAlign: "center",
                     ...theme.FONTS.H2,
                     color: theme.COLORS.mainDark,
-                    marginBottom: 8,
-                }}
+                    marginBottom: 8}}
             >
                 {t.auth.createAccountTitle}
             </Text>
@@ -68,8 +66,7 @@ const SignUp: React.FC = ({ navigation }: any) => {
                     fontSize: 14,
                     color: theme.COLORS.bodyTextColor,
                     marginBottom: 24,
-                    lineHeight: 14 * 1.6,
-                }}
+                    lineHeight: 14 * 1.6}}
             >
                 {t.auth.createAccountSubtitle}
             </Text>

@@ -17,6 +17,7 @@ import { useWebInputStyles } from "./src/hooks/useWebInputStyles";
 
 import AppShell from "./src/components/AppShell";
 import ToastHost from "./src/components/ToastHost";
+import AppDialogHost from "./src/components/AppDialogHost";
 import StackNavigator from "./src/navigation/StackNavigator";
 import ErrorBoundary from "./src/components/ErrorBoundary";
 import { useTheme } from "./src/hooks/useTheme";
@@ -25,7 +26,7 @@ export { navigationRef } from "./src/navigation/navigationRef";
 
 const AppRoot: React.FC = () => {
     const dispatch = useDispatch();
-    const { isDark } = useTheme();
+    const { isDark, colors } = useTheme();
 
     useWebInputStyles();
     useAuthRestore();
@@ -59,10 +60,11 @@ const AppRoot: React.FC = () => {
     }, []);
 
     return (
-        <View style={styles.root}>
+        <View style={[styles.root, { backgroundColor: colors.bgColor }]}>
             <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
             <StackNavigator initialRoute="SignIn" />
             <ToastHost />
+            <AppDialogHost />
         </View>
     );
 };

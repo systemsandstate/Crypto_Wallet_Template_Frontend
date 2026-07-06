@@ -1,4 +1,4 @@
-import { Text, Alert } from "react-native";
+import { Text} from "react-native";
 import LoadingSpinner from "../components/LoadingSpinner";
 import React, { useState } from "react";
 import { useDispatch } from "react-redux";
@@ -13,6 +13,7 @@ import { useTabBarInset } from "../hooks/useTabBarInset";
 import { useTranslation } from "../hooks/useTranslation";
 import { formatMessage } from "../i18n";
 import { navigateUp } from "../navigation/navigateUp";
+import { appAlert } from '../utils/appAlert';
 
 const EditPersonalInfo: React.FC = ({ navigation }: any) => {
     const dispatch = useDispatch();
@@ -25,25 +26,24 @@ const EditPersonalInfo: React.FC = ({ navigation }: any) => {
 
     const handleSave = async () => {
         if (!businessName.trim()) {
-            Alert.alert(t.common.error, t.account.businessNameRequired);
+            appAlert.alert(t.common.error, t.account.businessNameRequired);
             return;
         }
         setLoading(true);
         try {
             const res = await api.updateProfile({
                 businessName: businessName.trim(),
-                phone: phone.trim() || null,
-            });
+                phone: phone.trim() || null});
             const { getAuthToken } = await import("../services/api");
             const token = getAuthToken();
             if (token) {
                 dispatch(setCredentials({ merchant: res.data, accessToken: token }));
             }
-            Alert.alert(t.account.saved, t.account.profileUpdated, [
+            appAlert.alert(t.account.saved, t.account.profileUpdated, [
                 { text: t.common.ok, onPress: () => navigateUp(navigation, "EditPersonalInfo") },
             ]);
         } catch (err: any) {
-            Alert.alert(t.common.error, err.message || t.account.couldNotSave);
+            appAlert.alert(t.common.error, err.message || t.account.couldNotSave);
         } finally {
             setLoading(false);
         }
@@ -74,8 +74,7 @@ const EditPersonalInfo: React.FC = ({ navigation }: any) => {
                         fontSize: 13,
                         color: theme.COLORS.bodyTextColor,
                         marginBottom: 16,
-                        textAlign: "center",
-                    }}
+                        textAlign: "center"}}
                 >
                     {formatMessage(t.account.emailReadOnly, { email: merchant.email })}
                 </Text>

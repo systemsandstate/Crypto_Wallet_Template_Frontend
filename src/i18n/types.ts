@@ -13,6 +13,7 @@ export type TranslationDict = {
         sessionExpired: string;
         sessionExpiredMessage: string;
         save: string;
+        delete: string;
         send: string;
         success: string;
         yes: string;
@@ -88,6 +89,8 @@ export type TranslationDict = {
     dashboard: {
         welcomeBack: string;
         subtitle: string;
+        subtitlePayments: string;
+        subtitleMultiChain: string;
         merchantAccount: string;
         deposit: string;
         createPayment: string;
@@ -142,6 +145,7 @@ export type TranslationDict = {
         statusSuccess: string;
         filterAll: string;
         filterReceived: string;
+        filterSent: string;
         filterPending: string;
         filterPaid: string;
         filterExpired: string;
@@ -152,7 +156,10 @@ export type TranslationDict = {
         noHistory: string;
         noHistoryAny: string;
         noDeposits: string;
+        noSends: string;
+        showAllHistory: string;
         walletDeposit: string;
+        walletReceive: string;
         walletSend: string;
         depositReceived: string;
         sentOnChain: string;
@@ -335,6 +342,7 @@ export type TranslationDict = {
         setupDescription: string;
         createNewWallet: string;
         importWallet: string;
+        restoreWallet: string;
         backupTitle: string;
         backupDescription: string;
         confirmBackup: string;
@@ -353,7 +361,22 @@ export type TranslationDict = {
         setupFailed: string;
         setupComplete: string;
         setupCompleteDescription: string;
+        setupRestoredDescription: string;
         goToDashboard: string;
+        walletsTitle: string;
+        multiCoinWallets: string;
+        addWallet: string;
+        doneAddWallet: string;
+        noWalletsYet: string;
+        walletOptions: string;
+        viewAddresses: string;
+        renameWallet: string;
+        renameWalletFailed: string;
+        walletNamePlaceholder: string;
+        deleteWallet: string;
+        deleteWalletTitle: string;
+        deleteWalletMessage: string;
+        manageWallets: string;
         myWalletTitle: string;
         myWalletDescription: string;
         notConfigured: string;

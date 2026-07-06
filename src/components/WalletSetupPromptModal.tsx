@@ -85,7 +85,7 @@ const WalletSetupPromptModal: React.FC<Props> = ({
             containerStyle={styles.button}
           />
           <Button
-            title={t.wallet.importWallet}
+            title={t.wallet.restoreWallet}
             onPress={onImportWallet}
             containerStyle={styles.buttonSecondary}
           />

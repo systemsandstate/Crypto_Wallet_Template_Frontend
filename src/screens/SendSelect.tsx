@@ -8,7 +8,7 @@ import {
         Platform,
 } from "react-native";
 import LoadingSpinner from "../components/LoadingSpinner";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState, useRef } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRoute } from "@react-navigation/native";
 
@@ -18,6 +18,8 @@ import { useTranslation } from "../hooks/useTranslation";
 import { useTheme } from "../hooks/useTheme";
 import { getLocalizedNetworkLabel } from "../i18n/network";
 import { api } from "../services/api";
+import { resolveNetworkBalanceMap } from "../utils/walletBalance";
+import { resolveActiveWalletAddresses, syncDeviceWalletInBackground } from "../services/wallet/syncDeviceWallet";
 import { svg } from "../svg";
 import type { NetworkFilter } from "./SendNetworkSelect";
 
@@ -77,6 +79,7 @@ const SendSelect: React.FC = ({ navigation }: any) => {
     const [filter, setFilter] = useState<NetworkFilter>("ALL");
     const [balances, setBalances] = useState<Record<string, number | null>>({});
     const [loading, setLoading] = useState(true);
+    const hasLoadedRef = useRef(false);
     const [receiveModalVisible, setReceiveModalVisible] = useState(false);
 
     const dateLocale = locale === "es" ? "es-ES" : "en-US";
@@ -92,17 +95,23 @@ const SendSelect: React.FC = ({ navigation }: any) => {
     );
 
     const loadBalances = useCallback(() => {
-        setLoading(true);
-        api.getWalletBalances()
-            .then((res) => {
-                const map: Record<string, number | null> = {};
-                for (const row of res.data.balances) {
-                    map[row.network] = row.usdtBalance;
-                }
-                setBalances(map);
-            })
-            .catch(() => setBalances({}))
-            .finally(() => setLoading(false));
+        const silent = hasLoadedRef.current;
+        if (!silent) setLoading(true);
+        void (async () => {
+            syncDeviceWalletInBackground();
+            try {
+                const [activeAddresses, cached] = await Promise.all([
+                    resolveActiveWalletAddresses(),
+                    api.getWalletBalances(),
+                ]);
+                setBalances(resolveNetworkBalanceMap(cached.data.balances, activeAddresses));
+                hasLoadedRef.current = true;
+                setLoading(false);
+            } catch {
+                if (!hasLoadedRef.current) setBalances({});
+                setLoading(false);
+            }
+        })();
     }, []);
 
     useFocusEffect(
@@ -303,6 +312,12 @@ const SendSelect: React.FC = ({ navigation }: any) => {
                     color: colors.bodyTextColor,
                     marginTop: 2,
                 },
+                loadingWrap: {
+                    flex: 1,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minHeight: 240,
+                },
                 emptyWrap: {
                     alignItems: "center",
                     paddingTop: 48,
@@ -431,8 +446,10 @@ const SendSelect: React.FC = ({ navigation }: any) => {
                         nestedScrollEnabled
                         showsVerticalScrollIndicator
                     >
-                        {loading ? (
-                            <LoadingSpinner size={40} style={{ marginTop: 12 }} />
+                        {loading && Object.keys(balances).length === 0 ? (
+                            <View style={styles.loadingWrap}>
+                                <LoadingSpinner size={48} />
+                            </View>
                         ) : showEmptyState ? (
                             <View style={styles.emptyWrap}>
                                 <SendEmptyIllustration color={colors.border} />

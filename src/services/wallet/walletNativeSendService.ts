@@ -6,6 +6,7 @@ import {
   EVM_SEND_NETWORKS,
   WalletSendError,
   mapSendError,
+  resolveTxFeeOverrides,
   toTokenAmountString,
   unlockWalletSigner,
   withWalletRpc,
@@ -40,18 +41,26 @@ export async function sendNative(params: {
 
   try {
     const result = await withWalletRpc(network, async (provider) => {
-      const signer = await unlockWalletSigner(network, pin, provider);
+      const [signer, feeOverrides] = await Promise.all([
+        unlockWalletSigner(network, pin, provider),
+        resolveTxFeeOverrides(provider),
+      ]);
 
       onProgress?.('signing');
-      const tx = await signer.sendTransaction({ to: checksumTo, value: amountWei });
+      const tx = await signer.sendTransaction({
+        to: checksumTo,
+        value: amountWei,
+        gasLimit: 21_000n,
+        ...feeOverrides,
+      });
 
       onProgress?.('broadcasting');
-      const receipt = await tx.wait();
-      const txHash = receipt?.hash ?? tx?.hash;
+      const txHash = tx.hash;
       if (!txHash) {
         throw new WalletSendError('Transaction failed');
       }
 
+      void tx.wait(1).catch(() => {});
       return { txHash, fromAddress: signer.address, currency };
     });
 

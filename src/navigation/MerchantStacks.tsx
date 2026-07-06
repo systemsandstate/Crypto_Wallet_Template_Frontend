@@ -17,6 +17,7 @@ import TransactionHistory from "../screens/TransactionHistory";
 import Analytics from "../screens/Analytics";
 import Profile from "../screens/Profile";
 import MyWallet from "../screens/MyWallet";
+import Wallets from "../screens/Wallets";
 import WalletSetup from "../screens/WalletSetup";
 import EditPersonalInfo from "../screens/EditPersonalInfo";
 import ChangePassword from "../screens/ChangePassword";
@@ -75,6 +76,7 @@ export const ProfileStackNavigator: React.FC = () => (
         <ProfileStack.Screen name="ProfileMain">
             {(props) => <Profile {...props} embedded />}
         </ProfileStack.Screen>
+        <ProfileStack.Screen name="Wallets" component={Wallets} />
         <ProfileStack.Screen name="MyWallet" component={MyWallet} />
         <ProfileStack.Screen name="WalletReceive" component={WalletReceive} />
         <ProfileStack.Screen name="WalletSetup" component={WalletSetup} />

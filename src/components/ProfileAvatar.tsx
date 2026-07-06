@@ -1,4 +1,4 @@
-import { View, Image, TouchableOpacity, Text, Platform, Alert } from "react-native";
+import { View, Image, TouchableOpacity, Text, Platform} from "react-native";
 import React from "react";
 import { useDispatch } from "react-redux";
 import { useAppSelector } from "../hooks/useAppSelector";
@@ -8,6 +8,7 @@ import { svg } from "../svg";
 import { RootState } from "../store/store";
 import { setAvatarUrl } from "../store/authSlice";
 import { readImageFileAsDataUrl, validateImageDataUrl } from "../utils/avatarStorage";
+import { appAlert } from '../utils/appAlert';
 import { useTranslation } from "../hooks/useTranslation";
 import { useTheme } from "../hooks/useTheme";
 import { pickWebImage } from "../utils/pickWebImage";
@@ -32,7 +33,7 @@ const ProfileAvatar: React.FC<Props> = ({ size = 88, showEdit = true }) => {
             validateImageDataUrl(dataUrl);
             dispatch(setAvatarUrl({ merchantId: merchant.id, avatarUrl: dataUrl }));
         } catch (err: any) {
-            Alert.alert(t.profile.changePhoto, err.message || t.profile.photoError);
+            appAlert.alert(t.profile.changePhoto, err.message || t.profile.photoError);
         }
     };
 
@@ -42,7 +43,7 @@ const ProfileAvatar: React.FC<Props> = ({ size = 88, showEdit = true }) => {
             const dataUrl = await readImageFileAsDataUrl(file);
             applyDataUrl(dataUrl);
         } catch (err: any) {
-            Alert.alert(t.profile.changePhoto, err.message || t.profile.photoError);
+            appAlert.alert(t.profile.changePhoto, err.message || t.profile.photoError);
         }
     };
 
@@ -51,7 +52,7 @@ const ProfileAvatar: React.FC<Props> = ({ size = 88, showEdit = true }) => {
 
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== "granted") {
-            Alert.alert(
+            appAlert.alert(
                 t.profile.changePhoto,
                 t.profile.photoPermission
             );
@@ -63,8 +64,7 @@ const ProfileAvatar: React.FC<Props> = ({ size = 88, showEdit = true }) => {
             allowsEditing: true,
             aspect: [1, 1],
             quality: 0.7,
-            base64: true,
-        });
+            base64: true});
 
         if (result.canceled || !result.assets[0]) return;
 
@@ -101,8 +101,7 @@ const ProfileAvatar: React.FC<Props> = ({ size = 88, showEdit = true }) => {
                         backgroundColor: colors.surfaceMuted,
                         ...(isDark
                             ? { borderWidth: 2, borderColor: colors.pureWhite }
-                            : null),
-                    }}
+                            : null)}}
                 />
                 {showEdit ? (
                     <View
@@ -117,8 +116,7 @@ const ProfileAvatar: React.FC<Props> = ({ size = 88, showEdit = true }) => {
                             alignItems: "center",
                             justifyContent: "center",
                             borderWidth: 2,
-                            borderColor: colors.pureWhite,
-                        }}
+                            borderColor: colors.pureWhite}}
                     >
                         <View style={{ transform: [{ scale: 0.65 }] }}>
                             <svg.EditPhotoSvg />
@@ -133,8 +131,7 @@ const ProfileAvatar: React.FC<Props> = ({ size = 88, showEdit = true }) => {
                             marginTop: 8,
                             ...FONTS.Mulish_600SemiBold,
                             fontSize: 12,
-                            color: colors.linkColor,
-                        }}
+                            color: colors.linkColor}}
                     >
                         {t.profile.changePhoto}
                     </Text>

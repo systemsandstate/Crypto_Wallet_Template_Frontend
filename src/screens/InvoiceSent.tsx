@@ -1,4 +1,4 @@
-import { View, Text, Image, Alert } from "react-native";
+import { View, Text, Image} from "react-native";
 import LoadingSpinner from "../components/LoadingSpinner";
 import React, { useEffect, useRef, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -11,6 +11,7 @@ import { useTheme } from "../hooks/useTheme";
 import { getLocalizedNetworkLabel } from "../i18n/network";
 import { USDT_NETWORKS, UsdtNetwork } from "../constants/usdtNetworks";
 import { showToast } from "../utils/toast";
+import { appAlert } from '../utils/appAlert';
 import { triggerDashboardRefresh } from "../utils/dashboardRefresh";
 
 const InvoiceSent: React.FC = ({ navigation, route }: any) => {
@@ -48,7 +49,7 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
 
     const handleCancel = () => {
         if (!payment) return;
-        Alert.alert(t.transaction.cancelPaymentTitle, t.transaction.cancelPaymentConfirm, [
+        appAlert.alert(t.transaction.cancelPaymentTitle, t.transaction.cancelPaymentConfirm, [
             { text: t.common.no, style: "cancel" },
             {
                 text: t.transaction.yesCancel,
@@ -59,12 +60,11 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                         const res = await api.cancelPayment(payment.id);
                         setPayment(res.data);
                     } catch (err: any) {
-                        Alert.alert(t.common.error, err.message || t.transaction.couldNotCancel);
+                        appAlert.alert(t.common.error, err.message || t.transaction.couldNotCancel);
                     } finally {
                         setCancelling(false);
                     }
-                },
-            },
+                }},
         ]);
     };
 
@@ -100,16 +100,14 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                                 alignSelf: "center",
                                 marginBottom: 20,
                                 maxWidth: "70%",
-                                resizeMode: "contain",
-                            }}
+                                resizeMode: "contain"}}
                         />
                         <Text
                             style={{
                                 textAlign: "center",
                                 ...FONTS.H2,
                                 color: isPaid ? colors.green : colors.mainDark,
-                                marginBottom: 12,
-                            }}
+                                marginBottom: 12}}
                         >
                             {getStatusTitle()}
                         </Text>
@@ -119,8 +117,7 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                                 ...FONTS.Mulish_700Bold,
                                 fontSize: 22,
                                 color: colors.mainDark,
-                                marginBottom: 8,
-                            }}
+                                marginBottom: 8}}
                         >
                             {payment.amount} {payment.currency}
                         </Text>
@@ -130,8 +127,7 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                                 ...FONTS.Mulish_400Regular,
                                 fontSize: 14,
                                 color: colors.bodyTextColor,
-                                marginBottom: 8,
-                            }}
+                                marginBottom: 8}}
                         >
                             {t.network.networkLabel}{" "}
                             {networkLabel}
@@ -144,8 +140,7 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                                     ...FONTS.Mulish_400Regular,
                                     fontSize: 16,
                                     color: colors.bodyTextColor,
-                                    marginBottom: 16,
-                                }}
+                                    marginBottom: 16}}
                             >
                                 {t.network.refLabel} {payment.reference}
                             </Text>
@@ -157,8 +152,7 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                                     ...FONTS.Mulish_400Regular,
                                     fontSize: 14,
                                     color: "#FF8A71",
-                                    marginBottom: 16,
-                                }}
+                                    marginBottom: 16}}
                             >
                                 {payment.failureReason}
                             </Text>
@@ -174,8 +168,7 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                                     marginBottom: 16,
                                     backgroundColor: colors.white,
                                     borderRadius: 8,
-                                    alignSelf: "center",
-                                }}
+                                    alignSelf: "center"}}
                             />
                         )}
 
@@ -187,8 +180,7 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                                         ...FONTS.Mulish_400Regular,
                                         fontSize: 13,
                                         color: colors.bodyTextColor,
-                                        marginBottom: 6,
-                                    }}
+                                        marginBottom: 6}}
                                 >
                                     {t.wallet.sendToAddress}
                                 </Text>
@@ -199,8 +191,7 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
                                         ...FONTS.Mulish_600SemiBold,
                                         fontSize: 12,
                                         color: colors.mainDark,
-                                        lineHeight: 18,
-                                    }}
+                                        lineHeight: 18}}
                                 >
                                     {payment.depositAddress || payment.paymentUrl}
                                 </Text>

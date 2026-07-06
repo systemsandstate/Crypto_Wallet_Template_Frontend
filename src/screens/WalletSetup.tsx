@@ -1,4 +1,4 @@
-import { View, Text, Alert, ScrollView, StyleSheet } from "react-native";
+import { View, Text,  ScrollView, StyleSheet, Platform } from "react-native";
 import React, { useEffect, useState, useMemo } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -11,20 +11,23 @@ import {
     deriveAllAddresses,
     encryptMnemonic,
     addressesToWalletPayload,
-} from "../services/wallet/walletCore";
-import { saveEncryptedWallet } from "../services/wallet/walletStorage";
-import { persistAndSyncWalletAddresses } from "../services/wallet/syncDeviceWallet";
+    type DerivedWalletAddresses} from "../services/wallet/walletCore";
+import { restoreLocalWalletFromSetup } from "../services/wallet/walletStorage";
+import { syncWalletAddressesInBackground } from "../services/wallet/syncDeviceWallet";
 import { navigateUp } from "../navigation/navigateUp";
 import SetupStepHeader from "../components/SetupStepHeader";
 import { USDT_NETWORKS } from "../constants/usdtNetworks";
 import { getLocalizedNetworkLabel } from "../i18n/network";
 import { triggerDashboardRefresh } from "../utils/dashboardRefresh";
+import { appAlert } from '../utils/appAlert';
+import { triggerWalletSetupRefresh } from "../utils/walletSetupRefresh";
+import { runWhenIdle } from "../utils/runWhenIdle";
 
 type Step = "choose" | "backup" | "import" | "pin" | "done";
 
 const WalletSetup: React.FC = ({ navigation, route }: any) => {
     const { t } = useTranslation();
-    const { colors, FONTS } = useTheme();
+    const { colors, FONTS, isDark } = useTheme();
     const [step, setStep] = useState<Step>("choose");
     const [mnemonic, setMnemonic] = useState("");
     const [importPhrase, setImportPhrase] = useState("");
@@ -33,7 +36,9 @@ const WalletSetup: React.FC = ({ navigation, route }: any) => {
     const [confirmedBackup, setConfirmedBackup] = useState(false);
     const [isImportPath, setIsImportPath] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [derivedAddresses, setDerivedAddresses] = useState<DerivedWalletAddresses | null>(null);
     const startAction = route.params?.startAction as "create" | "import" | undefined;
+    const isAddMode = Boolean(route.params?.addWallet);
 
     const styles = useMemo(
         () =>
@@ -42,52 +47,44 @@ const WalletSetup: React.FC = ({ navigation, route }: any) => {
                     ...FONTS.H2,
                     color: colors.mainDark,
                     marginBottom: 12,
-                    textAlign: "center",
-                },
+                    textAlign: "center"},
                 subtitle: {
                     ...FONTS.Mulish_400Regular,
                     fontSize: 14,
                     color: colors.bodyTextColor,
                     lineHeight: 14 * 1.6,
                     marginBottom: 20,
-                    textAlign: "center",
-                },
+                    textAlign: "center"},
                 phraseBox: {
                     backgroundColor: colors.surfaceMuted,
                     borderRadius: 12,
                     padding: 16,
-                    marginBottom: 20,
-                },
+                    marginBottom: 20},
                 phraseText: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 16,
                     color: colors.mainDark,
                     lineHeight: 24,
-                    textAlign: "center",
-                },
+                    textAlign: "center"},
                 addressRow: {
                     marginBottom: 12,
                     padding: 12,
                     backgroundColor: colors.surfaceMuted,
-                    borderRadius: 8,
-                },
+                    borderRadius: 8},
                 networkLabel: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 13,
                     color: colors.mainDark,
-                    marginBottom: 4,
-                },
+                    marginBottom: 4},
                 addressText: {
                     ...FONTS.Mulish_400Regular,
                     fontSize: 12,
-                    color: colors.bodyTextColor,
-                },
+                    color: colors.bodyTextColor},
                 wordGrid: {
                     flexDirection: "row",
                     flexWrap: "wrap",
                     gap: 8,
-                    marginBottom: 16,
-                },
+                    marginBottom: 16},
                 wordChip: {
                     width: "47%",
                     flexDirection: "row",
@@ -97,30 +94,45 @@ const WalletSetup: React.FC = ({ navigation, route }: any) => {
                     borderWidth: 1,
                     borderColor: colors.border,
                     paddingVertical: 8,
-                    paddingHorizontal: 10,
-                },
+                    paddingHorizontal: 10},
                 wordNum: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 11,
                     color: colors.bodyTextColor,
-                    width: 20,
-                },
+                    width: 20},
                 wordText: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 14,
                     color: colors.mainDark,
-                    flex: 1,
-                },
+                    flex: 1},
                 safetyTip: {
                     ...FONTS.Mulish_400Regular,
                     fontSize: 13,
                     color: colors.bodyTextColor,
                     lineHeight: 13 * 1.5,
                     textAlign: "center",
-                    marginBottom: 16,
-                },
-            }),
-        [colors, FONTS]
+                    marginBottom: 16},
+                loadingOverlay: {
+                    position: Platform.OS === "web" ? ("fixed" as "absolute") : "absolute",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: isDark ? "rgba(14, 14, 19, 0.55)" : "rgba(15, 23, 42, 0.28)",
+                    zIndex: 1000,
+                    elevation: 1000,
+                    ...(Platform.OS === "web"
+                        ? ({
+                              inset: 0,
+                              width: "100vw",
+                              height: "100vh",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center"} as object)
+                        : {})}}),
+        [colors, FONTS, isDark]
     );
 
     useEffect(() => {
@@ -129,7 +141,7 @@ const WalletSetup: React.FC = ({ navigation, route }: any) => {
                 setMnemonic(createMnemonic());
                 setStep("backup");
             } catch (err: any) {
-                Alert.alert(t.common.error, err?.message || t.wallet.setupFailed);
+                appAlert.alert(t.common.error, err?.message || t.wallet.setupFailed);
                 navigateUp(navigation, "WalletSetup");
             }
         } else if (startAction === "import") {
@@ -138,20 +150,28 @@ const WalletSetup: React.FC = ({ navigation, route }: any) => {
         }
     }, [startAction, navigation, t.common.error, t.wallet.setupFailed]);
 
+    useEffect(() => {
+        if (step !== "pin" || !mnemonic) return;
+        const task = runWhenIdle(() => {
+            setDerivedAddresses(deriveAllAddresses(mnemonic));
+        });
+        return () => task.cancel();
+    }, [step, mnemonic]);
+
     const handleCreate = () => {
         try {
             setIsImportPath(false);
             setMnemonic(createMnemonic());
             setStep("backup");
         } catch (err: any) {
-            Alert.alert(t.common.error, err?.message || t.wallet.setupFailed);
+            appAlert.alert(t.common.error, err?.message || t.wallet.setupFailed);
         }
     };
 
     const handleImportNext = () => {
         const phrase = importPhrase.trim().toLowerCase();
         if (!isValidMnemonic(phrase)) {
-            Alert.alert(t.common.error, t.wallet.invalidMnemonic);
+            appAlert.alert(t.common.error, t.wallet.invalidMnemonic);
             return;
         }
         setMnemonic(phrase);
@@ -160,30 +180,47 @@ const WalletSetup: React.FC = ({ navigation, route }: any) => {
 
     const finishSetup = async () => {
         if (pin.length < 4) {
-            Alert.alert(t.common.error, t.wallet.pinTooShort);
+            appAlert.alert(t.common.error, t.wallet.pinTooShort);
             return;
         }
         if (pin !== confirmPin) {
-            Alert.alert(t.common.error, t.wallet.pinMismatch);
+            appAlert.alert(t.common.error, t.wallet.pinMismatch);
             return;
         }
 
         setLoading(true);
         try {
             const encrypted = await encryptMnemonic(mnemonic, pin);
-            await saveEncryptedWallet(encrypted);
-
-            const addresses = deriveAllAddresses(mnemonic);
-            const wallets = addressesToWalletPayload(addresses);
-            await persistAndSyncWalletAddresses(wallets);
-            triggerDashboardRefresh();
-
+            const wallets = addressesToWalletPayload(
+                derivedAddresses ?? deriveAllAddresses(mnemonic)
+            );
+            await restoreLocalWalletFromSetup({
+                encryptedMnemonic: encrypted,
+                addresses: wallets});
+            void syncWalletAddressesInBackground(wallets);
             setStep("done");
+            triggerWalletSetupRefresh();
+            triggerDashboardRefresh();
         } catch (err: any) {
-            Alert.alert(t.common.error, err.message || t.wallet.setupFailed);
+            appAlert.alert(t.common.error, err.message || t.wallet.setupFailed);
         } finally {
             setLoading(false);
         }
+    };
+
+    const finishAndLeave = () => {
+        if (isAddMode) {
+            const routeNames = navigation.getState()?.routeNames ?? [];
+            if (routeNames.includes("Wallets")) {
+                navigation.navigate("Wallets");
+                return;
+            }
+            if (navigation.canGoBack()) {
+                navigation.goBack();
+                return;
+            }
+        }
+        navigation.reset({ index: 0, routes: [{ name: "TabNavigator" }] });
     };
 
     const renderChoose = () => (
@@ -200,7 +237,7 @@ const WalletSetup: React.FC = ({ navigation, route }: any) => {
                 containerStyle={{ marginBottom: 12 }}
             />
             <components.Button
-                title={t.wallet.importWallet}
+                title={t.wallet.restoreWallet}
                 onPress={() => {
                     setIsImportPath(true);
                     setStep("import");
@@ -283,25 +320,23 @@ const WalletSetup: React.FC = ({ navigation, route }: any) => {
                 keyboardType="numeric"
                 containerStyle={{ marginBottom: 16 }}
             />
-            {loading ? (
-                <View style={{ alignItems: "center", marginVertical: 12 }}>
-                    <components.LoadingSpinner size={40} />
-                </View>
-            ) : (
-                <components.Button title={t.wallet.finishSetup} onPress={finishSetup} />
-            )}
+            <components.Button
+                title={t.wallet.finishSetup}
+                onPress={finishSetup}
+                disabled={loading}
+            />
         </components.MerchantContent>
     );
 
     const renderDone = () => {
-        const addresses = deriveAllAddresses(mnemonic);
+        const addresses = derivedAddresses ?? deriveAllAddresses(mnemonic);
         return (
             <components.MerchantContent style={{ paddingTop: 24 }}>
                 <SetupStepHeader
                     current={isImportPath ? 2 : 3}
                     total={isImportPath ? 2 : 3}
                     title={t.wallet.setupComplete}
-                    subtitle={t.wallet.setupCompleteDescription}
+                    subtitle={isImportPath ? t.wallet.setupRestoredDescription : t.wallet.setupCompleteDescription}
                 />
                 {USDT_NETWORKS.map((network) => (
                     <View key={network} style={styles.addressRow}>
@@ -312,8 +347,8 @@ const WalletSetup: React.FC = ({ navigation, route }: any) => {
                     </View>
                 ))}
                 <components.Button
-                    title={t.wallet.goToDashboard}
-                    onPress={() => navigation.reset({ index: 0, routes: [{ name: "TabNavigator" }] })}
+                    title={isAddMode ? t.wallet.doneAddWallet : t.wallet.goToDashboard}
+                    onPress={finishAndLeave}
                     containerStyle={{ marginTop: 20 }}
                 />
             </components.MerchantContent>
@@ -324,8 +359,8 @@ const WalletSetup: React.FC = ({ navigation, route }: any) => {
         <View style={{ flex: 1, backgroundColor: colors.bgColor }}>
             <SafeAreaView style={{ flex: 1 }}>
                 <components.Header
-                    title={t.wallet.setupTitle}
-                    goBack={step === "choose"}
+                    title={isAddMode ? t.wallet.addWallet : t.wallet.setupTitle}
+                    goBack={step === "choose" || isAddMode}
                 />
                 <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }}>
                     {step === "choose" && renderChoose()}
@@ -334,6 +369,11 @@ const WalletSetup: React.FC = ({ navigation, route }: any) => {
                     {step === "pin" && renderPin()}
                     {step === "done" && renderDone()}
                 </ScrollView>
+                {loading ? (
+                    <View style={styles.loadingOverlay} pointerEvents="auto">
+                        <components.LoadingSpinner size={48} />
+                    </View>
+                ) : null}
             </SafeAreaView>
         </View>
     );

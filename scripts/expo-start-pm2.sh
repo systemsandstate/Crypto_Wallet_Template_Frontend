@@ -10,7 +10,13 @@ export REACT_NATIVE_PACKAGER_HOSTNAME="${EXPO_PUBLIC_HOST:-mohsinraza.xyz}"
 export EXPO_DEVTOOLS_LISTEN_ADDRESS="${EXPO_DEVTOOLS_LISTEN_ADDRESS:-0.0.0.0}"
 export EXPO_UNSTABLE_HEADLESS="${EXPO_UNSTABLE_HEADLESS:-1}"
 
+# Free Metro port — stale listeners after PM2 restarts block expo start.
+if command -v fuser >/dev/null 2>&1; then
+  fuser -k "${METRO_PORT}/tcp" 2>/dev/null || true
+  sleep 1
+fi
+
 EXPO_URL="exp://${REACT_NATIVE_PACKAGER_HOSTNAME}:${METRO_PORT}"
 node scripts/print-expo-qr.js "${EXPO_URL}" || true
 
-exec npx expo start --host lan --go --port "${METRO_PORT}" --clear
+exec npx expo start --host lan --go --port "${METRO_PORT}"

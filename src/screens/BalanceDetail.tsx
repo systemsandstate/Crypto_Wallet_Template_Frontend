@@ -7,7 +7,7 @@ import {
     RefreshControl,
     TouchableOpacity,
 } from "react-native";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState, useRef } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 
@@ -18,8 +18,11 @@ import { useTranslation } from "../hooks/useTranslation";
 import { useTheme } from "../hooks/useTheme";
 import { getLocalizedNetworkLabel } from "../i18n/network";
 import { api } from "../services/api";
-import { sumWalletBalances } from "../utils/walletBalance";
+import { sumWalletBalances, filterBalancesForActiveWallet } from "../utils/walletBalance";
+import { computePortfolioUsd } from "../utils/portfolioValue";
+import { getTokenUsdPrices } from "../utils/tokenPrices";
 import { formatNativeAmount } from "../utils/formatAmount";
+import { resolveWalletAddressesForFilter, syncDeviceWalletInBackground } from "../services/wallet/syncDeviceWallet";
 import { svg } from "../svg";
 
 type BalanceRow = {
@@ -42,41 +45,69 @@ const BalanceDetail: React.FC = () => {
     const { t, locale } = useTranslation();
     const { colors, FONTS } = useTheme();
     const [rows, setRows] = useState<BalanceRow[]>([]);
+    const [prices, setPrices] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const hasLoadedRef = useRef(false);
 
     const dateLocale = locale === "es" ? "es-ES" : "en-US";
 
     const load = useCallback((isRefresh = false) => {
+        const silent = hasLoadedRef.current;
         if (isRefresh) setRefreshing(true);
-        else setLoading(true);
+        else if (!silent) setLoading(true);
 
-        api.getWalletBalances()
-            .then((res) => {
-                const map = new Map(
-                    res.data.balances.map((row) => [
-                        row.network,
-                        {
-                            network: row.network as UsdtNetwork,
-                            usdtBalance: row.usdtBalance,
-                            nativeBalance: row.nativeBalance ?? null,
-                            nativeSymbol:
-                                row.nativeSymbol ||
-                                NATIVE_SYMBOLS[row.network as UsdtNetwork] ||
-                                row.network,
-                        },
-                    ])
-                );
-                const ordered = USDT_NETWORKS.filter((network) => map.has(network)).map(
-                    (network) => map.get(network)!
-                );
-                setRows(ordered);
-            })
-            .catch(() => setRows([]))
-            .finally(() => {
+        void (async () => {
+            try {
+                syncDeviceWalletInBackground({ force: isRefresh });
+                const [activeAddresses, tokenPrices, cached] = await Promise.all([
+                    resolveWalletAddressesForFilter(),
+                    getTokenUsdPrices(),
+                    api.getWalletBalances(),
+                ]);
+                setPrices(tokenPrices);
+
+                const applyRows = (
+                    source: Awaited<ReturnType<typeof api.getWalletBalances>>["data"]["balances"]
+                ) => {
+                    const rows = filterBalancesForActiveWallet(source, activeAddresses);
+                    const map = new Map(
+                        rows.map((row) => [
+                            row.network,
+                            {
+                                network: row.network as UsdtNetwork,
+                                usdtBalance: row.usdtBalance,
+                                nativeBalance: row.nativeBalance ?? null,
+                                nativeSymbol:
+                                    row.nativeSymbol ||
+                                    NATIVE_SYMBOLS[row.network as UsdtNetwork] ||
+                                    row.network,
+                            },
+                        ])
+                    );
+                    const ordered = USDT_NETWORKS.filter((network) => map.has(network)).map(
+                        (network) => map.get(network)!
+                    );
+                    setRows(ordered);
+                };
+
+                applyRows(cached.data.balances);
+                hasLoadedRef.current = true;
+                setLoading(false);
+
+                if (isRefresh) {
+                    void api
+                        .getWalletBalances({ live: true })
+                        .then((live) => applyRows(live.data.balances))
+                        .catch(() => {});
+                }
+            } catch {
+                if (!hasLoadedRef.current) setRows([]);
+            } finally {
                 setLoading(false);
                 setRefreshing(false);
-            });
+            }
+        })();
     }, []);
 
     useFocusEffect(
@@ -85,11 +116,26 @@ const BalanceDetail: React.FC = () => {
         }, [load])
     );
 
+    const totalPortfolio = useMemo(() => computePortfolioUsd(rows, prices), [rows, prices]);
     const totalUsdt = useMemo(() => sumWalletBalances(rows), [rows]);
 
     const styles = useMemo(
         () =>
             StyleSheet.create({
+                root: {
+                    flex: 1,
+                    backgroundColor: colors.bgColor,
+                },
+                body: {
+                    flex: 1,
+                    position: "relative",
+                    minHeight: 0,
+                },
+                loadingCenter: {
+                    flex: 1,
+                    alignItems: "center",
+                    justifyContent: "center",
+                },
                 totalCard: {
                     backgroundColor: colors.white,
                     borderRadius: 16,
@@ -244,11 +290,16 @@ const BalanceDetail: React.FC = () => {
     );
 
     const formatToken = (value: number | null | undefined, maxDecimals = 6) => {
-        if (value == null || !Number.isFinite(value)) return "—";
-        return value.toLocaleString(dateLocale, {
+        const amount = value != null && Number.isFinite(value) ? value : 0;
+        return amount.toLocaleString(dateLocale, {
             minimumFractionDigits: 0,
             maximumFractionDigits: maxDecimals,
         });
+    };
+
+    const nativeUsd = (balance: number | null | undefined, symbol: string) => {
+        const amount = balance != null && Number.isFinite(balance) ? balance : 0;
+        return amount * (prices[String(symbol).toUpperCase()] ?? 0);
     };
 
     const formatNativeToken = (value: number | null | undefined) => formatNativeAmount(value, dateLocale);
@@ -318,93 +369,99 @@ const BalanceDetail: React.FC = () => {
 };
 
     return (
-        <View style={{ flex: 1, backgroundColor: colors.bgColor }}>
+        <View style={styles.root}>
             <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
                 <components.Header title={t.balance.balanceDetailTitle} goBack={true} />
-                <View style={styles.totalCardWrap}>
-                    <View style={styles.totalCard}>
-                        <Text style={styles.totalLabel}>{t.balance.balanceDetailTotal}</Text>
-                        {loading ? (
-                            <components.LoadingSpinner size={36} />
-                        ) : (
-                            <>
-                                <Text style={styles.totalValue}>{formatFiat(totalUsdt)}</Text>
+                {loading && rows.length === 0 ? (
+                    <View style={styles.loadingCenter}>
+                        <LoadingSpinner size={48} />
+                    </View>
+                ) : (
+                    <View style={styles.body}>
+                        <View style={styles.totalCardWrap}>
+                            <View style={styles.totalCard}>
+                                <Text style={styles.totalLabel}>{t.balance.balanceDetailTotal}</Text>
+                                <Text style={styles.totalValue}>{formatFiat(totalPortfolio)}</Text>
                                 <Text style={styles.totalSub}>
                                     {formatToken(totalUsdt)} USDT · {t.balance.onChainAllNetworks}
                                 </Text>
-                            </>
-                        )}
-                    </View>
-                </View>
-                <ScrollView
-                    style={{ flex: 1 }}
-                    contentContainerStyle={styles.scrollContent}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={() => load(true)}
-                            tintColor={colors.mainDark}
-                        />
-                    }
-                >
-                    {loading ? (
-                        <LoadingSpinner size={36} style={{ marginTop: 12 }} />
-                    ) : rows.length === 0 ? (
-                        <Text style={styles.emptyText}>{t.balance.balanceDetailEmpty}</Text>
-                    ) : (
-                        rows.map((row) => {
-                            const chainLabel = getLocalizedNetworkLabel(row.network, t);
-                            const networkShort = row.network;
-                            return (
-                                <View key={row.network} style={styles.chainSection}>
-                                    <View style={styles.chainHeader}>
-                                        <components.NetworkLogo network={row.network} size={28} />
-                                        <Text style={styles.chainTitle}>{chainLabel}</Text>
-                                    </View>
-                                    <View style={styles.chainCard}>
-                                        {renderTokenRow(
-                                            `${row.network}-usdt`,
-                                            "USDT",
-                                            networkShort,
-                                            row.usdtBalance,
-                                            formatFiat(row.usdtBalance),
-                                            <View>
-                                                <svg.UsdtMarkSvg size={40} />
-                                                <View style={styles.networkBadge}>
+                            </View>
+                        </View>
+                        <ScrollView
+                            style={{ flex: 1 }}
+                            contentContainerStyle={styles.scrollContent}
+                            refreshControl={
+                                <RefreshControl
+                                    refreshing={refreshing}
+                                    onRefresh={() => load(true)}
+                                    tintColor={colors.mainDark}
+                                />
+                            }
+                        >
+                            {rows.length === 0 ? (
+                                <Text style={styles.emptyText}>{t.balance.balanceDetailEmpty}</Text>
+                            ) : (
+                                rows.map((row) => {
+                                    const chainLabel = getLocalizedNetworkLabel(row.network, t);
+                                    const networkShort = row.network;
+                                    return (
+                                        <View key={row.network} style={styles.chainSection}>
+                                            <View style={styles.chainHeader}>
+                                                <components.NetworkLogo
+                                                    network={row.network}
+                                                    size={28}
+                                                />
+                                                <Text style={styles.chainTitle}>{chainLabel}</Text>
+                                            </View>
+                                            <View style={styles.chainCard}>
+                                                {renderTokenRow(
+                                                    `${row.network}-usdt`,
+                                                    "USDT",
+                                                    networkShort,
+                                                    row.usdtBalance,
+                                                    formatFiat(row.usdtBalance),
+                                                    <View>
+                                                        <svg.UsdtMarkSvg size={40} />
+                                                        <View style={styles.networkBadge}>
+                                                            <components.NetworkLogo
+                                                                network={row.network}
+                                                                size={12}
+                                                            />
+                                                        </View>
+                                                    </View>,
+                                                    false
+                                                )}
+                                                {renderTokenRow(
+                                                    `${row.network}-native`,
+                                                    row.nativeSymbol,
+                                                    "",
+                                                    row.nativeBalance,
+                                                    formatFiat(
+                                                        nativeUsd(row.nativeBalance, row.nativeSymbol)
+                                                    ),
                                                     <components.NetworkLogo
                                                         network={row.network}
-                                                        size={12}
-                                                    />
-                                                </View>
-                                            </View>,
-                                            false
-                                        )}
-                                        {renderTokenRow(
-                                            `${row.network}-native`,
-                                            row.nativeSymbol,
-                                            "",
-                                            row.nativeBalance,
-                                            null,
-                                            <components.NetworkLogo
-                                                network={row.network}
-                                                size={36}
-                                            />,
-                                            true,
-                                            formatNativeToken,
-                                            row.nativeBalance != null && row.nativeBalance > 0
-                                                ? () =>
-                                                      navigation.navigate("Withdraw", {
-                                                          network: row.network,
-                                                          asset: "NATIVE",
-                                                      })
-                                                : undefined
-                                        )}
-                                    </View>
-                                </View>
-                            );
-                        })
-                    )}
-                </ScrollView>
+                                                        size={36}
+                                                    />,
+                                                    true,
+                                                    formatNativeToken,
+                                                    row.nativeBalance != null &&
+                                                        row.nativeBalance > 0
+                                                        ? () =>
+                                                              navigation.navigate("Withdraw", {
+                                                                  network: row.network,
+                                                                  asset: "NATIVE",
+                                                              })
+                                                        : undefined
+                                                )}
+                                            </View>
+                                        </View>
+                                    );
+                                })
+                            )}
+                        </ScrollView>
+                    </View>
+                )}
             </SafeAreaView>
         </View>
     );

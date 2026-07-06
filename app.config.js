@@ -7,6 +7,11 @@ module.exports = () => {
 
   return {
     ...appJson.expo,
+    updates: {
+      ...appJson.expo.updates,
+      enabled: false,
+      checkAutomatically: 'NEVER',
+    },
     extra: {
       ...appJson.expo.extra,
       eas: {

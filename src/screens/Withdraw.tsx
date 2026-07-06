@@ -1,20 +1,19 @@
 import {
     Text,
-    View,
-    Alert,
+    View, 
     TouchableOpacity,
     StyleSheet,
     TextInput,
     Modal,
     Pressable,
-    Platform,
-} from "react-native";
+    Platform} from "react-native";
 import React, { useCallback, useMemo, useState } from "react";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect, useRoute } from "@react-navigation/native";
 import * as Clipboard from "expo-clipboard";
 
-import { isAddress } from "ethers";
+import { isEvmAddress } from "../utils/isEvmAddress";
+import { appAlert } from '../utils/appAlert';
 
 import { components } from "../components";
 import QrScanModal from "../components/QrScanModal";
@@ -27,11 +26,15 @@ import { getLocalizedNetworkLabel } from "../i18n/network";
 import { formatMessage } from "../i18n";
 import { showToast } from "../utils/toast";
 import { svg } from "../svg";
-import { api } from "../services/api";
+import { api, ensureAuthToken } from "../services/api";
 import { sendUsdt, WalletSendError as UsdtSendError } from "../services/wallet/walletSendService";
 import { sendNative, WalletSendError as NativeSendError } from "../services/wallet/walletNativeSendService";
 import { triggerDashboardRefresh } from "../utils/dashboardRefresh";
 import { toPlainLanguageError } from "../utils/plainLanguageErrors";
+import {
+    resolveNetworkBalanceMap,
+    resolveNetworkNativeBalanceMap} from "../utils/walletBalance";
+import { resolveActiveWalletAddresses, syncDeviceWalletInBackground } from "../services/wallet/syncDeviceWallet";
 
 const SUPPORTED_SEND_NETWORKS: UsdtNetwork[] = ["ERC20", "BEP20", "POLYGON"];
 
@@ -83,21 +86,24 @@ const Withdraw: React.FC = ({ navigation }: any) => {
                 }
                 navigation.setParams({ pickedAddress: undefined, pickedNetwork: undefined });
             }
-            api.getWalletBalances()
-                .then((res) => {
-                    const usdtMap: Record<string, number | null> = {};
-                    const nativeMap: Record<string, number | null> = {};
-                    for (const row of res.data.balances) {
-                        usdtMap[row.network] = row.usdtBalance;
-                        nativeMap[row.network] = row.nativeBalance;
-                    }
-                    setNetworkBalances(usdtMap);
-                    setNativeBalances(nativeMap);
-                })
-                .catch(() => {
+                void (async () => {
+                syncDeviceWalletInBackground();
+                try {
+                    const [activeAddresses, cached] = await Promise.all([
+                        resolveActiveWalletAddresses(),
+                        api.getWalletBalances(),
+                    ]);
+                    setNetworkBalances(
+                        resolveNetworkBalanceMap(cached.data.balances, activeAddresses)
+                    );
+                    setNativeBalances(
+                        resolveNetworkNativeBalanceMap(cached.data.balances, activeAddresses)
+                    );
+                } catch {
                     setNetworkBalances({});
                     setNativeBalances({});
-                });
+                }
+            })();
         }, [navigation, route.params])
     );
 
@@ -109,17 +115,14 @@ const Withdraw: React.FC = ({ navigation }: any) => {
                     fontSize: 14,
                     color: colors.bodyTextColor,
                     marginBottom: 20,
-                    lineHeight: 14 * 1.6,
-                },
+                    lineHeight: 14 * 1.6},
                 fieldBlock: {
-                    marginBottom: 18,
-                },
+                    marginBottom: 18},
                 fieldLabel: {
                     ...FONTS.Mulish_400Regular,
                     fontSize: 14,
                     color: colors.bodyTextColor,
-                    marginBottom: 8,
-                },
+                    marginBottom: 8},
                 addressField: {
                     flexDirection: "row",
                     alignItems: "center",
@@ -129,8 +132,7 @@ const Withdraw: React.FC = ({ navigation }: any) => {
                     borderWidth: 1,
                     borderColor: colors.inputBorder,
                     paddingLeft: 14,
-                    paddingRight: 6,
-                },
+                    paddingRight: 6},
                 addressInput: {
                     flex: 1,
                     minWidth: 0,
@@ -143,36 +145,29 @@ const Withdraw: React.FC = ({ navigation }: any) => {
                               outlineStyle: "none",
                               outlineWidth: 0,
                               backgroundColor: "transparent",
-                              paddingLeft: 0,
-                          } as object)
-                        : {}),
-                },
+                              paddingLeft: 0} as object)
+                        : {})},
                 addressActions: {
                     flexDirection: "row",
                     alignItems: "center",
-                    flexShrink: 0,
-                },
+                    flexShrink: 0},
                 actionDivider: {
                     width: 1,
                     height: 22,
                     backgroundColor: colors.border,
-                    marginHorizontal: 4,
-                },
+                    marginHorizontal: 4},
                 pasteButton: {
                     paddingHorizontal: 8,
-                    paddingVertical: 10,
-                },
+                    paddingVertical: 10},
                 pasteText: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 14,
-                    color: colors.accentBlue,
-                },
+                    color: colors.accentBlue},
                 iconAction: {
                     width: 40,
                     height: 40,
                     alignItems: "center",
-                    justifyContent: "center",
-                },
+                    justifyContent: "center"},
                 networkPill: {
                     flexDirection: "row",
                     alignItems: "center",
@@ -182,28 +177,24 @@ const Withdraw: React.FC = ({ navigation }: any) => {
                     borderWidth: 1,
                     borderColor: colors.border,
                     paddingHorizontal: 14,
-                    paddingVertical: 10,
-                },
+                    paddingVertical: 10},
                 networkPillLabel: {
                     ...FONTS.Mulish_400Regular,
                     fontSize: 15,
                     color: colors.bodyTextColor,
                     flex: 1,
-                    marginLeft: 10,
-                },
+                    marginLeft: 10},
                 chevron: {
                     ...FONTS.Mulish_400Regular,
                     fontSize: 12,
                     color: colors.bodyTextColor,
-                    marginLeft: 8,
-                },
+                    marginLeft: 8},
                 feeHint: {
                     ...FONTS.Mulish_400Regular,
                     fontSize: 13,
                     color: colors.bodyTextColor,
                     lineHeight: 13 * 1.5,
-                    marginTop: 10,
-                },
+                    marginTop: 10},
                 amountField: {
                     flexDirection: "row",
                     alignItems: "center",
@@ -212,14 +203,11 @@ const Withdraw: React.FC = ({ navigation }: any) => {
                     borderRadius: 12,
                     borderWidth: 2,
                     paddingLeft: 14,
-                    paddingRight: 10,
-                },
+                    paddingRight: 10},
                 amountFieldFocused: {
-                    borderColor: colors.accentBlue,
-                },
+                    borderColor: colors.accentBlue},
                 amountFieldBlurred: {
-                    borderColor: colors.inputBorder,
-                },
+                    borderColor: colors.inputBorder},
                 amountInput: {
                     flex: 1,
                     minWidth: 0,
@@ -229,8 +217,7 @@ const Withdraw: React.FC = ({ navigation }: any) => {
                     paddingVertical: 12,
                     ...(Platform.OS === "web"
                         ? ({ outlineStyle: "none", outlineWidth: 0 } as object)
-                        : {}),
-                },
+                        : {})},
                 clearButton: {
                     width: 22,
                     height: 22,
@@ -238,75 +225,62 @@ const Withdraw: React.FC = ({ navigation }: any) => {
                     backgroundColor: colors.border,
                     alignItems: "center",
                     justifyContent: "center",
-                    marginRight: 8,
-                },
+                    marginRight: 8},
                 clearText: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 12,
                     color: colors.bodyTextColor,
-                    lineHeight: 14,
-                },
+                    lineHeight: 14},
                 currencyTag: {
                     ...FONTS.Mulish_400Regular,
                     fontSize: 15,
                     color: colors.bodyTextColor,
-                    marginRight: 10,
-                },
+                    marginRight: 10},
                 maxButton: {
                     paddingHorizontal: 4,
-                    paddingVertical: 8,
-                },
+                    paddingVertical: 8},
                 maxText: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 15,
-                    color: colors.accentBlue,
-                },
+                    color: colors.accentBlue},
                 approxUsd: {
                     ...FONTS.Mulish_400Regular,
                     fontSize: 13,
                     color: colors.bodyTextColor,
-                    marginTop: 8,
-                },
+                    marginTop: 8},
                 sendFooter: {
                     paddingHorizontal: 20,
                     paddingTop: 10,
                     borderTopWidth: 1,
                     borderTopColor: colors.border,
-                    backgroundColor: colors.bgColor,
-                },
+                    backgroundColor: colors.bgColor},
                 networkModalBackdrop: {
                     flex: 1,
                     backgroundColor: "rgba(0,0,0,0.4)",
-                    justifyContent: "flex-end",
-                },
+                    justifyContent: "flex-end"},
                 networkModalSheet: {
                     backgroundColor: colors.bgColor,
                     borderTopLeftRadius: 16,
                     borderTopRightRadius: 16,
                     paddingHorizontal: 20,
-                    paddingTop: 16,
-                },
+                    paddingTop: 16},
                 networkModalTitle: {
                     ...FONTS.H4,
                     color: colors.mainDark,
                     textAlign: "center",
-                    marginBottom: 12,
-                },
+                    marginBottom: 12},
                 networkOption: {
                     flexDirection: "row",
                     alignItems: "center",
                     paddingVertical: 14,
                     borderBottomWidth: StyleSheet.hairlineWidth,
-                    borderBottomColor: colors.border,
-                },
+                    borderBottomColor: colors.border},
                 networkOptionLabel: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 15,
                     color: colors.mainDark,
                     marginLeft: 10,
-                    flex: 1,
-                },
-            }),
+                    flex: 1}}),
         [FONTS, colors]
     );
 
@@ -317,9 +291,7 @@ const Withdraw: React.FC = ({ navigation }: any) => {
     const approxUsdText = formatMessage(t.withdraw.approxUsd, {
         amount: (Number.isFinite(parsedAmount) ? parsedAmount : 0).toLocaleString(dateLocale, {
             minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        }),
-    });
+            maximumFractionDigits: 2})});
 
     const handlePaste = async () => {
         try {
@@ -353,24 +325,24 @@ const Withdraw: React.FC = ({ navigation }: any) => {
     const handleSubmit = () => {
         const num = parseFloat(amount);
         if (!num || num <= 0) {
-            Alert.alert(t.common.error, t.payment.invalidAmount);
+            appAlert.alert(t.common.error, t.payment.invalidAmount);
             return;
         }
         if (!address.trim()) {
-            Alert.alert(t.common.error, t.withdraw.enterWalletAddress);
+            appAlert.alert(t.common.error, t.withdraw.enterWalletAddress);
             return;
         }
-        if (!isAddress(address.trim())) {
-            Alert.alert(t.common.error, t.ux.invalidWalletAddress);
+        if (!isEvmAddress(address.trim())) {
+            appAlert.alert(t.common.error, t.ux.invalidWalletAddress);
             return;
         }
         const balance = isNativeSend ? nativeBalances[network] : networkBalances[network];
         if (balance != null && num > balance) {
-            Alert.alert(t.common.error, isNativeSend ? t.ux.insufficientNative : t.ux.insufficientUsdt);
+            appAlert.alert(t.common.error, isNativeSend ? t.ux.insufficientNative : t.ux.insufficientUsdt);
             return;
         }
         if (!SUPPORTED_SEND_NETWORKS.includes(network)) {
-            Alert.alert(t.common.error, t.withdraw.networkSendUnsupported);
+            appAlert.alert(t.common.error, t.withdraw.networkSendUnsupported);
             return;
         }
         setConfirmVisible(true);
@@ -385,22 +357,21 @@ const Withdraw: React.FC = ({ navigation }: any) => {
         setSendProgressVisible(true);
         setSendStep("preparing");
         try {
+            await ensureAuthToken();
             if (isNativeSend) {
                 await sendNative({
                     network,
                     toAddress: address.trim(),
                     amount: num,
                     pin,
-                    onProgress: (step) => setSendStep(step),
-                });
+                    onProgress: (step) => setSendStep(step)});
             } else {
                 const { txHash, fromAddress } = await sendUsdt({
                     network,
                     toAddress: address.trim(),
                     amount: num,
                     pin,
-                    onProgress: (step) => setSendStep(step),
-                });
+                    onProgress: (step) => setSendStep(step)});
                 void api
                     .reportWalletSend({
                         network,
@@ -408,12 +379,11 @@ const Withdraw: React.FC = ({ navigation }: any) => {
                         fromAddress,
                         toAddress: address.trim(),
                         amount: num,
-                        currency: "USDT",
-                    })
+                        currency: "USDT"})
                     .catch(() => {});
             }
             setSendStep("done");
-            await new Promise((resolve) => setTimeout(resolve, 700));
+            await new Promise((resolve) => setTimeout(resolve, 250));
             setAmount("");
             setAddress("");
             triggerDashboardRefresh();
@@ -545,10 +515,8 @@ const Withdraw: React.FC = ({ navigation }: any) => {
                                 {isNativeSend
                                     ? `${formatMessage(t.withdraw.nativeBalanceAvailable, {
                                           amount: (nativeBalances[network] ?? 0).toLocaleString(dateLocale, {
-                                              maximumFractionDigits: 8,
-                                          }),
-                                          symbol: currencyLabel,
-                                      })}`
+                                              maximumFractionDigits: 8}),
+                                          symbol: currencyLabel})}`
                                     : approxUsdText}
                             </Text>
                         </View>

@@ -1,14 +1,18 @@
-import { JsonRpcProvider, Network, Wallet } from 'ethers';
+import { Platform } from 'react-native';
+import { FetchRequest, JsonRpcProvider, Network, Wallet } from 'ethers';
 
+import { API_BASE_URL } from '../../config/api';
+import { attachNativeFetchRequest } from '../../polyfills/ethersFetch';
 import { UsdtNetwork } from '../../constants/usdtNetworks';
+import { getAuthToken, hydrateAuthToken } from '../api';
 import {
   addressesToWalletPayload,
   decryptMnemonic,
   deriveAllAddresses,
   getPrivateKeyForNetwork,
 } from './walletCore';
-import { isWalletSetupLocally, loadEncryptedWallet } from './walletStorage';
-import { persistAndSyncWalletAddresses } from './syncDeviceWallet';
+import { isWalletSetupLocally, loadEncryptedWallet, saveWalletAddresses, hydrateLocalWalletAddresses } from './walletStorage';
+import { syncWalletAddressesInBackground } from './syncDeviceWallet';
 
 const EVM_CHAIN_IDS: Partial<Record<UsdtNetwork, number>> = {
   ERC20: 1,
@@ -16,8 +20,8 @@ const EVM_CHAIN_IDS: Partial<Record<UsdtNetwork, number>> = {
   POLYGON: 137,
 };
 
-/** Prefer reliable public endpoints; try fallbacks when one is rate-limited. */
-const RPC_URLS: Partial<Record<UsdtNetwork, string[]>> = {
+/** Public RPC endpoints for web (direct browser fetch). */
+const WEB_RPC_URLS: Partial<Record<UsdtNetwork, string[]>> = {
   ERC20: [
     'https://ethereum.publicnode.com',
     'https://cloudflare-eth.com',
@@ -47,34 +51,115 @@ export class WalletSendError extends Error {
 
 export const EVM_SEND_NETWORKS: UsdtNetwork[] = ['ERC20', 'BEP20', 'POLYGON'];
 
+export type SendProgressStep = 'preparing' | 'signing' | 'broadcasting';
+
+const NATIVE_RPC_TIMEOUT_MS = 45_000;
+
+const lastGoodWebRpcUrl: Partial<Record<UsdtNetwork, string>> = {};
+
 export function createEvmProvider(network: UsdtNetwork, rpcUrl: string): JsonRpcProvider {
   const chainId = EVM_CHAIN_IDS[network];
   const networkConfig = chainId ? Network.from(chainId) : undefined;
   return new JsonRpcProvider(rpcUrl, networkConfig, { staticNetwork: true });
 }
 
+async function createNativeProxyProvider(network: UsdtNetwork): Promise<JsonRpcProvider> {
+  const token = getAuthToken() ?? (await hydrateAuthToken());
+  if (!token) {
+    throw new WalletSendError('Session expired');
+  }
+
+  const chainId = EVM_CHAIN_IDS[network];
+  const networkConfig = chainId ? Network.from(chainId) : undefined;
+  const req = attachNativeFetchRequest(
+    new FetchRequest(`${API_BASE_URL}/merchant/wallets/evm-rpc/${network}`),
+    async () => getAuthToken() ?? (await hydrateAuthToken())
+  );
+  req.timeout = NATIVE_RPC_TIMEOUT_MS;
+  req.setHeader('content-type', 'application/json');
+
+  return new JsonRpcProvider(req, networkConfig, {
+    staticNetwork: true,
+    batchMaxCount: 1,
+    batchStallTime: 0,
+  });
+}
+
+/** Gas/fee fields for EVM sends — BSC prefers legacy gasPrice. */
+export async function resolveTxFeeOverrides(
+  provider: JsonRpcProvider
+): Promise<Record<string, bigint>> {
+  const feeData = await provider.getFeeData();
+  if (feeData.gasPrice != null && feeData.gasPrice > 0n) {
+    return { gasPrice: feeData.gasPrice };
+  }
+  if (feeData.maxFeePerGas != null && feeData.maxFeePerGas > 0n) {
+    const priority =
+      feeData.maxPriorityFeePerGas != null && feeData.maxPriorityFeePerGas > 0n
+        ? feeData.maxPriorityFeePerGas
+        : feeData.maxFeePerGas / 2n;
+    return {
+      maxFeePerGas: feeData.maxFeePerGas,
+      maxPriorityFeePerGas: priority,
+    };
+  }
+
+  try {
+    const gasPriceHex = await provider.send('eth_gasPrice', []);
+    const gasPrice = BigInt(String(gasPriceHex));
+    if (gasPrice > 0n) return { gasPrice };
+  } catch {
+    // fall through
+  }
+
+  return {};
+}
+
+/**
+ * Authenticated API JSON-RPC proxy first (same on web + mobile).
+ * Web falls back to direct public RPC if the proxy fails.
+ */
 export async function withWalletRpc<T>(
   network: UsdtNetwork,
   fn: (provider: JsonRpcProvider) => Promise<T>
 ): Promise<T> {
-  const urls = RPC_URLS[network] || [];
+  const token = getAuthToken() ?? (await hydrateAuthToken());
+  if (token) {
+    try {
+      const provider = await createNativeProxyProvider(network);
+      return await fn(provider);
+    } catch (err) {
+      if (err instanceof WalletSendError) throw err;
+      if (Platform.OS !== 'web') throw mapSendError(err);
+    }
+  } else if (Platform.OS !== 'web') {
+    throw new WalletSendError('Session expired');
+  }
+
+  const urls = WEB_RPC_URLS[network] || [];
   if (urls.length === 0) {
     throw new WalletSendError('Network RPC is not configured');
   }
 
+  const preferred = lastGoodWebRpcUrl[network];
+  const orderedUrls = preferred
+    ? [preferred, ...urls.filter((url) => url !== preferred)]
+    : urls;
+
   let lastError: unknown;
-  for (const url of urls) {
+  for (const url of orderedUrls) {
     try {
       const provider = createEvmProvider(network, url);
-      // Fail fast if this RPC is dead / rate-limited.
-      await provider.getBlockNumber();
-      return await fn(provider);
+      if (url !== preferred) {
+        await provider.getBlockNumber();
+      }
+      const result = await fn(provider);
+      lastGoodWebRpcUrl[network] = url;
+      return result;
     } catch (err) {
-      // Business errors (PIN, balance, address) must not rotate RPCs.
       if (err instanceof WalletSendError) throw err;
       lastError = err;
       const message = err instanceof Error ? err.message : String(err || '');
-      // On-chain reverts / insufficient funds are not RPC problems.
       if (/insufficient|exceeds balance|transfer amount exceeds|nonce|replacement|user/i.test(message)) {
         throw mapSendError(err);
       }
@@ -123,12 +208,11 @@ export async function unlockWalletSigner(
     throw new WalletSendError('Invalid wallet PIN');
   }
 
-  // This device's wallet is source of truth for balance, history, and sends.
-  const wallets = addressesToWalletPayload(deriveAllAddresses(mnemonic));
-  try {
-    await persistAndSyncWalletAddresses(wallets);
-  } catch {
-    // Continue signing even if sync fails; send still uses local keys.
+  const existingAddresses = await hydrateLocalWalletAddresses();
+  if (!existingAddresses?.length) {
+    const wallets = addressesToWalletPayload(deriveAllAddresses(mnemonic));
+    void saveWalletAddresses(wallets);
+    void syncWalletAddressesInBackground(wallets);
   }
 
   const privateKey = getPrivateKeyForNetwork(mnemonic, network);
@@ -137,22 +221,42 @@ export async function unlockWalletSigner(
 
 export function mapSendError(err: unknown, fallback = 'Transaction failed'): WalletSendError {
   if (err instanceof WalletSendError) return err;
-  const message = err instanceof Error ? err.message : String(err || fallback);
-  if (/insufficient funds|gas required|gas fee/i.test(message)) {
+
+  const errObj = err as { code?: string; reason?: string; shortMessage?: string; message?: string };
+  const parts = [errObj?.shortMessage, errObj?.reason, errObj?.message]
+    .filter((part): part is string => typeof part === 'string' && part.length > 0)
+    .join(' ');
+  const message = parts || fallback;
+  const lower = message.toLowerCase();
+
+  if (/does not hold your funds|restore your recovery phrase/i.test(message)) {
+    return new WalletSendError(message);
+  }
+  if (/insufficient funds|gas required|gas fee|intrinsic gas/i.test(lower)) {
     return new WalletSendError(
       'Not enough native coin for network fees (e.g. BNB on BEP20). Add a small amount and try again.'
     );
   }
-  if (/exceeds balance|insufficient balance|transfer amount exceeds/i.test(message)) {
+  if (/exceeds balance|insufficient balance|transfer amount exceeds|bep20:|erc20:/i.test(lower)) {
     return new WalletSendError('Insufficient USDT balance for this transfer');
   }
-  if (/too many|rate|limit exceeded|detect network|failed to fetch|network error/i.test(message)) {
+  if (/call_exception|execution reverted|revert/i.test(lower)) {
+    return new WalletSendError('Insufficient USDT balance for this transfer');
+  }
+  if (/session expired|invalid or expired token|access token required|unauthorized/i.test(lower)) {
+    return new WalletSendError('Session expired');
+  }
+  if (/too many|rate|limit exceeded|detect network|failed to fetch|network error|network request failed|network request timed out|timeout|aborted/i.test(lower)) {
     return new WalletSendError('Network RPC is not configured');
   }
-  if (/user rejected|denied/i.test(message)) {
+  if (/crypto\.getrandomvalues|getrandomvalues|randombytes|textencoder|textdecoder|buffer is not defined/i.test(lower)) {
+    return new WalletSendError(
+      'This device is missing secure crypto support. Close and reopen the app, then try again.'
+    );
+  }
+  if (/user rejected|denied/i.test(lower)) {
     return new WalletSendError('Transaction failed');
   }
-  // Keep short technical messages; long ethers dumps become generic.
   if (message.length > 160) {
     return new WalletSendError(fallback);
   }
