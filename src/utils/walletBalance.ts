@@ -1,4 +1,5 @@
 import type { WalletTransfer } from "../services/api";
+import { UsdtNetwork } from "../constants/usdtNetworks";
 
 export type BalanceAddressRow = {
     network?: string;
@@ -7,9 +8,9 @@ export type BalanceAddressRow = {
 };
 
 export const sumWalletBalances = (
-    rows: Array<{ usdtBalance: number | null | undefined }>
+    rows: Array<{ usdtBalance: number | null | undefined }> | null | undefined
 ): number =>
-    rows.reduce((total, row) => total + (typeof row.usdtBalance === "number" ? row.usdtBalance : 0), 0);
+    (rows ?? []).reduce((total, row) => total + (typeof row.usdtBalance === "number" ? row.usdtBalance : 0), 0);
 
 /** Net USDT from history (deposits − sends). */
 export const netUsdtFromTransfers = (transfers: WalletTransfer[]): number =>
@@ -22,7 +23,7 @@ export const netUsdtFromTransfers = (transfers: WalletTransfer[]): number =>
 const addressKey = (network: string, address: string) => {
     const trimmed = address.trim();
     const normalized =
-        network === "TRC20" || network === "SOL" ? trimmed : trimmed.toLowerCase();
+        network === "TRC20" ? trimmed : trimmed.toLowerCase();
     return `${network}:${normalized}`;
 };
 
@@ -31,31 +32,43 @@ const addressKey = (network: string, address: string) => {
  * Drops stale server rows from a previously active wallet.
  */
 export const filterBalancesForActiveWallet = <T extends BalanceAddressRow>(
-    balances: T[],
+    balances: T[] | null | undefined,
     activeAddresses: Array<{ network: string; address: string }> | null | undefined
 ): T[] => {
-    if (!activeAddresses?.length) return [];
+    if (!balances?.length) return [];
+    if (!activeAddresses?.length) return balances;
+
     const allowed = new Set(
         activeAddresses.map((row) => addressKey(row.network, row.address))
     );
-    return balances.filter(
+    const filtered = balances.filter(
         (row) =>
             row.network &&
             row.address &&
             allowed.has(addressKey(row.network, row.address))
     );
+
+    if (
+        filtered.length === 0 &&
+        balances.some((row) => typeof row.usdtBalance === "number" && row.usdtBalance > 0)
+    ) {
+        return balances;
+    }
+
+    return filtered;
 };
 
-/** Map filtered balance rows to one value per network (active device wallet only). */
+/** Map filtered balance rows to one value per network (sums multiple TRC20 rows). */
 export const networkBalancesFromRows = (
     balances: BalanceAddressRow[],
     activeAddresses: Array<{ network: string; address: string }> | null | undefined
 ): Record<string, number | null> => {
     const map: Record<string, number | null> = {};
     for (const row of filterBalancesForActiveWallet(balances, activeAddresses)) {
-        if (row.network) {
-            map[row.network] = row.usdtBalance ?? null;
-        }
+        if (!row.network) continue;
+        const value = row.usdtBalance;
+        if (typeof value !== "number") continue;
+        map[row.network] = (map[row.network] ?? 0) + value;
     }
     return map;
 };
@@ -95,7 +108,8 @@ export const resolveNetworkNativeBalanceMap = (
  * History rows shown in the UI: real on-chain/client txs only (no balance_sync gaps),
  * deduped by network + direction + tx hash + currency.
  */
-export const filterTransfersForDisplay = (transfers: WalletTransfer[]): WalletTransfer[] => {
+export const filterTransfersForDisplay = (transfers: WalletTransfer[] | null | undefined): WalletTransfer[] => {
+    if (!transfers?.length) return [];
     const seen = new Set<string>();
     const result: WalletTransfer[] = [];
 
@@ -115,9 +129,10 @@ export const filterTransfersForDisplay = (transfers: WalletTransfer[]): WalletTr
 
 /** Keep only transfers that touch the active wallet addresses. */
 export const filterTransfersForActiveWallet = (
-    transfers: WalletTransfer[],
+    transfers: WalletTransfer[] | null | undefined,
     activeAddresses: Array<{ network: string; address: string }> | null | undefined
 ): WalletTransfer[] => {
+    if (!transfers?.length) return [];
     if (!activeAddresses?.length) return [];
     const allowed = new Set(
         activeAddresses.map((row) => addressKey(row.network, row.address))

@@ -1,21 +1,23 @@
 import {
     View,
     TouchableOpacity,
-    Text, 
+    Text,
     StyleSheet,
     Keyboard,
-    Platform} from "react-native";
+    Platform,
+} from "react-native";
 import React, { useState, useCallback, memo, useRef, useMemo } from "react";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useDispatch } from "react-redux";
 
 import { components } from "../components";
-import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
+import AuthLabeledField from "../components/AuthLabeledField";
 import { useTheme } from "../hooks/useTheme";
-import { api, ensureAuthToken, persistAuthToken, setAuthToken } from "../services/api";
+import { createAuthFormStyles } from "../styles/authFormStyles";
+import { api, clearApiCache, persistAuthToken, setAuthToken } from "../services/api";
 import { setCredentials } from "../store/authSlice";
 import { safeReset } from "../utils/safeNavigation";
-import { appAlert } from '../utils/appAlert';
+import { appAlert } from "../utils/appAlert";
 import { syncPushTokenWithBackend } from "../services/pushNotifications";
 import { setWalletMerchantContext } from "../services/wallet/walletStorage";
 import { syncDeviceWalletInBackground } from "../services/wallet/syncDeviceWallet";
@@ -34,7 +36,6 @@ const readInputValue = (ref: React.RefObject<InputFieldHandle | null>, fallback:
     if (node && typeof node.getValue === "function") {
         return node.getValue();
     }
-    // Web autofill may skip onChange — read DOM value when present.
     const domNode = node as unknown as { value?: string } | null;
     if (domNode && typeof domNode.value === "string" && domNode.value.length > 0) {
         return domNode.value;
@@ -49,7 +50,6 @@ const waitForInputSync = (): Promise<void> =>
 
 const SignInForm = memo(function SignInForm({ t, navigation }: Props) {
     const dispatch = useDispatch();
-    const { isCompact } = useResponsiveLayout();
     const { colors, FONTS } = useTheme();
     const emailValueRef = useRef("");
     const passwordValueRef = useRef("");
@@ -59,6 +59,8 @@ const SignInForm = memo(function SignInForm({ t, navigation }: Props) {
     const [password, setPassword] = useState("");
     const [rememberMe, setRememberMe] = useState(false);
     const [loading, setLoading] = useState(false);
+
+    const authStyles = useMemo(() => createAuthFormStyles(colors, FONTS), [colors, FONTS]);
 
     const onEmailChange = useCallback((text: string) => {
         emailValueRef.current = text;
@@ -81,10 +83,7 @@ const SignInForm = memo(function SignInForm({ t, navigation }: Props) {
             passwordInputRef.current?.blur();
             await waitForInputSync();
 
-            const trimmedEmail = readInputValue(
-                emailInputRef,
-                emailValueRef.current || email
-            )
+            const trimmedEmail = readInputValue(emailInputRef, emailValueRef.current || email)
                 .trim()
                 .toLowerCase();
             const pwd = readInputValue(passwordInputRef, passwordValueRef.current || password);
@@ -99,14 +98,16 @@ const SignInForm = memo(function SignInForm({ t, navigation }: Props) {
                 setAuthToken(null);
                 const res = await api.login({ email: trimmedEmail, password: pwd });
                 await persistAuthToken(res.data.accessToken);
+                clearApiCache();
+                await setWalletMerchantContext(res.data.merchant.id);
                 dispatch(
                     setCredentials({
                         merchant: res.data.merchant,
-                        accessToken: res.data.accessToken})
+                        accessToken: res.data.accessToken,
+                    })
                 );
                 safeReset([{ name: "TabNavigator" }]);
-                void setWalletMerchantContext(res.data.merchant.id);
-                syncDeviceWalletInBackground();
+                syncDeviceWalletInBackground({ force: true });
                 void syncPushTokenWithBackend();
             } catch (err: any) {
                 appAlert.alert(t.auth.signInFailed, err.message || t.auth.invalidCredentials);
@@ -115,76 +116,12 @@ const SignInForm = memo(function SignInForm({ t, navigation }: Props) {
         })();
     }, [dispatch, email, loading, password, t]);
 
-    const styles = useMemo(
-        () =>
-            StyleSheet.create({
-                title: {
-                    textAlign: "center",
-                    ...FONTS.H1,
-                    color: colors.mainDark,
-                    marginBottom: 8},
-                titleCompact: {
-                    fontSize: 32,
-                    lineHeight: 38},
-                subtitle: {
-                    textAlign: "center",
-                    ...FONTS.Mulish_400Regular,
-                    fontSize: 14,
-                    color: colors.bodyTextColor,
-                    marginBottom: 24},
-                fieldGap: {
-                    marginBottom: 14},
-                fieldGapLarge: {
-                    marginBottom: 20},
-                row: {
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: 24},
-                rememberRow: {
-                    flexDirection: "row",
-                    alignItems: "center"},
-                checkbox: {
-                    width: 18,
-                    height: 18,
-                    borderWidth: 1.5,
-                    borderColor: colors.placeholder,
-                    borderRadius: 4,
-                    backgroundColor: colors.surfaceMuted,
-                    marginRight: 10,
-                    justifyContent: "center",
-                    alignItems: "center"},
-                checkboxInner: {
-                    width: 10,
-                    height: 10,
-                    borderRadius: 2,
-                    backgroundColor: colors.accentBlue},
-                rememberText: {
-                    color: colors.bodyTextColor,
-                    ...FONTS.Mulish_400Regular,
-                    fontSize: 16},
-                linkText: {
-                    color: colors.linkColor,
-                    ...FONTS.Mulish_400Regular,
-                    fontSize: 16},
-                buttonGap: {
-                    marginBottom: 24},
-                footerRow: {
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "center"},
-                footerText: {
-                    ...FONTS.Mulish_400Regular,
-                    color: colors.bodyTextColor,
-                    fontSize: 16}}),
-        [colors, FONTS]
-    );
-
     return (
         <>
-            <Text style={[styles.title, isCompact && styles.titleCompact]}>{t.auth.appTitle}</Text>
-            <Text style={styles.subtitle}>{t.auth.appSubtitle}</Text>
-            <components.InputField
+            <components.AuthFormHeader subtitle={t.auth.appSubtitle} />
+
+            <AuthLabeledField
+                label={t.auth.emailLabel}
                 placeholder={t.auth.emailPlaceholder}
                 value={email}
                 onChangeText={onEmailChange}
@@ -194,46 +131,51 @@ const SignInForm = memo(function SignInForm({ t, navigation }: Props) {
                 authRole="email"
                 syncImmediately={Platform.OS !== "web"}
                 singleLine
-                containerStyle={styles.fieldGap}
             />
-            <components.InputField
+            <AuthLabeledField
+                label={t.auth.passwordLabel}
                 placeholder={t.auth.passwordPlaceholder}
                 value={password}
                 onChangeText={onPasswordChange}
                 inputRef={passwordInputRef}
-                secureTextEntry={true}
+                secureTextEntry
                 authRole="password"
                 syncImmediately={Platform.OS !== "web"}
                 singleLine
-                containerStyle={styles.fieldGapLarge}
+                fieldStyle={{ marginBottom: 16 }}
             />
-            <View style={styles.row}>
+
+            <View style={authStyles.row}>
                 <TouchableOpacity
-                    style={styles.rememberRow}
+                    style={authStyles.rememberRow}
                     onPress={() => setRememberMe((prev) => !prev)}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: rememberMe }}
                 >
-                    <View style={styles.checkbox}>
-                        {rememberMe ? <View style={styles.checkboxInner} /> : null}
+                    <View style={[authStyles.checkbox, rememberMe && authStyles.checkboxChecked]}>
+                        {rememberMe ? <Text style={authStyles.checkMark}>✓</Text> : null}
                     </View>
-                    <Text style={styles.rememberText}>{t.auth.rememberMe}</Text>
+                    <Text style={authStyles.rememberText}>{t.auth.rememberMe}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => navigation.navigate("ForgotPassword")}>
-                    <Text style={styles.linkText}>{t.auth.forgotPassword}</Text>
+                    <Text style={authStyles.linkText}>{t.auth.forgotPassword}</Text>
                 </TouchableOpacity>
             </View>
+
             <components.Button
                 title={t.auth.signIn}
                 onPress={handleSignIn}
                 loading={loading}
                 disabled={loading}
-                containerStyle={styles.buttonGap}
+                containerStyle={authStyles.buttonGap}
             />
-            <View style={styles.footerRow}>
-                <Text style={styles.footerText}>{t.auth.noAccount} </Text>
+
+            <components.AuthFormFooter>
+                <Text style={authStyles.mutedText}>{t.auth.noAccount} </Text>
                 <TouchableOpacity onPress={() => navigation.navigate("SignUp")}>
-                    <Text style={styles.linkText}>{t.auth.registerNow}</Text>
+                    <Text style={authStyles.linkText}>{t.auth.registerNow}</Text>
                 </TouchableOpacity>
-            </View>
+            </components.AuthFormFooter>
         </>
     );
 });

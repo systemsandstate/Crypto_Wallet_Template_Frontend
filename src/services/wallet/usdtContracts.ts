@@ -20,14 +20,4 @@ export const USDT_CONTRACTS: Record<
     decimals: 18,
     chainLabel: 'BNB Chain',
   },
-  SOL: {
-    contractAddress: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
-    decimals: 6,
-    chainLabel: 'Solana',
-  },
-  POLYGON: {
-    contractAddress: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F',
-    decimals: 6,
-    chainLabel: 'Polygon',
-  },
 };

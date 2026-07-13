@@ -1,5 +1,5 @@
 import { View, Text } from "react-native";
-import React, { useEffect, useMemo } from "react";
+import React, { useMemo } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch } from "react-redux";
 import { useAppSelector } from "../hooks/useAppSelector";
@@ -10,8 +10,6 @@ import { components } from "../components";
 import { RootState } from "../store/store";
 import { logoutAndNavigateToSignIn } from "../navigation/logoutAndNavigateToSignIn";
 import { unregisterPushTokenFromBackend } from "../services/pushNotifications";
-import { setAvatarUrl } from "../store/authSlice";
-import { getStoredAvatarUrlAsync } from "../utils/avatarStorage";
 import { confirmAction } from "../utils/confirm";
 import { useTranslation } from "../hooks/useTranslation";
 import { useTheme } from "../hooks/useTheme";
@@ -22,19 +20,9 @@ const Profile: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
     const navigation: any = useNavigation();
     const dispatch = useDispatch();
     const { t } = useTranslation();
-    const { colors, isDark, FONTS } = useTheme();
+    const { colors, FONTS } = useTheme();
     const pageStyles = useMemo(() => createMerchantTabPageStyles(colors), [colors]);
     const merchant = useAppSelector((state: RootState) => state.auth.merchant);
-    const avatarUrl = useAppSelector((state: RootState) => state.auth.avatarUrl);
-
-    useEffect(() => {
-        if (!merchant?.id || avatarUrl) return;
-        getStoredAvatarUrlAsync(merchant.id).then((stored) => {
-            if (stored) {
-                dispatch(setAvatarUrl({ merchantId: merchant.id, avatarUrl: stored }));
-            }
-        });
-    }, [merchant?.id, avatarUrl, dispatch]);
 
     const handleLogout = () => {
         confirmAction({
@@ -50,15 +38,15 @@ const Profile: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
         });
     };
 
-    const menuIconColor = isDark ? colors.pureWhite : colors.mainDark;
+    const menuIconColor = colors.icon;
 
     const menu = (
         <components.MerchantContent style={{ paddingVertical: 20 }}>
             <components.ProfileCategory
-                title={t.wallet.walletsTitle}
+                title={t.wallet.myWalletTitle}
                 icon={<svg.MyWalletSvg size={MENU_ICON_SIZE} color={menuIconColor} />}
                 rightElement={<svg.ArrowOneSvg />}
-                onPress={() => navigation.navigate("Wallets")}
+                onPress={() => navigation.navigate("MyWallet")}
             />
             <components.ProfileCategory
                 title={t.profile.editBusinessInfo}

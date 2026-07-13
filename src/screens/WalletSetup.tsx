@@ -1,8 +1,10 @@
-import { View, Text,  ScrollView, StyleSheet, Platform } from "react-native";
-import React, { useEffect, useState, useMemo } from "react";
+import { View, Text, StyleSheet, Platform, Modal, Animated } from "react-native";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { components } from "../components";
+import FormScrollView from "../components/FormScrollView";
+import type { InputFieldHandle } from "../components/InputField";
 import { useTranslation } from "../hooks/useTranslation";
 import { useTheme } from "../hooks/useTheme";
 import {
@@ -10,20 +12,24 @@ import {
     isValidMnemonic,
     deriveAllAddresses,
     encryptMnemonic,
-    addressesToWalletPayload,
     type DerivedWalletAddresses} from "../services/wallet/walletCore";
 import { restoreLocalWalletFromSetup } from "../services/wallet/walletStorage";
 import { syncWalletAddressesInBackground } from "../services/wallet/syncDeviceWallet";
+import { resolveTrc20ReceiveForSetup } from "../services/wallet/trc20ReceiveAddress";
+import { UsdtNetwork } from "../constants/usdtNetworks";
 import { navigateUp } from "../navigation/navigateUp";
 import SetupStepHeader from "../components/SetupStepHeader";
 import { USDT_NETWORKS } from "../constants/usdtNetworks";
 import { getLocalizedNetworkLabel } from "../i18n/network";
 import { triggerDashboardRefresh } from "../utils/dashboardRefresh";
 import { appAlert } from '../utils/appAlert';
+import { blurActiveElement } from "../utils/blurActiveElement";
 import { triggerWalletSetupRefresh } from "../utils/walletSetupRefresh";
-import { runWhenIdle } from "../utils/runWhenIdle";
+import { yieldToUi } from "../utils/yieldToUi";
+import { useSmoothSetupProgress } from "../hooks/useSmoothSetupProgress";
 
 type Step = "choose" | "backup" | "import" | "pin" | "done";
+type SetupPhase = "idle" | "preparing" | "verifying" | "encrypting" | "saving";
 
 const WalletSetup: React.FC = ({ navigation, route }: any) => {
     const { t } = useTranslation();
@@ -36,9 +42,15 @@ const WalletSetup: React.FC = ({ navigation, route }: any) => {
     const [confirmedBackup, setConfirmedBackup] = useState(false);
     const [isImportPath, setIsImportPath] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [setupPhase, setSetupPhase] = useState<SetupPhase>("idle");
+    const setupProgress = useSmoothSetupProgress();
     const [derivedAddresses, setDerivedAddresses] = useState<DerivedWalletAddresses | null>(null);
+    const [doneAddresses, setDoneAddresses] = useState<Record<string, string>>({});
+    const [trc20ReceiveDisplay, setTrc20ReceiveDisplay] = useState("");
+    const trc20OwnerRef = useRef("");
+    const pinRef = useRef<InputFieldHandle>(null);
+    const confirmPinRef = useRef<InputFieldHandle>(null);
     const startAction = route.params?.startAction as "create" | "import" | undefined;
-    const isAddMode = Boolean(route.params?.addWallet);
 
     const styles = useMemo(
         () =>
@@ -113,25 +125,53 @@ const WalletSetup: React.FC = ({ navigation, route }: any) => {
                     textAlign: "center",
                     marginBottom: 16},
                 loadingOverlay: {
-                    position: Platform.OS === "web" ? ("fixed" as "absolute") : "absolute",
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
+                    flex: 1,
                     alignItems: "center",
                     justifyContent: "center",
-                    backgroundColor: isDark ? "rgba(14, 14, 19, 0.55)" : "rgba(15, 23, 42, 0.28)",
-                    zIndex: 1000,
-                    elevation: 1000,
+                    backgroundColor: isDark ? "rgba(14, 14, 19, 0.55)" : "rgba(15, 23, 42, 0.28)"},
+                loadingCard: {
+                    alignItems: "center",
+                    justifyContent: "center",
+                    paddingHorizontal: 28,
+                    paddingVertical: 24,
+                    borderRadius: 16,
+                    backgroundColor: colors.white,
+                    maxWidth: 320,
+                    width: "88%",
                     ...(Platform.OS === "web"
-                        ? ({
-                              inset: 0,
-                              width: "100vw",
-                              height: "100vh",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center"} as object)
-                        : {})}}),
+                        ? ({ boxShadow: "0 8px 32px rgba(15, 23, 42, 0.18)" } as object)
+                        : {
+                              shadowColor: "#0F172A",
+                              shadowOffset: { width: 0, height: 8 },
+                              shadowOpacity: 0.16,
+                              shadowRadius: 16,
+                              elevation: 8,
+                          })},
+                loadingText: {
+                    ...FONTS.Mulish_600SemiBold,
+                    fontSize: 15,
+                    color: colors.mainDark,
+                    textAlign: "center",
+                    marginTop: 16,
+                    lineHeight: 22},
+                loadingHint: {
+                    ...FONTS.Mulish_400Regular,
+                    fontSize: 13,
+                    color: colors.bodyTextColor,
+                    textAlign: "center",
+                    marginTop: 10,
+                    lineHeight: 18},
+                progressTrack: {
+                    marginTop: 14,
+                    width: "100%",
+                    height: 6,
+                    borderRadius: 999,
+                    backgroundColor: colors.surfaceMuted,
+                    overflow: "hidden"},
+                progressFill: {
+                    height: "100%",
+                    borderRadius: 999,
+                    backgroundColor: colors.accentBlue}}),
         [colors, FONTS, isDark]
     );
 
@@ -152,11 +192,37 @@ const WalletSetup: React.FC = ({ navigation, route }: any) => {
 
     useEffect(() => {
         if (step !== "pin" || !mnemonic) return;
-        const task = runWhenIdle(() => {
-            setDerivedAddresses(deriveAllAddresses(mnemonic));
-        });
-        return () => task.cancel();
+        setDerivedAddresses(deriveAllAddresses(mnemonic));
     }, [step, mnemonic]);
+
+    const buildSetupWallets = (
+        derived: DerivedWalletAddresses,
+        trc20Receive: string
+    ): Array<{ network: UsdtNetwork; address: string }> => [
+        { network: "TRC20", address: trc20Receive },
+        { network: "ERC20", address: derived.ERC20 },
+        { network: "BEP20", address: derived.BEP20 },
+    ];
+
+    const setupStatusMessage = useMemo(() => {
+        switch (setupPhase) {
+            case "verifying":
+                return t.wallet.setupImportVerifying;
+            case "encrypting":
+                return t.wallet.setupEncrypting;
+            case "saving":
+                return t.wallet.setupSaving;
+            case "preparing":
+            default:
+                return t.wallet.setupFinishing;
+        }
+    }, [
+        setupPhase,
+        t.wallet.setupEncrypting,
+        t.wallet.setupFinishing,
+        t.wallet.setupImportVerifying,
+        t.wallet.setupSaving,
+    ]);
 
     const handleCreate = () => {
         try {
@@ -168,58 +234,105 @@ const WalletSetup: React.FC = ({ navigation, route }: any) => {
         }
     };
 
-    const handleImportNext = () => {
+    const handleImportNext = async () => {
+        blurActiveElement();
         const phrase = importPhrase.trim().toLowerCase();
         if (!isValidMnemonic(phrase)) {
             appAlert.alert(t.common.error, t.wallet.invalidMnemonic);
             return;
         }
-        setMnemonic(phrase);
-        setStep("pin");
+
+        setLoading(true);
+        setSetupPhase("verifying");
+        setupProgress.start({ durationMs: 12_000, cap: 0.92 });
+        try {
+            await yieldToUi();
+
+            const derived = deriveAllAddresses(phrase);
+            setupProgress.report(0.94);
+            setDerivedAddresses(derived);
+            setMnemonic(phrase);
+            await setupProgress.finish();
+            await new Promise((resolve) => setTimeout(resolve, 200));
+            setStep("pin");
+        } catch (err: any) {
+            appAlert.alert(t.common.error, err?.message || t.wallet.setupFailed);
+        } finally {
+            setSetupPhase("idle");
+            setupProgress.reset();
+            setLoading(false);
+        }
     };
 
     const finishSetup = async () => {
-        if (pin.length < 4) {
+        blurActiveElement();
+        pinRef.current?.blur();
+        confirmPinRef.current?.blur();
+
+        const pinValue = (pinRef.current?.getValue() ?? pin).trim();
+        const confirmValue = (confirmPinRef.current?.getValue() ?? confirmPin).trim();
+
+        if (pinValue.length < 4) {
             appAlert.alert(t.common.error, t.wallet.pinTooShort);
             return;
         }
-        if (pin !== confirmPin) {
+        if (pinValue !== confirmValue) {
             appAlert.alert(t.common.error, t.wallet.pinMismatch);
+            return;
+        }
+        if (!mnemonic.trim()) {
+            appAlert.alert(t.common.error, t.wallet.invalidMnemonic);
             return;
         }
 
         setLoading(true);
+        setSetupPhase("preparing");
+        setupProgress.reset();
         try {
-            const encrypted = await encryptMnemonic(mnemonic, pin);
-            const wallets = addressesToWalletPayload(
-                derivedAddresses ?? deriveAllAddresses(mnemonic)
-            );
+            await yieldToUi();
+
+            const derived = derivedAddresses ?? deriveAllAddresses(mnemonic);
+            setSetupPhase("encrypting");
+            setupProgress.start({ durationMs: 10_000, cap: 0.88 });
+            await yieldToUi();
+
+            const encrypted = await encryptMnemonic(mnemonic, pinValue, (percent) => {
+                setupProgress.report(0.12 + percent * 0.82);
+            });
+            const trc20Receive = await resolveTrc20ReceiveForSetup(derived.TRC20);
+            if (trc20Receive === derived.TRC20) {
+                throw new Error("Failed to resolve GasFree TRC20 receive address");
+            }
+            const wallets = buildSetupWallets(derived, trc20Receive);
+            trc20OwnerRef.current = derived.TRC20;
+            setTrc20ReceiveDisplay(trc20Receive);
+            setDoneAddresses(Object.fromEntries(wallets.map((row) => [row.network, row.address])));
+
+            setSetupPhase("saving");
+            setupProgress.report(0.96);
+            await yieldToUi();
+
             await restoreLocalWalletFromSetup({
                 encryptedMnemonic: encrypted,
-                addresses: wallets});
+                addresses: wallets,
+                trc20OwnerEoa: derived.TRC20,
+            });
             void syncWalletAddressesInBackground(wallets);
+            await setupProgress.finish();
+            await new Promise((resolve) => setTimeout(resolve, 200));
             setStep("done");
             triggerWalletSetupRefresh();
             triggerDashboardRefresh();
         } catch (err: any) {
             appAlert.alert(t.common.error, err.message || t.wallet.setupFailed);
         } finally {
+            setSetupPhase("idle");
+            setupProgress.reset();
             setLoading(false);
         }
     };
 
     const finishAndLeave = () => {
-        if (isAddMode) {
-            const routeNames = navigation.getState()?.routeNames ?? [];
-            if (routeNames.includes("Wallets")) {
-                navigation.navigate("Wallets");
-                return;
-            }
-            if (navigation.canGoBack()) {
-                navigation.goBack();
-                return;
-            }
-        }
         navigation.reset({ index: 0, routes: [{ name: "TabNavigator" }] });
     };
 
@@ -292,7 +405,12 @@ const WalletSetup: React.FC = ({ navigation, route }: any) => {
                 onChangeText={setImportPhrase}
                 containerStyle={{ marginBottom: 16 }}
             />
-            <components.Button title={t.wallet.continueSetup} onPress={handleImportNext} />
+            <components.Button
+                title={t.wallet.continueSetup}
+                onPress={() => void handleImportNext()}
+                loading={loading}
+                disabled={loading}
+            />
         </components.MerchantContent>
     );
 
@@ -308,6 +426,8 @@ const WalletSetup: React.FC = ({ navigation, route }: any) => {
                 placeholder={t.wallet.pinPlaceholder}
                 value={pin}
                 onChangeText={setPin}
+                inputRef={pinRef}
+                syncImmediately
                 secureTextEntry
                 keyboardType="numeric"
                 containerStyle={{ marginBottom: 12 }}
@@ -316,20 +436,26 @@ const WalletSetup: React.FC = ({ navigation, route }: any) => {
                 placeholder={t.wallet.confirmPinPlaceholder}
                 value={confirmPin}
                 onChangeText={setConfirmPin}
+                inputRef={confirmPinRef}
+                syncImmediately
                 secureTextEntry
                 keyboardType="numeric"
                 containerStyle={{ marginBottom: 16 }}
             />
             <components.Button
                 title={t.wallet.finishSetup}
-                onPress={finishSetup}
+                onPress={() => void finishSetup()}
+                loading={loading}
                 disabled={loading}
             />
         </components.MerchantContent>
     );
 
     const renderDone = () => {
-        const addresses = derivedAddresses ?? deriveAllAddresses(mnemonic);
+        const derived = derivedAddresses ?? deriveAllAddresses(mnemonic);
+        const trc20Display = trc20ReceiveDisplay || doneAddresses.TRC20 || "—";
+        const evmDisplay = doneAddresses.ERC20 || derived.ERC20 || "—";
+        const bnbDisplay = doneAddresses.BEP20 || derived.BEP20 || "—";
         return (
             <components.MerchantContent style={{ paddingTop: 24 }}>
                 <SetupStepHeader
@@ -342,12 +468,16 @@ const WalletSetup: React.FC = ({ navigation, route }: any) => {
                     <View key={network} style={styles.addressRow}>
                         <Text style={styles.networkLabel}>{getLocalizedNetworkLabel(network, t)}</Text>
                         <Text style={styles.addressText} selectable>
-                            {addresses[network] || "—"}
+                            {network === "TRC20"
+                                ? trc20Display
+                                : network === "ERC20"
+                                  ? evmDisplay
+                                  : bnbDisplay}
                         </Text>
                     </View>
                 ))}
                 <components.Button
-                    title={isAddMode ? t.wallet.doneAddWallet : t.wallet.goToDashboard}
+                    title={t.wallet.goToDashboard}
                     onPress={finishAndLeave}
                     containerStyle={{ marginTop: 20 }}
                 />
@@ -359,21 +489,39 @@ const WalletSetup: React.FC = ({ navigation, route }: any) => {
         <View style={{ flex: 1, backgroundColor: colors.bgColor }}>
             <SafeAreaView style={{ flex: 1 }}>
                 <components.Header
-                    title={isAddMode ? t.wallet.addWallet : t.wallet.setupTitle}
-                    goBack={step === "choose" || isAddMode}
+                    title={t.wallet.setupTitle}
+                    goBack={step === "choose"}
                 />
-                <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }}>
+                <FormScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }}>
                     {step === "choose" && renderChoose()}
                     {step === "backup" && renderBackup()}
                     {step === "import" && renderImport()}
                     {step === "pin" && renderPin()}
                     {step === "done" && renderDone()}
-                </ScrollView>
-                {loading ? (
+                </FormScrollView>
+                <Modal visible={loading} transparent animationType="fade" statusBarTranslucent>
                     <View style={styles.loadingOverlay} pointerEvents="auto">
-                        <components.LoadingSpinner size={48} />
+                        <View style={styles.loadingCard}>
+                            <components.LoadingSpinner size={48} />
+                            <Text style={styles.loadingText}>{setupStatusMessage}</Text>
+                            {setupPhase === "verifying" ? (
+                                <Text style={styles.loadingHint}>{t.wallet.setupImportHint}</Text>
+                            ) : null}
+                            {setupPhase === "encrypting" ? (
+                                <Text style={styles.loadingHint}>{t.wallet.setupEncryptingHint}</Text>
+                            ) : null}
+                            {setupPhase === "verifying" ||
+                            setupPhase === "encrypting" ||
+                            setupPhase === "saving" ? (
+                                <View style={styles.progressTrack}>
+                                    <Animated.View
+                                        style={[styles.progressFill, { width: setupProgress.width }]}
+                                    />
+                                </View>
+                            ) : null}
+                        </View>
                     </View>
-                ) : null}
+                </Modal>
             </SafeAreaView>
         </View>
     );

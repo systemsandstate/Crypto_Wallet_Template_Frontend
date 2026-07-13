@@ -1,22 +1,20 @@
-import { View, Text, TouchableOpacity, Platform, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import LoadingSpinner from "./LoadingSpinner";
-import React from "react";
-import { LinearGradient } from "expo-linear-gradient";
+import React, { useMemo } from "react";
 
-import { theme } from "../constants";
+import { useTheme } from "../hooks/useTheme";
+import { DENSITY } from "../constants/density";
 
 type Props = {
     containerStyle?: object;
-    onPress?: () => void;
+    onPress?: (event?: { preventDefault?: () => void }) => void;
     title?: string;
     leading?: React.ReactNode;
     loading?: boolean;
     disabled?: boolean;
     size?: "default" | "compact";
+    variant?: "primary" | "secondary";
 };
-
-const GRADIENT_COLORS = ["#96D9FE", "#1D5DA2"] as const;
-const SOLID_COLOR = "#1D5DA2";
 
 const Button: React.FC<Props> = ({
     title,
@@ -26,97 +24,78 @@ const Button: React.FC<Props> = ({
     loading = false,
     disabled = false,
     size = "default",
+    variant = "primary",
 }) => {
+    const { colors, FONTS } = useTheme();
     const isDisabled = disabled || loading;
     const compact = size === "compact";
-    const content = (
-        <>
-            {loading ? (
-                <LoadingSpinner size={22} style={styles.loader} />
-            ) : (
-                leading
-            )}
-            <Text
-                style={[
-                    styles.label,
-                    compact && styles.labelCompact,
-                    leading && !loading ? styles.labelWithLeading : null,
-                ]}
-            >
-                {title}
-            </Text>
-        </>
+    const primary = variant === "primary";
+
+    const styles = useMemo(
+        () =>
+            StyleSheet.create({
+                wrap: {
+                    width: "100%",
+                },
+                inner: {
+                    width: "100%",
+                    height: compact ? DENSITY.buttonHeightCompact : DENSITY.buttonHeight,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    borderRadius: compact ? 8 : 10,
+                    flexDirection: "row",
+                    backgroundColor: primary ? colors.accentBlue : colors.white,
+                    borderWidth: primary ? 0 : 1,
+                    borderColor: colors.border,
+                },
+                innerDisabled: {
+                    opacity: 0.55,
+                },
+                loader: {
+                    marginRight: 8,
+                },
+                label: {
+                    color: primary ? colors.pureWhite : colors.mainDark,
+                    ...FONTS.Mulish_600SemiBold,
+                    fontSize: compact ? 13 : 14,
+                    letterSpacing: 0.2,
+                },
+                labelWithLeading: {
+                    marginLeft: 10,
+                },
+            }),
+        [FONTS, colors, compact, primary]
     );
 
     return (
         <View style={[styles.wrap, containerStyle]}>
             <TouchableOpacity
-                onPress={onPress}
+                onPress={(event) => onPress?.(event as { preventDefault?: () => void })}
                 disabled={isDisabled}
-                activeOpacity={0.85}
+                activeOpacity={0.88}
             >
-                {Platform.OS === "android" ? (
-                    <View
+                <View style={[styles.inner, isDisabled && styles.innerDisabled]}>
+                    {loading ? (
+                        <LoadingSpinner
+                            size={22}
+                            shellColor={primary ? "rgba(255,255,255,0.3)" : colors.border}
+                            arcColor={primary ? colors.pureWhite : colors.accentBlue}
+                        />
+                    ) : (
+                        leading
+                    )}
+                    <Text
                         style={[
-                            styles.inner,
-                            compact && styles.innerCompact,
-                            styles.innerSolid,
-                            isDisabled && styles.innerDisabled,
+                            styles.label,
+                            leading && !loading ? styles.labelWithLeading : null,
                         ]}
                     >
-                        {content}
-                    </View>
-                ) : (
-                    <LinearGradient
-                        colors={[...GRADIENT_COLORS]}
-                        style={[styles.inner, compact && styles.innerCompact, isDisabled && styles.innerDisabled]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                    >
-                        {content}
-                    </LinearGradient>
-                )}
+                        {title}
+                    </Text>
+                </View>
             </TouchableOpacity>
         </View>
     );
 };
-
-const styles = StyleSheet.create({
-    wrap: {
-        width: "100%",
-    },
-    inner: {
-        width: "100%",
-        height: 50,
-        justifyContent: "center",
-        alignItems: "center",
-        borderRadius: 10,
-        flexDirection: "row",
-    },
-    innerCompact: {
-        height: 36,
-        borderRadius: 8,
-    },
-    innerSolid: {
-        backgroundColor: SOLID_COLOR,
-    },
-    innerDisabled: {
-        opacity: 0.7,
-    },
-    loader: {
-        marginRight: 8,
-    },
-    label: {
-        color: theme.COLORS.pureWhite,
-        ...theme.FONTS.Mulish_600SemiBold,
-        fontSize: 16,
-    },
-    labelCompact: {
-        fontSize: 13,
-    },
-    labelWithLeading: {
-        marginLeft: 10,
-    },
-});
 
 export default Button;

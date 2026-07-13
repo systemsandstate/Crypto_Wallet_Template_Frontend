@@ -1,26 +1,30 @@
-import { View, Text, Image} from "react-native";
+import { View, Text, Image, StyleSheet } from "react-native";
+import PaymentRequestQrPanel from "../components/PaymentRequestQrPanel";
 import LoadingSpinner from "../components/LoadingSpinner";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { components } from "../components";
-import { api, PaymentRequest } from "../services/api";
+import { PaymentRequest } from "../services/api";
 import { subscribePaymentStream } from "../services/paymentStream";
 import { useTranslation } from "../hooks/useTranslation";
 import { useTheme } from "../hooks/useTheme";
 import { getLocalizedNetworkLabel } from "../i18n/network";
+import { formatMessage } from "../i18n";
 import { USDT_NETWORKS, UsdtNetwork } from "../constants/usdtNetworks";
+import { formatUsdtAmount } from "../utils/formatAmount";
 import { showToast } from "../utils/toast";
-import { appAlert } from '../utils/appAlert';
 import { triggerDashboardRefresh } from "../utils/dashboardRefresh";
 
 const InvoiceSent: React.FC = ({ navigation, route }: any) => {
-    const { t } = useTranslation();
+    const { t, dateLocale } = useTranslation();
     const { colors, FONTS } = useTheme();
     const initial: PaymentRequest = route.params?.payment;
     const [payment, setPayment] = useState<PaymentRequest | null>(initial || null);
-    const [cancelling, setCancelling] = useState(false);
     const notifiedPaid = useRef(initial?.status === "PAID");
+
+    const isPaid = payment?.status === "PAID";
+    const isPending = payment?.status === "PENDING";
 
     useEffect(() => {
         if (!payment || payment.status !== "PENDING") return;
@@ -30,13 +34,13 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
             if (updated.status === "PAID" && !notifiedPaid.current) {
                 notifiedPaid.current = true;
                 showToast(
-                    `${t.payment.statusSuccess}: ${updated.amount} ${updated.currency}`,
+                    `${t.payment.statusSuccess}: ${formatUsdtAmount(updated.amount, dateLocale)} ${updated.currency}`,
                     "success"
                 );
                 triggerDashboardRefresh();
             }
         });
-    }, [payment?.id, payment?.status, t.payment.statusSuccess]);
+    }, [payment?.id, payment?.status, dateLocale, t.payment.statusSuccess]);
 
     const getStatusTitle = () => {
         if (!payment) return "";
@@ -47,26 +51,72 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
         return t.payment.paymentFailed;
     };
 
-    const handleCancel = () => {
-        if (!payment) return;
-        appAlert.alert(t.transaction.cancelPaymentTitle, t.transaction.cancelPaymentConfirm, [
-            { text: t.common.no, style: "cancel" },
-            {
-                text: t.transaction.yesCancel,
-                style: "destructive",
-                onPress: async () => {
-                    setCancelling(true);
-                    try {
-                        const res = await api.cancelPayment(payment.id);
-                        setPayment(res.data);
-                    } catch (err: any) {
-                        appAlert.alert(t.common.error, err.message || t.transaction.couldNotCancel);
-                    } finally {
-                        setCancelling(false);
-                    }
-                }},
-        ]);
-    };
+    const styles = useMemo(
+        () =>
+            StyleSheet.create({
+                root: {
+                    flex: 1,
+                    backgroundColor: colors.bgColor,
+                },
+                scrollContent: {
+                    paddingTop: 8,
+                    paddingBottom: 24,
+                },
+                heroIcon: {
+                    alignSelf: "center",
+                    marginBottom: 16,
+                    maxWidth: "70%",
+                    resizeMode: "contain",
+                },
+                heroIconPending: {
+                    width: 72,
+                    height: 72,
+                },
+                heroIconPaid: {
+                    width: 161,
+                    height: 150,
+                },
+                title: {
+                    textAlign: "center",
+                    ...FONTS.H2,
+                    marginBottom: 8,
+                },
+                amount: {
+                    textAlign: "center",
+                    ...FONTS.Mulish_700Bold,
+                    fontSize: 28,
+                    color: colors.mainDark,
+                    marginBottom: 8,
+                },
+                hint: {
+                    textAlign: "center",
+                    ...FONTS.Mulish_400Regular,
+                    fontSize: 14,
+                    color: colors.bodyTextColor,
+                    marginBottom: 12,
+                    paddingHorizontal: 8,
+                    lineHeight: 20,
+                },
+                reference: {
+                    textAlign: "center",
+                    ...FONTS.Mulish_400Regular,
+                    fontSize: 15,
+                    color: colors.bodyTextColor,
+                    marginBottom: 16,
+                },
+                qrSection: {
+                    width: "100%",
+                    marginBottom: 16,
+                },
+                statusRow: {
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 8,
+                },
+            }),
+        [FONTS, colors]
+    );
 
     if (!payment) {
         return (
@@ -76,156 +126,86 @@ const InvoiceSent: React.FC = ({ navigation, route }: any) => {
         );
     }
 
-    const isPaid = payment.status === "PAID";
-    const isPending = payment.status === "PENDING";
+    const amountLabel = `${formatUsdtAmount(payment.amount, dateLocale)} ${payment.currency}`;
     const networkLabel = (USDT_NETWORKS as readonly string[]).includes(payment.network)
         ? getLocalizedNetworkLabel(payment.network as UsdtNetwork, t)
         : payment.network;
 
     return (
-        <View style={{ flex: 1, backgroundColor: colors.bgColor }}>
-            <SafeAreaView style={{ flex: 1 }}>
+        <View style={styles.root}>
+            <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
                 <components.Header goBack={true} />
-                <components.ScreenScroll withTabBarInset={false}>
-                    <components.MerchantContent style={{ marginTop: 32, alignItems: "center", paddingBottom: 20 }}>
+                <components.ScreenScroll contentContainerStyle={styles.scrollContent}>
+                    <components.MerchantContent style={{ alignItems: "center" }}>
                         <Image
                             source={
                                 isPaid
                                     ? require("../assets/other-icons/21.png")
                                     : require("../assets/icons/26.png")
                             }
-                            style={{
-                                width: isPaid ? 161 : 100,
-                                height: isPaid ? 150 : 100,
-                                alignSelf: "center",
-                                marginBottom: 20,
-                                maxWidth: "70%",
-                                resizeMode: "contain"}}
+                            style={[
+                                styles.heroIcon,
+                                isPaid ? styles.heroIconPaid : styles.heroIconPending,
+                            ]}
                         />
                         <Text
-                            style={{
-                                textAlign: "center",
-                                ...FONTS.H2,
-                                color: isPaid ? colors.green : colors.mainDark,
-                                marginBottom: 12}}
+                            style={[
+                                styles.title,
+                                { color: isPaid ? colors.green : colors.mainDark },
+                            ]}
                         >
                             {getStatusTitle()}
                         </Text>
-                        <Text
-                            style={{
-                                textAlign: "center",
-                                ...FONTS.Mulish_700Bold,
-                                fontSize: 22,
-                                color: colors.mainDark,
-                                marginBottom: 8}}
-                        >
-                            {payment.amount} {payment.currency}
-                        </Text>
-                        <Text
-                            style={{
-                                textAlign: "center",
-                                ...FONTS.Mulish_400Regular,
-                                fontSize: 14,
-                                color: colors.bodyTextColor,
-                                marginBottom: 8}}
-                        >
-                            {t.network.networkLabel}{" "}
-                            {networkLabel}
-                            {payment.network ? ` (${payment.network})` : ""}
-                        </Text>
-                        {payment.reference && (
-                            <Text
-                                style={{
-                                    textAlign: "center",
-                                    ...FONTS.Mulish_400Regular,
-                                    fontSize: 16,
-                                    color: colors.bodyTextColor,
-                                    marginBottom: 16}}
-                            >
+                        <Text style={styles.amount}>{amountLabel}</Text>
+
+                        {isPaid ? (
+                            <Text style={styles.hint}>
+                                {formatMessage(t.payment.paidViaNetwork, { network: networkLabel })}
+                            </Text>
+                        ) : null}
+
+                        {payment.reference ? (
+                            <Text style={styles.reference}>
                                 {t.network.refLabel} {payment.reference}
                             </Text>
-                        )}
-                        {payment.failureReason && (
+                        ) : null}
+
+                        {payment.failureReason ? (
                             <Text
                                 style={{
                                     textAlign: "center",
                                     ...FONTS.Mulish_400Regular,
                                     fontSize: 14,
                                     color: "#FF8A71",
-                                    marginBottom: 16}}
+                                    marginBottom: 16,
+                                }}
                             >
                                 {payment.failureReason}
                             </Text>
-                        )}
+                        ) : null}
 
-                        {isPending && payment.qrCodeDataUrl && (
-                            <Image
-                                source={{ uri: payment.qrCodeDataUrl }}
-                                style={{
-                                    width: "100%",
-                                    maxWidth: 220,
-                                    aspectRatio: 1,
-                                    marginBottom: 16,
-                                    backgroundColor: colors.white,
-                                    borderRadius: 8,
-                                    alignSelf: "center"}}
-                            />
-                        )}
+                        {isPending ? (
+                            <View style={styles.qrSection}>
+                                <PaymentRequestQrPanel payment={payment} />
+                            </View>
+                        ) : null}
 
-                        {isPending && (payment.depositAddress || payment.paymentUrl) && (
-                            <View style={{ marginBottom: 16, width: "100%" }}>
-                                <Text
-                                    style={{
-                                        textAlign: "center",
-                                        ...FONTS.Mulish_400Regular,
-                                        fontSize: 13,
-                                        color: colors.bodyTextColor,
-                                        marginBottom: 6}}
-                                >
-                                    {t.wallet.sendToAddress}
-                                </Text>
-                                <Text
-                                    selectable
-                                    style={{
-                                        textAlign: "center",
-                                        ...FONTS.Mulish_600SemiBold,
-                                        fontSize: 12,
-                                        color: colors.mainDark,
-                                        lineHeight: 18}}
-                                >
-                                    {payment.depositAddress || payment.paymentUrl}
+                        {isPending ? (
+                            <View style={styles.statusRow}>
+                                <LoadingSpinner size={24} style={{ marginRight: 8 }} />
+                                <Text style={{ color: colors.bodyTextColor }}>
+                                    {t.transaction.checkingStatus}
                                 </Text>
                             </View>
-                        )}
+                        ) : null}
 
-                        {isPending && (
-                            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 24 }}>
-                                <LoadingSpinner size={28} style={{ marginRight: 8 }} />
-                                <Text style={{ color: colors.bodyTextColor }}>{t.transaction.checkingStatus}</Text>
-                            </View>
-                        )}
-
-                        {isPaid && (
+                        {isPaid ? (
                             <components.Button
                                 title={t.transaction.viewDetails}
                                 onPress={() => navigation.navigate("TransactionDetails", { payment })}
-                                containerStyle={{ width: "100%", marginBottom: 12 }}
+                                containerStyle={{ marginTop: 16 }}
                             />
-                        )}
-
-                        {isPending && (
-                            <components.Button
-                                title={cancelling ? t.transaction.cancelling : t.transaction.cancelPayment}
-                                onPress={handleCancel}
-                                containerStyle={{ width: "100%", marginBottom: 12 }}
-                            />
-                        )}
-
-                        <components.Button
-                            title={isPaid ? t.transaction.backToDashboard : t.common.done}
-                            onPress={() => navigation.navigate("Home")}
-                            containerStyle={{ width: "100%", marginBottom: 20 }}
-                        />
+                        ) : null}
                     </components.MerchantContent>
                 </components.ScreenScroll>
             </SafeAreaView>

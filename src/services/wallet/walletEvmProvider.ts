@@ -6,18 +6,22 @@ import { attachNativeFetchRequest } from '../../polyfills/ethersFetch';
 import { UsdtNetwork } from '../../constants/usdtNetworks';
 import { getAuthToken, hydrateAuthToken } from '../api';
 import {
-  addressesToWalletPayload,
-  decryptMnemonic,
-  deriveAllAddresses,
+  walletAddressesFromMnemonic,
   getPrivateKeyForNetwork,
+  unlockMnemonicWithPin,
+  WalletUnlockError,
 } from './walletCore';
-import { isWalletSetupLocally, loadEncryptedWallet, saveWalletAddresses, hydrateLocalWalletAddresses } from './walletStorage';
+import {
+  isWalletSetupLocally,
+  saveWalletAddresses,
+  hydrateLocalWalletAddresses,
+  ensureLocalWalletForUnlock,
+} from './walletStorage';
 import { syncWalletAddressesInBackground } from './syncDeviceWallet';
 
 const EVM_CHAIN_IDS: Partial<Record<UsdtNetwork, number>> = {
   ERC20: 1,
   BEP20: 56,
-  POLYGON: 137,
 };
 
 /** Public RPC endpoints for web (direct browser fetch). */
@@ -35,11 +39,6 @@ const WEB_RPC_URLS: Partial<Record<UsdtNetwork, string[]>> = {
     'https://bsc-dataseed3.binance.org',
     'https://bsc-dataseed4.binance.org',
   ],
-  POLYGON: [
-    'https://polygon-bor-rpc.publicnode.com',
-    'https://polygon-rpc.com',
-    'https://1rpc.io/matic',
-  ],
 };
 
 export class WalletSendError extends Error {
@@ -49,7 +48,7 @@ export class WalletSendError extends Error {
   }
 }
 
-export const EVM_SEND_NETWORKS: UsdtNetwork[] = ['ERC20', 'BEP20', 'POLYGON'];
+export const EVM_SEND_NETWORKS: UsdtNetwork[] = ['ERC20', 'BEP20'];
 
 export type SendProgressStep = 'preparing' | 'signing' | 'broadcasting';
 
@@ -113,6 +112,22 @@ export async function resolveTxFeeOverrides(
   }
 
   return {};
+}
+
+export function getPublicEvmRpcUrl(network: UsdtNetwork): string | null {
+  const preferred = lastGoodWebRpcUrl[network];
+  const urls = WEB_RPC_URLS[network] || [];
+  return preferred ?? urls[0] ?? null;
+}
+
+export async function resolveWalletRpcUrl(network: UsdtNetwork): Promise<string> {
+  const token = getAuthToken() ?? (await hydrateAuthToken());
+  if (token) {
+    return `${API_BASE_URL}/merchant/wallets/evm-rpc/${network}`;
+  }
+  const urls = WEB_RPC_URLS[network] || [];
+  const preferred = lastGoodWebRpcUrl[network];
+  return preferred ?? urls[0] ?? '';
 }
 
 /**
@@ -192,25 +207,26 @@ export async function unlockWalletSigner(
     throw new WalletSendError('Send is only supported on BEP20, ERC20, and Polygon for now');
   }
 
-  if (!(await isWalletSetupLocally())) {
+  if (!(await ensureLocalWalletForUnlock())) {
     throw new WalletSendError('Wallet not set up on this device');
-  }
-
-  const encrypted = await loadEncryptedWallet();
-  if (!encrypted) {
-    throw new WalletSendError('Wallet not found on this device');
   }
 
   let mnemonic: string;
   try {
-    mnemonic = await decryptMnemonic(encrypted, pin);
-  } catch {
-    throw new WalletSendError('Invalid wallet PIN');
+    mnemonic = await unlockMnemonicWithPin(pin);
+  } catch (err) {
+    if (err instanceof WalletUnlockError) {
+      if (err.code === 'WRONG_PIN') throw new WalletSendError('Invalid wallet PIN');
+      throw new WalletSendError(err.message);
+    }
+    throw mapSendError(err);
   }
 
   const existingAddresses = await hydrateLocalWalletAddresses();
-  if (!existingAddresses?.length) {
-    const wallets = addressesToWalletPayload(deriveAllAddresses(mnemonic));
+  const wallets = walletAddressesFromMnemonic(mnemonic);
+  const existingTrc20 = existingAddresses?.find((row) => row.network === 'TRC20')?.address;
+  const nextTrc20 = wallets.find((row) => row.network === 'TRC20')?.address;
+  if (!existingAddresses?.length || existingTrc20 !== nextTrc20) {
     void saveWalletAddresses(wallets);
     void syncWalletAddressesInBackground(wallets);
   }
@@ -249,7 +265,7 @@ export function mapSendError(err: unknown, fallback = 'Transaction failed'): Wal
   if (/too many|rate|limit exceeded|detect network|failed to fetch|network error|network request failed|network request timed out|timeout|aborted/i.test(lower)) {
     return new WalletSendError('Network RPC is not configured');
   }
-  if (/crypto\.getrandomvalues|getrandomvalues|randombytes|textencoder|textdecoder|buffer is not defined/i.test(lower)) {
+    if (/crypto\.getrandomvalues|getrandomvalues|randombytes|textencoder|textdecoder|buffer is not defined|property ['\"]buffer['\"]/i.test(lower)) {
     return new WalletSendError(
       'This device is missing secure crypto support. Close and reopen the app, then try again.'
     );

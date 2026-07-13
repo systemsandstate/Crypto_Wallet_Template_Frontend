@@ -8,22 +8,32 @@ import {
     View,
 } from "react-native";
 
+import { useTabBarInset } from "../hooks/useTabBarInset";
+
 type Props = ScrollViewProps & {
     children: React.ReactNode;
     keyboardVerticalOffset?: number;
+    withTabBarInset?: boolean;
 };
 
 const FormScrollView: React.FC<Props> = ({
     children,
     keyboardVerticalOffset = Platform.OS === "ios" ? 72 : 0,
+    withTabBarInset = false,
     contentContainerStyle,
     ...scrollProps
 }) => {
+    const tabBarInset = useTabBarInset(withTabBarInset ? 8 : 0);
+
     const scroll = (
         <ScrollView
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={[styles.content, contentContainerStyle]}
+            contentContainerStyle={[
+                styles.content,
+                withTabBarInset ? { paddingBottom: tabBarInset } : null,
+                contentContainerStyle,
+            ]}
             {...scrollProps}
         >
             {children}

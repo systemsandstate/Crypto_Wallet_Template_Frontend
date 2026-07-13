@@ -20,6 +20,7 @@ import { formatMessage } from "../i18n";
 import { getLocalizedNetworkLabel } from "../i18n/network";
 import { loadAddressBook, type AddressBookEntry } from "../services/addressBookStorage";
 import { RootState } from "../store/store";
+import { entrySupportsNetwork, getAddressBookEntryAddress } from "../utils/addressBookNetworks";
 
 type Props = {
     visible: boolean;
@@ -43,7 +44,7 @@ const AddressBookPickerModal: React.FC<Props> = ({ visible, network, onClose, on
         }
         setLoading(true);
         const items = await loadAddressBook(merchant.id);
-        setEntries(items.filter((entry) => entry.network === network));
+        setEntries(items.filter((entry) => entrySupportsNetwork(entry, network)));
         setLoading(false);
     }, [merchant?.id, network]);
 
@@ -187,28 +188,35 @@ const AddressBookPickerModal: React.FC<Props> = ({ visible, network, onClose, on
                         ) : entries.length === 0 ? (
                             <Text style={styles.empty}>{t.withdraw.addressBookEmptyForNetwork}</Text>
                         ) : (
-                            entries.map((entry) => (
+                            entries.map((entry) => {
+                                const entryAddress = getAddressBookEntryAddress(entry, network) ?? entry.address;
+                                return (
                                 <TouchableOpacity
                                     key={entry.id}
                                     style={styles.row}
                                     activeOpacity={0.75}
                                     onPress={() => {
-                                        onSelect(entry);
+                                        onSelect({
+                                            ...entry,
+                                            address: entryAddress,
+                                            network,
+                                        });
                                         onClose();
                                     }}
                                 >
-                                    <NetworkLogo network={entry.network} size={32} />
+                                    <NetworkLogo network={network} size={32} />
                                     <View style={styles.meta}>
                                         <Text style={styles.name} numberOfLines={1}>
                                             {entry.name}
                                         </Text>
                                         <Text style={styles.address} numberOfLines={2}>
-                                            {entry.address}
+                                            {entryAddress}
                                         </Text>
                                     </View>
-                                    <Text style={styles.networkText}>{entry.network}</Text>
+                                    <Text style={styles.networkText}>{network}</Text>
                                 </TouchableOpacity>
-                            ))
+                            );
+                            })
                         )}
                     </ScrollView>
                 </Pressable>

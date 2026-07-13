@@ -6,13 +6,13 @@ import {
     ScrollView,
     Modal,
     TextInput,
-    Share,
     Platform,
     KeyboardAvoidingView,
 } from "react-native";
-import React, { useMemo, useState, useCallback } from "react";
-import { SafeAreaView } from "react-native-safe-area-context";
+import React, { useMemo, useState, useCallback, useRef } from "react";
 import { useFocusEffect } from "@react-navigation/native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useInitialScreenLoad } from "../hooks/useInitialScreenLoad";
 import QRCode from "react-native-qrcode-svg";
 
 import { components } from "../components";
@@ -29,11 +29,13 @@ import {
     getReceiveAssetSymbol,
     splitAddressLines,
 } from "../utils/walletQrPayload";
+import { buildReceiveShareMessage } from "../utils/buildReceiveShareMessage";
+import { shareReceivePayment, type QrSvgRef } from "../utils/shareReceivePayment";
 import { svg } from "../svg";
 
 type RouteParams = {
-    network: UsdtNetwork;
-    address: string;
+    network?: UsdtNetwork;
+    address?: string;
     asset?: ReceiveAsset;
 };
 
@@ -43,17 +45,23 @@ const WalletReceive: React.FC = ({ navigation, route }: any) => {
     const { t } = useTranslation();
     const { colors, FONTS } = useTheme();
     const routeParams = route.params as RouteParams;
-    const [selectedNetwork, setSelectedNetwork] = useState<UsdtNetwork>(routeParams.network);
+    const [selectedNetwork, setSelectedNetwork] = useState<UsdtNetwork>(
+        routeParams.network ?? "BEP20"
+    );
     const [selectedAsset, setSelectedAsset] = useState<ReceiveAsset>(routeParams.asset ?? "USDT");
     const [wallets, setWallets] = useState<MerchantWallet[]>([]);
     const [amount, setAmount] = useState<string>("");
     const [amountModalVisible, setAmountModalVisible] = useState(false);
     const [draftAmount, setDraftAmount] = useState("");
+    const qrRef = useRef<QrSvgRef | null>(null);
 
     const address = useMemo(() => {
         const wallet = wallets.find((w) => w.network === selectedNetwork);
-        if (wallet?.address) return wallet.address;
-        if (selectedNetwork === routeParams.network) return routeParams.address;
+        const fromWallet = wallet?.address?.trim();
+        if (fromWallet) return fromWallet;
+        if (selectedNetwork === routeParams.network) {
+            return routeParams.address?.trim() ?? "";
+        }
         return "";
     }, [wallets, selectedNetwork, routeParams.address, routeParams.network]);
 
@@ -70,7 +78,7 @@ const WalletReceive: React.FC = ({ navigation, route }: any) => {
             address
                 ? buildWalletQrPayload(selectedNetwork, address, parsedAmount, selectedAsset)
                 : "",
-        [selectedNetwork, address, parsedAmount, selectedAsset]
+        [address, parsedAmount, selectedAsset, selectedNetwork]
     );
 
     const addressLines = useMemo(() => splitAddressLines(address), [address]);
@@ -238,7 +246,7 @@ const WalletReceive: React.FC = ({ navigation, route }: any) => {
         const copied = await copyToClipboard(address);
         if (copied) {
             showToast(
-                formatMessage(t.transaction.copiedToClipboard, { label: assetSymbol })
+                formatMessage(t.wallet.accountNumberCopied, { network: selectedNetwork })
             );
         } else {
             showToast(t.transaction.couldNotCopy, "error");
@@ -246,28 +254,40 @@ const WalletReceive: React.FC = ({ navigation, route }: any) => {
     }, [address, assetSymbol, t]);
 
     const handleShare = useCallback(async () => {
-        const message = isUsdt
-            ? formatMessage(t.wallet.shareMessage, { network: selectedNetwork, address })
-            : formatMessage(t.wallet.shareMessageNative, {
-                  symbol: assetSymbol,
-                  network: selectedNetwork,
-                  address,
-              });
-        try {
-            if (Platform.OS === "web" && typeof navigator !== "undefined" && navigator.share) {
-                await navigator.share({ title: t.wallet.receiveTitle, text: message });
-                return;
-            }
-            await Share.share({ message, title: t.wallet.receiveTitle });
-        } catch {
-            const copied = await copyToClipboard(message);
-            if (copied) {
-                showToast(t.wallet.shareCopiedFallback);
-            } else {
-                showToast(t.wallet.shareFailed, "error");
-            }
+        if (!address || !qrValue) {
+            showToast(t.wallet.addressUnavailable, "error");
+            return;
         }
-    }, [address, assetSymbol, isUsdt, selectedNetwork, t]);
+
+        const message = buildReceiveShareMessage({
+            t,
+            network: selectedNetwork,
+            address,
+            amount: parsedAmount,
+            assetSymbol,
+            isUsdt,
+        });
+
+        try {
+            const result = await shareReceivePayment({
+                title: t.wallet.receiveTitle,
+                subject: t.wallet.shareSubject,
+                message,
+                qrValue,
+                qrSvgRef: qrRef.current,
+            });
+
+            if (result === "shared") {
+                showToast(t.wallet.shareOpened);
+            } else if (result === "email") {
+                showToast(t.wallet.shareEmailFallback);
+            } else if (result === "copied") {
+                showToast(t.wallet.shareCopiedFallback);
+            }
+        } catch {
+            showToast(t.wallet.shareFailed, "error");
+        }
+    }, [address, assetSymbol, isUsdt, parsedAmount, qrValue, selectedNetwork, t]);
 
     const openAmountModal = () => {
         setDraftAmount(amount);
@@ -284,6 +304,15 @@ const WalletReceive: React.FC = ({ navigation, route }: any) => {
         setAmountModalVisible(false);
     };
 
+    useInitialScreenLoad(async () => {
+        try {
+            const res = await api.getWallets();
+            setWallets(res.data?.wallets ?? []);
+        } catch {
+            setWallets([]);
+        }
+    });
+
     useFocusEffect(
         useCallback(() => {
             if (routeParams.network) {
@@ -293,22 +322,6 @@ const WalletReceive: React.FC = ({ navigation, route }: any) => {
                 setSelectedAsset(routeParams.asset);
             }
         }, [routeParams.asset, routeParams.network])
-    );
-
-    useFocusEffect(
-        useCallback(() => {
-            let cancelled = false;
-            api.getWallets()
-                .then((res) => {
-                    if (!cancelled) setWallets(res.data.wallets);
-                })
-                .catch(() => {
-                    if (!cancelled) setWallets([]);
-                });
-            return () => {
-                cancelled = true;
-            };
-        }, [])
     );
 
     return (
@@ -349,6 +362,9 @@ const WalletReceive: React.FC = ({ navigation, route }: any) => {
                         <View style={styles.qrWrap}>
                             {address && qrValue ? (
                                 <QRCode
+                                    getRef={(ref) => {
+                                        qrRef.current = ref;
+                                    }}
                                     value={qrValue}
                                     size={220}
                                     logo={isUsdt ? USDT_LOGO : undefined}
@@ -369,6 +385,12 @@ const WalletReceive: React.FC = ({ navigation, route }: any) => {
                         )}
 
                         <View style={styles.addressBlock}>
+                            <Text style={[styles.amountHint, { marginBottom: 6, color: colors.bodyTextColor }]}>
+                                {formatMessage(t.payment.qrNetworkReceive, {
+                                    network: networkLabel,
+                                    short: selectedNetwork,
+                                })}
+                            </Text>
                             {addressLines.map((line, i) => (
                                 <Text key={i} style={styles.addressLine} selectable>
                                     {line}

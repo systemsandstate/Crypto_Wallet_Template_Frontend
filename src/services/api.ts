@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
+import { walletsForServerSync } from '../utils/walletSync';
 
 const TOKEN_STORAGE_KEY = 'accessToken';
 
@@ -9,6 +10,7 @@ export interface Merchant {
   email: string;
   businessName: string;
   phone: string | null;
+  avatarUrl?: string | null;
   status: string;
   createdAt: string;
   lastLoginAt: string | null;
@@ -309,7 +311,7 @@ export const api = {
       suppressSessionExpired: true,
     }),
 
-  updateProfile: (body: { businessName?: string; phone?: string | null }) =>
+  updateProfile: (body: { businessName?: string; phone?: string | null; avatarUrl?: string | null }) =>
     request<{ success: boolean; data: Merchant }>('/merchant/profile', {
       method: 'PATCH',
       body: JSON.stringify(body),
@@ -381,6 +383,31 @@ export const api = {
     }>(`/merchant/wallets/balances${q}`);
   },
 
+  lookupWalletRecipient: (params: { address?: string; email?: string; network?: string }) => {
+    const q = new URLSearchParams();
+    if (params.email?.trim()) {
+      q.set('email', params.email.trim().toLowerCase());
+    } else if (params.address?.trim()) {
+      q.set('address', params.address.trim());
+    }
+    if (params.network) q.set('network', params.network);
+    return request<{
+      success: boolean;
+      data: {
+        found: boolean;
+        businessName?: string;
+        merchantId?: string;
+        avatarUrl?: string | null;
+        network?: string;
+        isSelf?: boolean;
+        email?: string;
+        addresses?: Partial<Record<string, string>>;
+        defaultNetwork?: string;
+        resolvedAddress?: string;
+      };
+    }>(`/merchant/wallets/recipient-lookup?${q.toString()}`);
+  },
+
   getWalletTransfers: () =>
     cachedGet<{ success: boolean; data: { transfers: WalletTransfer[] } }>(
       '/merchant/wallets/transfers'
@@ -407,8 +434,20 @@ export const api = {
   syncWallets: (wallets: Array<{ network: string; address: string }>) =>
     request<{ success: boolean; data: { wallets: MerchantWallet[] } }>('/merchant/wallets/sync', {
       method: 'POST',
-      body: JSON.stringify({ wallets }),
+      body: JSON.stringify({ wallets: walletsForServerSync(wallets) }),
     }),
+
+  getGasFreeAccount: (ownerAddress: string) =>
+    request<{
+      success: boolean;
+      data: {
+        accountAddress: string;
+        gasFreeAddress: string;
+        active: boolean;
+        nonce: number;
+        allowSubmit: boolean;
+      };
+    }>(`/merchant/wallets/gasfree/${encodeURIComponent(ownerAddress.trim())}`),
 
   registerPushToken: (body: { token: string; platform?: string }) =>
     request<{ success: boolean; data: { registered: boolean } }>('/merchant/push-token', {

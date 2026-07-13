@@ -7,8 +7,6 @@ const NETWORK_LOGOS: Record<UsdtNetwork, number> = {
     TRC20: require("../assets/networks/tron.png"),
     ERC20: require("../assets/networks/ethereum.png"),
     BEP20: require("../assets/networks/bnb.png"),
-    SOL: require("../assets/networks/solana.png"),
-    POLYGON: require("../assets/networks/polygon.png"),
 };
 
 type Props = {

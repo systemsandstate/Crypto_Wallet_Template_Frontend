@@ -6,6 +6,11 @@ import FormScrollView from "./FormScrollView";
 import TeofinShadow from "./TeofinShadow";
 import SmallHeader from "./SmallHeader";
 import AuthScreenLayout from "./AuthScreenLayout";
+import AuthCardBrand from "./AuthCardBrand";
+import AuthFormHeader from "./AuthFormHeader";
+import AuthLabeledField from "./AuthLabeledField";
+import AuthFormFooter from "./AuthFormFooter";
+import KivoLogo from "./KivoLogo";
 import PaymentListItem from "./PaymentListItem";
 import MerchantBalanceCard from "./MerchantBalanceCard";
 import WalletQuickActions from "./WalletQuickActions";
@@ -28,6 +33,11 @@ const components = {
     TeofinShadow,
     SmallHeader,
     AuthScreenLayout,
+    AuthCardBrand,
+    AuthFormHeader,
+    AuthLabeledField,
+    AuthFormFooter,
+    KivoLogo,
     PaymentListItem,
     MerchantBalanceCard,
     WalletQuickActions,

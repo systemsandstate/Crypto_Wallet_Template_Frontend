@@ -1,37 +1,23 @@
-import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
-import { useDispatch } from "react-redux";
+import { useCallback, useMemo } from "react";
 
 import { COLORS, FONTS, getColors, SIZES } from "../constants/theme";
-import { setDarkMode, toggleDarkMode } from "../store/themeSlice";
-import store from "../store/store";
-
-const subscribe = (onStoreChange: () => void) => store.subscribe(onStoreChange);
-const getIsDark = () => store.getState().theme.isDark;
 
 export function useTheme() {
-    const dispatch = useDispatch();
-    const isDark = useSyncExternalStore(subscribe, getIsDark, getIsDark);
-    const colors = useMemo(() => getColors(isDark), [isDark]);
+    const isDark = false;
+    const colors = useMemo(() => {
+        const next = getColors(false);
+        Object.assign(COLORS, next);
+        return next;
+    }, []);
 
-    useEffect(() => {
-        Object.assign(COLORS, colors);
-    }, [colors]);
-
-    const onToggleDarkMode = useCallback(() => {
-        dispatch(toggleDarkMode());
-    }, [dispatch]);
-
-    const onSetDarkMode = useCallback(
-        (value: boolean) => {
-            dispatch(setDarkMode(value));
-        },
-        [dispatch]
-    );
+    const onSetDarkMode = useCallback(() => {
+        // Light-only UI.
+    }, []);
 
     return {
         colors,
         isDark,
-        toggleDarkMode: onToggleDarkMode,
+        toggleDarkMode: onSetDarkMode,
         setDarkMode: onSetDarkMode,
         FONTS,
         SIZES,

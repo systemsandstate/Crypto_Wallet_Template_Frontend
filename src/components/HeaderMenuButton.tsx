@@ -7,7 +7,6 @@ import {
     Platform,
     useWindowDimensions,
     Pressable,
-    Switch,
     Modal,
     Animated,
     Easing,
@@ -28,6 +27,7 @@ import { confirmAction } from "../utils/confirm";
 import type { AppColors } from "../constants/theme";
 import { FONTS } from "../constants/theme";
 import { MENU_ICON_SIZE } from "../constants/menuIcon";
+import { DENSITY } from "../constants/density";
 
 const LANGUAGE_OPTIONS: AppLocale[] = ["es", "en"];
 
@@ -65,30 +65,37 @@ const SettingsRow: React.FC<SettingsRowProps> = ({ icon, title, onPress, trailin
     );
 };
 
-const navigateProfileScreen = (screen: "Wallets" | "MyWallet" | "ProfileMain") => {
+const navigateProfileScreen = (screen: "MyWallet" | "ProfileMain") => {
     if (!navigationRef.isReady()) return;
     if (screen === "ProfileMain") {
         navigationRef.navigate("TabNavigator", { screen: "Profile" });
         return;
     }
-    // Open wallet screens on the root stack so we don't route through Profile.
     navigationRef.navigate(screen);
 };
 
 type HeaderMenuButtonProps = {
     /** Transparent trigger for use on the navy header bar. */
     variant?: "default" | "onHeader";
+    /** Match compact header icon buttons on the dashboard. */
+    triggerStyle?: "default" | "header";
 };
 
-const HeaderMenuButton: React.FC<HeaderMenuButtonProps> = ({ variant = "default" }) => {
+const HeaderMenuButton: React.FC<HeaderMenuButtonProps> = ({
+    variant = "default",
+    triggerStyle = "default",
+}) => {
     const dispatch = useDispatch();
     const [modalVisible, setModalVisible] = useState(false);
     const [languageExpanded, setLanguageExpanded] = useState(false);
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
     const { t, locale, setLocale } = useTranslation();
-    const { colors, isDark, setDarkMode } = useTheme();
+    const { colors, isDark } = useTheme();
     const onHeader = variant === "onHeader";
+    const compactHeaderTrigger = triggerStyle === "header";
+    const triggerSize = compactHeaderTrigger ? DENSITY.iconButton : 40;
+    const triggerIconSize = compactHeaderTrigger ? 22 : 22;
 
     // Web: compact right drawer. Mobile: most of the screen, capped for tablets.
     const panelWidth = useMemo(() => {
@@ -226,8 +233,8 @@ const HeaderMenuButton: React.FC<HeaderMenuButtonProps> = ({ variant = "default"
         });
     };
 
-    const openWallets = () => {
-        close(() => navigateProfileScreen("Wallets"));
+    const openMyWallet = () => {
+        close(() => navigateProfileScreen("MyWallet"));
     };
 
     const openProfile = () => {
@@ -250,67 +257,37 @@ const HeaderMenuButton: React.FC<HeaderMenuButtonProps> = ({ variant = "default"
         });
     };
 
-    const panelIconColor = isDark ? colors.pureWhite : colors.icon;
+    const panelIconColor = colors.icon;
 
     const triggerStyles = useMemo(
         () =>
             StyleSheet.create({
                 menuButtonWrap: {
-                    width: 40,
-                    height: 40,
+                    width: triggerSize,
+                    height: triggerSize,
                     alignItems: "center",
                     justifyContent: "center",
-                },
-                glowRing: {
-                    position: "absolute",
-                    width: 36,
-                    height: 36,
-                    borderRadius: 18,
-                    backgroundColor: onHeader
-                        ? "transparent"
-                        : isDark
-                          ? "rgba(255, 255, 255, 0.28)"
-                          : "rgba(27, 29, 77, 0.08)",
-                    shadowColor: isDark ? "#FFFFFF" : colors.mainDark,
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: onHeader ? 0 : isDark ? 0.9 : 0.2,
-                    shadowRadius: isDark ? 12 : 6,
-                    elevation: onHeader ? 0 : 10,
-                    ...(Platform.OS === "web"
-                        ? ({
-                              boxShadow: onHeader
-                                  ? "none"
-                                  : isDark
-                                    ? "0 0 16px rgba(255, 255, 255, 0.55)"
-                                    : "0 2px 10px rgba(27, 29, 77, 0.18)",
-                          } as object)
-                        : {}),
                 },
                 menuButton: {
-                    width: 40,
-                    height: 40,
-                    borderRadius: 20,
+                    width: triggerSize,
+                    height: triggerSize,
+                    borderRadius: triggerSize / 2,
                     alignItems: "center",
                     justifyContent: "center",
-                    backgroundColor: onHeader
-                        ? "transparent"
-                        : isDark
-                          ? "rgba(255, 255, 255, 0.12)"
-                          : colors.white,
-                    borderWidth: onHeader || isDark ? 0 : 1,
-                    borderColor: colors.border,
+                    backgroundColor: compactHeaderTrigger ? colors.white : colors.surfaceMuted,
+                    borderWidth: compactHeaderTrigger ? 1 : 0,
+                    borderColor: compactHeaderTrigger ? colors.border : colors.transparent,
                     ...(Platform.OS === "web"
                         ? ({
-                              boxShadow: "none",
                               cursor: "pointer",
                           } as object)
                         : {}),
                 },
             }),
-        [colors.border, colors.mainDark, colors.white, isDark, onHeader]
+        [colors.border, colors.surfaceMuted, colors.transparent, colors.white, compactHeaderTrigger, triggerSize]
     );
 
-    const gearColor = onHeader || isDark ? colors.pureWhite : colors.mainDark;
+    const gearColor = colors.icon;
 
     const panelStyles = useMemo(
         () =>
@@ -322,9 +299,7 @@ const HeaderMenuButton: React.FC<HeaderMenuButtonProps> = ({ variant = "default"
                     borderBottomLeftRadius: 16,
                     ...(Platform.OS === "web"
                         ? ({
-                              boxShadow: isDark
-                                  ? "-8px 0 32px rgba(0, 0, 0, 0.45)"
-                                  : "-8px 0 32px rgba(6, 38, 100, 0.18)",
+                              boxShadow: "-4px 0 16px rgba(0, 0, 0, 0.08)",
                               maxWidth: "100%",
                           } as object)
                         : {
@@ -405,18 +380,6 @@ const HeaderMenuButton: React.FC<HeaderMenuButtonProps> = ({ variant = "default"
     return (
         <>
             <View style={triggerStyles.menuButtonWrap}>
-                {!onHeader ? (
-                    <Animated.View
-                        style={[
-                            triggerStyles.glowRing,
-                            {
-                                opacity: glowOpacity,
-                                transform: [{ scale: glowScale }],
-                            },
-                        ]}
-                        pointerEvents="none"
-                    />
-                ) : null}
                 <TouchableOpacity
                     style={triggerStyles.menuButton}
                     onPress={openPanel}
@@ -425,7 +388,7 @@ const HeaderMenuButton: React.FC<HeaderMenuButtonProps> = ({ variant = "default"
                     activeOpacity={0.7}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                    <svg.SettingsGearSvg color={gearColor} size={24} />
+                    <svg.SettingsGearSvg color={gearColor} size={triggerIconSize} />
                 </TouchableOpacity>
             </View>
 
@@ -471,8 +434,8 @@ const HeaderMenuButton: React.FC<HeaderMenuButtonProps> = ({ variant = "default"
                         <View style={styles.settingsGroup}>
                             <SettingsRow
                                 icon={<svg.MyWalletSvg color={panelIconColor} size={MENU_ICON_SIZE} />}
-                                title={t.wallet.walletsTitle}
-                                onPress={openWallets}
+                                title={t.wallet.myWalletTitle}
+                                onPress={openMyWallet}
                                 colors={colors}
                             />
                             <View style={panelStyles.divider} />
@@ -481,21 +444,6 @@ const HeaderMenuButton: React.FC<HeaderMenuButtonProps> = ({ variant = "default"
                                 title={t.profile.yourAccount}
                                 onPress={openProfile}
                                 colors={colors}
-                            />
-                            <View style={panelStyles.divider} />
-                            <SettingsRow
-                                icon={<svg.MoonSvg color={panelIconColor} size={MENU_ICON_SIZE} />}
-                                title={t.common.darkMode}
-                                colors={colors}
-                                trailing={
-                                    <Switch
-                                        value={isDark}
-                                        onValueChange={setDarkMode}
-                                        trackColor={{ false: colors.grey1, true: colors.green }}
-                                        thumbColor="#FFFFFF"
-                                        ios_backgroundColor={colors.grey1}
-                                    />
-                                }
                             />
                             <View style={panelStyles.divider} />
                             <SettingsRow

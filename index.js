@@ -1,7 +1,8 @@
 import 'react-native-get-random-values';
+import { setupBufferPolyfill, setupCryptoPolyfills } from './src/polyfills/crypto';
+setupBufferPolyfill();
 import { setupTextEncodingPolyfills } from './src/polyfills/textEncoding';
 setupTextEncodingPolyfills();
-import { setupCryptoPolyfills } from './src/polyfills/crypto';
 setupCryptoPolyfills();
 import 'react-native-gesture-handler';
 import { enableScreens } from 'react-native-screens';
@@ -12,6 +13,9 @@ enableScreens(false);
 import { registerRootComponent } from 'expo';
 
 import App from './App';
+import { installSafeWebReloadPolyfill } from './src/polyfills/safeWebReload';
+
+installSafeWebReloadPolyfill();
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);
 // It also ensures that whether you load the app in Expo Go or in a native build,

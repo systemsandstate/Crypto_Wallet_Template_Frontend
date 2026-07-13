@@ -1,8 +1,9 @@
-import { Text, View, Image } from "react-native";
+import { Text, View } from "react-native";
 import LoadingSpinner from "../components/LoadingSpinner";
 import React, { useEffect, useState, useCallback } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import TransactionDetailAvatar from "../components/TransactionDetailAvatar";
 import { components } from "../components";
 import { theme } from "../constants";
 import { api, PaymentRequest } from "../services/api";
@@ -119,10 +120,7 @@ const TransactionDetails: React.FC = ({ navigation, route }: any) => {
                     contentContainerStyle={{ paddingBottom: tabBarInset }}
                 >
                     <components.MerchantContent>
-                        <Image
-                            source={require("../assets/icons/26.png")}
-                            style={{ width: 60, height: 60, alignSelf: "center", marginBottom: 30 }}
-                        />
+                        <TransactionDetailAvatar counterparty={null} isSend={false} />
                         <Text
                             style={{
                                 textAlign: "center",
@@ -184,7 +182,9 @@ const TransactionDetails: React.FC = ({ navigation, route }: any) => {
                         </View>
                         <View style={{ marginBottom: 24 }}>
                             <DetailItem leftTitle={t.transaction.paymentId} rightTitle={payment.id.slice(0, 8) + "…"} />
-                            <DetailItem leftTitle={t.network.field} rightTitle={payment.network} />
+                            {payment.network ? (
+                                <DetailItem leftTitle={t.network.field} rightTitle={payment.network} />
+                            ) : null}
                             <DetailItem leftTitle={t.transaction.amount} rightTitle={`${payment.amount} ${payment.currency}`} />
                             {payment.paidAmount && (
                                 <DetailItem leftTitle={t.transaction.paidAmount} rightTitle={`${payment.paidAmount} ${payment.currency}`} />

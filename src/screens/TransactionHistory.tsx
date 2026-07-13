@@ -11,8 +11,10 @@ import { RootState } from "../store/store";
 import { useTranslation } from "../hooks/useTranslation";
 import { useTheme } from "../hooks/useTheme";
 import { filterTransfersForActiveWallet, filterTransfersForDisplay } from "../utils/walletBalance";
-import { resolveWalletAddressesForFilter, syncDeviceWalletInBackground } from "../services/wallet/syncDeviceWallet";
+import { filterPaymentsForActivityFeed } from "../utils/walletActivityFeed";
+import { resolveWalletAddressesForBalanceFilter, prepareWalletContext } from "../services/wallet/syncDeviceWallet";
 import { createMerchantTabPageStyles } from "../styles/merchantTabPageChrome";
+import { useCounterpartyLabelsForTransfers } from "../hooks/useCounterpartyLabelsForTransfers";
 
 type HistoryRow =
     | { kind: "payment"; key: string; sortAt: number; payment: PaymentRequest }
@@ -21,19 +23,21 @@ type HistoryRow =
 const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
     const navigation: any = useNavigation();
     const { t } = useTranslation();
-    const { colors, FONTS, isDark } = useTheme();
+    const { colors, FONTS } = useTheme();
     const merchant = useAppSelector((state: RootState) => state.auth.merchant);
     const [payments, setPayments] = useState<PaymentRequest[]>([]);
     const [deposits, setDeposits] = useState<WalletTransfer[]>([]);
     const [loading, setLoading] = useState(true);
     const hasLoadedRef = useRef(false);
+    const loadInFlightRef = useRef(false);
     const [filter, setFilter] = useState("");
+
+    const getCounterpartyLabel = useCounterpartyLabelsForTransfers(deposits);
 
     const filters = [
         { label: t.payment.filterAll, value: "" },
         { label: t.payment.filterReceived, value: "DEPOSIT" },
         { label: t.payment.filterSent, value: "SEND" },
-        { label: t.payment.filterPending, value: "PENDING" },
         { label: t.payment.filterPaid, value: "PAID" },
         { label: t.payment.filterExpired, value: "EXPIRED" },
         { label: t.payment.filterFailed, value: "FAILED" },
@@ -54,7 +58,7 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                     bottom: 0,
                     alignItems: "center",
                     justifyContent: "center",
-                    backgroundColor: isDark ? "rgba(14, 14, 19, 0.55)" : "rgba(15, 23, 42, 0.28)",
+                    backgroundColor: colors.overlay,
                     zIndex: 20,
                     ...(Platform.OS === "web"
                         ? ({
@@ -90,21 +94,22 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                     textDecorationLine: "underline",
                 },
             }),
-        [FONTS, colors, embedded, isDark]
+        [FONTS, colors, embedded]
     );
 
     const load = useCallback((opts?: { force?: boolean }) => {
+        if (loadInFlightRef.current) return;
+        loadInFlightRef.current = true;
+
         const silent = hasLoadedRef.current;
         if (!silent) setLoading(true);
 
         void (async () => {
             try {
-                syncDeviceWalletInBackground();
                 if (opts?.force) {
                     invalidateCachedGet("/merchant/wallets/transfers");
                     if (
                         filter === "" ||
-                        filter === "PENDING" ||
                         filter === "PAID" ||
                         filter === "EXPIRED" ||
                         filter === "FAILED" ||
@@ -113,7 +118,8 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                         invalidateCachedGet("/payments/requests");
                     }
                 }
-                const activeAddresses = await resolveWalletAddressesForFilter();
+
+                const activeAddresses = await prepareWalletContext();
 
                 const needsTransfers =
                     filter === "" || filter === "DEPOSIT" || filter === "SEND";
@@ -124,7 +130,7 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                     const type = filter === "DEPOSIT" ? "DEPOSIT" : "SEND";
                     const transfers = filterTransfersForDisplay(
                         filterTransfersForActiveWallet(
-                            res.data.transfers.filter((row) => row.type === type),
+                            (res.data.transfers ?? []).filter((row) => row.type === type),
                             activeAddresses
                         )
                     );
@@ -144,11 +150,13 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                         transfersPromise!,
                     ]);
                     setPayments(
-                        paymentsResult.status === "fulfilled" ? paymentsResult.value.data.items : []
+                        paymentsResult.status === "fulfilled"
+                            ? paymentsResult.value.data.items ?? []
+                            : []
                     );
                     const transfersRaw =
                         transfersResult.status === "fulfilled"
-                            ? transfersResult.value.data.transfers
+                            ? transfersResult.value.data.transfers ?? []
                             : [];
                     setDeposits(
                         filterTransfersForDisplay(
@@ -159,7 +167,7 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                 }
 
                 const res = await paymentsPromise;
-                setPayments(res.data.items);
+                setPayments(res.data.items ?? []);
                 setDeposits([]);
             } catch {
                 if (!hasLoadedRef.current) {
@@ -168,6 +176,7 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                 }
             } finally {
                 hasLoadedRef.current = true;
+                loadInFlightRef.current = false;
                 setLoading(false);
             }
         })();
@@ -177,7 +186,9 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
 
     useFocusEffect(
         useCallback(() => {
-            load();
+            if (!hasLoadedRef.current) {
+                load();
+            }
         }, [load])
     );
 
@@ -190,14 +201,17 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
     const rows = useMemo((): HistoryRow[] => {
         const byTime = (a: HistoryRow, b: HistoryRow) => b.sortAt - a.sortAt;
 
-        const paymentRows: HistoryRow[] = payments.map((payment) => ({
+        const visiblePayments =
+            filter === "" ? filterPaymentsForActivityFeed(payments, deposits) : payments;
+
+        const paymentRows: HistoryRow[] = visiblePayments.map((payment) => ({
             kind: "payment",
             key: `payment:${payment.id}`,
             sortAt: new Date(payment.paidAt || payment.createdAt).getTime(),
             payment,
         }));
 
-        const depositRows: HistoryRow[] = deposits.map((deposit) => ({
+        const depositRows: Extract<HistoryRow, { kind: "deposit" }>[] = deposits.map((deposit) => ({
             kind: "deposit",
             key: deposit.id,
             sortAt: new Date(deposit.timestamp).getTime(),
@@ -206,19 +220,19 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
 
         if (filter === "DEPOSIT") {
             return depositRows
-                .filter((row) => row.deposit?.type === "DEPOSIT")
+                .filter((row) => row.deposit.type === "DEPOSIT")
                 .sort(byTime);
         }
         if (filter === "SEND") {
             return depositRows
-                .filter((row) => row.deposit?.type === "SEND")
+                .filter((row) => row.deposit.type === "SEND")
                 .sort(byTime);
         }
         if (filter === "") {
             return [...paymentRows, ...depositRows].sort(byTime);
         }
         return paymentRows
-            .filter((row) => row.payment?.status === filter)
+            .filter((row) => row.payment.status === filter)
             .sort(byTime);
     }, [payments, deposits, filter]);
 
@@ -251,16 +265,18 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                     key={f.value || "all"}
                     onPress={() => setFilter(f.value)}
                     style={{
-                        paddingHorizontal: 16,
+                        paddingHorizontal: 14,
                         paddingVertical: 8,
                         borderRadius: 20,
                         marginRight: 8,
-                        backgroundColor: filter === f.value ? colors.white : "rgba(255,255,255,0.14)",
+                        backgroundColor: filter === f.value ? colors.accentBlue : colors.surfaceMuted,
+                        borderWidth: 1,
+                        borderColor: filter === f.value ? colors.accentBlue : colors.border,
                     }}
                 >
                     <Text
                         style={{
-                            color: filter === f.value ? colors.mainDark : colors.white,
+                            color: filter === f.value ? colors.pureWhite : colors.bodyTextColor,
                             fontSize: 13,
                             ...FONTS.Mulish_600SemiBold,
                         }}
@@ -308,6 +324,7 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                             key={row.key}
                             item={row.deposit}
                             showDate
+                            counterparty={getCounterpartyLabel(row.deposit)}
                             onPress={() =>
                                 navigation.navigate("WalletDepositDetails", { deposit: row.deposit })
                             }

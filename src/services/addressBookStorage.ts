@@ -7,6 +7,8 @@ export type AddressBookEntry = {
     name: string;
     address: string;
     network: UsdtNetwork;
+    email?: string;
+    addresses?: Partial<Record<UsdtNetwork, string>>;
     createdAt: string;
 };
 
@@ -61,7 +63,7 @@ export async function removeAddressBookEntries(
 export async function updateAddressBookEntriesBatch(
     merchantId: string,
     ids: string[],
-    updates: Partial<Pick<AddressBookEntry, "name" | "address" | "network">>
+    updates: Partial<Pick<AddressBookEntry, "name" | "address" | "network" | "email" | "addresses">>
 ): Promise<AddressBookEntry[]> {
     if (ids.length === 0) return loadAddressBook(merchantId);
     const idSet = new Set(ids);
@@ -73,6 +75,7 @@ export async function updateAddressBookEntriesBatch(
                   ...updates,
                   name: updates.name?.trim() ?? entry.name,
                   address: updates.address?.trim() ?? entry.address,
+                  addresses: updates.addresses ?? entry.addresses,
               }
             : entry
     );
@@ -83,7 +86,7 @@ export async function updateAddressBookEntriesBatch(
 export async function updateAddressBookEntry(
     merchantId: string,
     id: string,
-    updates: Partial<Pick<AddressBookEntry, "name" | "address" | "network">>
+    updates: Partial<Pick<AddressBookEntry, "name" | "address" | "network" | "email" | "addresses">>
 ): Promise<AddressBookEntry[]> {
     const existing = await loadAddressBook(merchantId);
     const updated = existing.map((entry) =>
@@ -93,6 +96,7 @@ export async function updateAddressBookEntry(
                   ...updates,
                   name: updates.name?.trim() ?? entry.name,
                   address: updates.address?.trim() ?? entry.address,
+                  addresses: updates.addresses ?? entry.addresses,
               }
             : entry
     );

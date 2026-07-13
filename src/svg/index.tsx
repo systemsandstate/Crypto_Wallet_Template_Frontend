@@ -13,6 +13,7 @@ import UsdtMarkSvg from "./UsdtMarkSvg";
 import QrCodeSvg from "./QrCodeSvg";
 import CheckSvg from "./CheckSvg";
 import EyeOffSvg from "./EyeOffSvg";
+import EyeSvg from "./EyeSvg";
 import FacebookSvg from "./FacebookSvg";
 import TwitterSvg from "./TwitterSvg";
 import GoogleSvg from "./GoogleSvg";
@@ -48,6 +49,8 @@ import ShareSvg from "./ShareSvg";
 import SetAmountSvg from "./SetAmountSvg";
 import SendSvg from "./SendSvg";
 import ReceiveSvg from "./ReceiveSvg";
+import AtSignSvg from "./AtSignSvg";
+import EmailSvg from "./EmailSvg";
 
 const svg = {
     GoBackSvg,
@@ -65,6 +68,7 @@ const svg = {
     QrCodeSvg,
     CheckSvg,
     EyeOffSvg,
+    EyeSvg,
     FacebookSvg,
     TwitterSvg,
     GoogleSvg,
@@ -100,6 +104,8 @@ const svg = {
     SetAmountSvg,
     SendSvg,
     ReceiveSvg,
+    AtSignSvg,
+    EmailSvg,
 };
 
 export { svg };

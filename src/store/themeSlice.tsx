@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { createSlice } from "@reduxjs/toolkit";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const THEME_STORAGE_KEY = "appDarkMode";
@@ -17,16 +17,17 @@ const themeSlice = createSlice({
     name: "theme",
     initialState,
     reducers: {
-        setDarkMode: (state, action: PayloadAction<boolean>) => {
-            state.isDark = action.payload;
-            void AsyncStorage.setItem(THEME_STORAGE_KEY, action.payload ? "1" : "0");
+        setDarkMode: (state) => {
+            // App is light-only for the banking UI refresh.
+            state.isDark = false;
+            void AsyncStorage.setItem(THEME_STORAGE_KEY, "0");
         },
         toggleDarkMode: (state) => {
-            state.isDark = !state.isDark;
-            void AsyncStorage.setItem(THEME_STORAGE_KEY, state.isDark ? "1" : "0");
+            state.isDark = false;
+            void AsyncStorage.setItem(THEME_STORAGE_KEY, "0");
         },
-        hydrateTheme: (state, action: PayloadAction<boolean>) => {
-            state.isDark = action.payload;
+        hydrateTheme: (state) => {
+            state.isDark = false;
             state.hydrated = true;
         },
     },
@@ -34,13 +35,14 @@ const themeSlice = createSlice({
 
 export const { setDarkMode, toggleDarkMode, hydrateTheme } = themeSlice.actions;
 
+/** Always light — clears legacy dark preference saved when the app was dark-only. */
 export async function loadStoredTheme(): Promise<boolean> {
     try {
-        const stored = await AsyncStorage.getItem(THEME_STORAGE_KEY);
-        return stored === "1";
+        await AsyncStorage.removeItem(THEME_STORAGE_KEY);
     } catch {
-        return false;
+        // ignore
     }
+    return false;
 }
 
 export default themeSlice.reducer;

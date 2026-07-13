@@ -2,10 +2,10 @@ import { Platform, StyleSheet } from "react-native";
 
 import type { AppColors } from "../constants/theme";
 
-/** Matches MerchantTabHeader borderBottomLeft/RightRadius. */
-export const MERCHANT_HEADER_CURVE = 24;
+/** Flat header — no curve overlap in light banking layout. */
+export const MERCHANT_HEADER_CURVE = 0;
 
-/** Shared tab-screen layout: dark bg, header curve overlap, web flex fill. */
+/** Shared tab-screen layout: light bg, flat header. */
 export function createMerchantTabPageStyles(colors: Pick<AppColors, "bgColor">) {
     return StyleSheet.create({
         root: {
@@ -13,16 +13,14 @@ export function createMerchantTabPageStyles(colors: Pick<AppColors, "bgColor">) 
             backgroundColor: colors.bgColor,
         },
         headerWrap: {
-            zIndex: 30,
-            elevation: 30,
+            zIndex: 10,
+            backgroundColor: colors.bgColor,
         },
         contentArea: {
             flex: 1,
             minHeight: 0,
             position: "relative",
             overflow: "hidden",
-            marginTop: -MERCHANT_HEADER_CURVE,
-            paddingTop: MERCHANT_HEADER_CURVE,
             ...(Platform.OS === "web"
                 ? ({ height: "100%", display: "flex" } as object)
                 : {}),

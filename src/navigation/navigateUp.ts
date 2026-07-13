@@ -13,11 +13,11 @@ const STACK_PARENTS: Record<string, string> = {
     CreateInvoice: "Home",
     ReceiveSelect: "Home",
     SendSelect: "Home",
+    SendFundSelect: "Home",
     SendNetworkSelect: "SendSelect",
-    Withdraw: "SendSelect",
+    Withdraw: "SendFundSelect",
     AddressBookPicker: "Withdraw",
     InvoiceSent: "Home",
-    Wallets: "ProfileMain",
     MyWallet: "ProfileMain",
     WalletReceive: "MyWallet",
     WalletSetup: "ProfileMain",
@@ -42,8 +42,6 @@ const ROOT_PARENTS: Record<string, ParentTarget> = {
     CreateInvoice: { name: "TabNavigator", params: { screen: "Dashboard" } },
     InvoiceSent: { name: "TabNavigator", params: { screen: "Dashboard" } },
     WalletSetup: { name: "TabNavigator", params: { screen: "Profile" } },
-    // Root-stack Wallets is opened from Home; back should return to the homepage.
-    Wallets: { name: "TabNavigator", params: { screen: "Dashboard" } },
     MyWallet: { name: "TabNavigator", params: { screen: "Profile" } },
     WalletReceive: { name: "TabNavigator", params: { screen: "Profile" } },
     EditPersonalInfo: { name: "TabNavigator", params: { screen: "Profile" } },
@@ -74,6 +72,13 @@ function resolveParent(
         }
     }
 
+    if (routeName === "Withdraw") {
+        const returnScreen = routeParams?.returnScreen;
+        if (typeof returnScreen === "string" && isInNavigator(navigation, returnScreen)) {
+            return returnScreen;
+        }
+    }
+
     if (routeName === "TransactionDetails" || routeName === "WalletDepositDetails") {
         const stackParent = getSharedDetailParent(navigation);
         if (isInNavigator(navigation, stackParent)) {
@@ -93,14 +98,6 @@ function resolveParent(
 
     if (routeName === "WalletReceive" && isInNavigator(navigation, "MyWallet")) {
         return "MyWallet";
-    }
-
-    // Prefer Wallets when it is already on the stack (add-wallet / manage flow).
-    if (
-        (routeName === "WalletSetup" || routeName === "MyWallet") &&
-        (navigation.getState()?.routes ?? []).some((route) => route.name === "Wallets")
-    ) {
-        return "Wallets";
     }
 
     return ROOT_PARENTS[routeName] ?? stackParent ?? null;

@@ -1,8 +1,9 @@
 import type { UsdtNetwork } from "../constants/usdtNetworks";
 import type { AddressBookEntry } from "../services/addressBookStorage";
+import { getAddressBookEntryAddress } from "./addressBookNetworks";
 
 export const normalizeAddressForMatch = (network: UsdtNetwork, address: string): string => {
-    if (network === "TRC20" || network === "SOL") return address;
+    if (network === "TRC20") return address;
     return address.toLowerCase();
 };
 
@@ -12,9 +13,9 @@ export const findAddressBookEntry = (
     network: UsdtNetwork
 ): AddressBookEntry | undefined => {
     const target = normalizeAddressForMatch(network, address);
-    return entries.find(
-        (entry) =>
-            entry.network === network &&
-            normalizeAddressForMatch(entry.network, entry.address) === target
-    );
+    return entries.find((entry) => {
+        const candidate = getAddressBookEntryAddress(entry, network);
+        if (!candidate) return false;
+        return normalizeAddressForMatch(network, candidate) === target;
+    });
 };

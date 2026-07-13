@@ -1,11 +1,40 @@
 import * as React from "react";
 import Svg, { Path } from "react-native-svg";
 
-const EyeOffSvg: React.FC = () => (
-    <Svg width={16} height={16} fill="none">
+import { MENU_ICON_STROKE } from "../constants/menuIcon";
+
+type Props = {
+    color?: string;
+    size?: number;
+};
+
+const EyeOffSvg: React.FC<Props> = ({ color = "#6B7280", size = 18 }) => (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
         <Path
-            d="M9.413 9.413a2 2 0 1 1-2.827-2.826M.667.667l14.667 14.666M11.96 11.96A6.713 6.713 0 0 1 8 13.333C3.333 13.333.667 8 .667 8A12.3 12.3 0 0 1 4.04 4.04l7.92 7.92ZM6.6 2.827a6.08 6.08 0 0 1 1.4-.16C12.666 2.667 15.333 8 15.333 8c-.405.757-.887 1.47-1.44 2.127L6.6 2.827Z"
-            stroke="#1B1D4D"
+            d="M9.88 9.88a3 3 0 1 0 4.24 4.24"
+            stroke={color}
+            strokeWidth={MENU_ICON_STROKE}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+        <Path
+            d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"
+            stroke={color}
+            strokeWidth={MENU_ICON_STROKE}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+        <Path
+            d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"
+            stroke={color}
+            strokeWidth={MENU_ICON_STROKE}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+        <Path
+            d="M2 2l20 20"
+            stroke={color}
+            strokeWidth={MENU_ICON_STROKE}
             strokeLinecap="round"
             strokeLinejoin="round"
         />

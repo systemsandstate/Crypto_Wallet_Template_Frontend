@@ -1,8 +1,9 @@
 import { View, Text,  ScrollView, StyleSheet, TouchableOpacity, Platform } from "react-native";
 import LoadingSpinner from "../components/LoadingSpinner";
-import React, { useCallback, useState, useMemo } from "react";
+import React, { useCallback, useState, useMemo, useRef } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect } from "@react-navigation/native";
+import { useInitialScreenLoad } from "../hooks/useInitialScreenLoad";
+import { useTabBarInset } from "../hooks/useTabBarInset";
 
 import { components } from "../components";
 import { useTranslation } from "../hooks/useTranslation";
@@ -12,6 +13,7 @@ import { USDT_NETWORKS, UsdtNetwork } from "../constants/usdtNetworks";
 import { getLocalizedNetworkLabel } from "../i18n/network";
 import { formatMessage } from "../i18n";
 import { isWalletSetupLocally } from "../services/wallet/walletStorage";
+import { prepareWalletContext } from "../services/wallet/syncDeviceWallet";
 import { copyToClipboard } from "../utils/copyToClipboard";
 import { appAlert } from '../utils/appAlert';
 import { showToast } from "../utils/toast";
@@ -20,6 +22,7 @@ import { svg } from "../svg";
 const MyWallet: React.FC = ({ navigation }: any) => {
     const { t, locale } = useTranslation();
     const { colors, FONTS } = useTheme();
+    const tabBarInset = useTabBarInset(8);
     const [wallets, setWallets] = useState<MerchantWallet[]>([]);
     const [balances, setBalances] = useState<Record<string, number | null>>({});
     const [hasServerWallet, setHasServerWallet] = useState(false);
@@ -152,28 +155,42 @@ const MyWallet: React.FC = ({ navigation }: any) => {
         [colors, FONTS]
     );
 
-    const loadWallets = useCallback(() => {
-        setLoading(true);
-        Promise.all([api.getWallets(), api.getWalletBalances(), isWalletSetupLocally()])
-            .then(([res, balanceRes, localReady]) => {
-                setWallets(res.data.wallets);
-                setHasServerWallet(res.data.hasWallet);
-                setLocalSetup(localReady);
-                const map: Record<string, number | null> = {};
-                for (const row of balanceRes.data.balances) {
-                    map[row.network] = row.usdtBalance;
-                }
-                setBalances(map);
-            })
-            .catch((err) => appAlert.alert(t.common.error, err.message))
-            .finally(() => setLoading(false));
+    const hasLoadedRef = useRef(false);
+
+    const loadWallets = useCallback(async () => {
+        if (!hasLoadedRef.current) setLoading(true);
+        try {
+            const [activeAddresses, res, balanceRes, localReady] = await Promise.all([
+                prepareWalletContext(),
+                api.getWallets(),
+                api.getWalletBalances(),
+                isWalletSetupLocally(),
+            ]);
+            const byNetwork = Object.fromEntries(
+                activeAddresses.map((row) => [row.network, row.address])
+            );
+            setWallets(
+                (res.data.wallets ?? []).map((w) => ({
+                    ...w,
+                    address: byNetwork[w.network] ?? w.address,
+                }))
+            );
+            setHasServerWallet(res.data.hasWallet);
+            setLocalSetup(localReady);
+            const map: Record<string, number | null> = {};
+            for (const row of balanceRes.data.balances ?? []) {
+                map[row.network] = row.usdtBalance;
+            }
+            setBalances(map);
+            hasLoadedRef.current = true;
+        } catch (err) {
+            appAlert.alert(t.common.error, err instanceof Error ? err.message : String(err));
+        } finally {
+            setLoading(false);
+        }
     }, [t.common.error]);
 
-    useFocusEffect(
-        useCallback(() => {
-            loadWallets();
-        }, [loadWallets])
-    );
+    useInitialScreenLoad(loadWallets);
 
     const getWallet = (network: UsdtNetwork): MerchantWallet | undefined =>
         wallets.find((w) => w.network === network);
@@ -183,8 +200,7 @@ const MyWallet: React.FC = ({ navigation }: any) => {
             const copied = await copyToClipboard(address);
             if (copied) {
                 showToast(
-                    formatMessage(t.transaction.copiedToClipboard, {
-                        label: getLocalizedNetworkLabel(network, t)})
+                    formatMessage(t.wallet.accountNumberCopied, { network })
                 );
             } else {
                 showToast(t.transaction.couldNotCopy, "error");
@@ -221,7 +237,7 @@ const MyWallet: React.FC = ({ navigation }: any) => {
                         <LoadingSpinner size={48} />
                     </View>
                 ) : (
-                <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+                <ScrollView contentContainerStyle={{ paddingBottom: tabBarInset }}>
                     <components.MerchantContent style={{ paddingTop: 16 }}>
                         <Text style={styles.subtitle}>{t.wallet.myWalletDescription}</Text>
 
@@ -285,6 +301,9 @@ const MyWallet: React.FC = ({ navigation }: any) => {
                                             </View>
                                         </View>
                                         <View style={styles.addressRow}>
+                                            <Text style={[styles.address, { marginBottom: 4, fontSize: 11 }]}>
+                                                {t.wallet.accountNumberLabel} · {network}
+                                            </Text>
                                             <Text style={styles.address} selectable>
                                                 {wallet?.address || t.wallet.notConfigured}
                                             </Text>
@@ -331,16 +350,9 @@ const MyWallet: React.FC = ({ navigation }: any) => {
                             })}
 
                         <components.Button
-                            title={t.wallet.manageWallets}
-                            onPress={() => navigation.navigate("Wallets")}
+                            title={t.wallet.reconfigureWallet}
+                            onPress={() => navigation.navigate("WalletSetup")}
                             containerStyle={{ marginTop: 20 }}
-                        />
-                        <components.Button
-                            title={t.wallet.addWallet}
-                            onPress={() =>
-                                navigation.navigate("WalletSetup", { addWallet: true })
-                            }
-                            containerStyle={{ marginTop: 12 }}
                         />
                     </components.MerchantContent>
                 </ScrollView>

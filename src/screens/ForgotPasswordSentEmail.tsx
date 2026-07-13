@@ -14,10 +14,10 @@ const ForgotPasswordSentEmail: React.FC = ({ navigation, route }: any) => {
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.COLORS.bgColor }}>
             <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-                <View style={{ paddingTop: "20%", paddingHorizontal: 20 }}>
+                <View style={{ paddingTop: "16%", paddingHorizontal: 20 }}>
                     <Image
                         source={require("../assets/reset.png")}
-                        style={{ width: 161, height: 111, alignSelf: "center", marginBottom: 30 }}
+                        style={{ width: 140, height: 96, alignSelf: "center", marginBottom: 24 }}
                     />
                     <Text
                         style={{

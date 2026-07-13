@@ -9,7 +9,6 @@ import {
 } from "react-native";
 import React, { useCallback, useMemo, useState, useRef } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
 
 import { components } from "../components";
 import LoadingSpinner from "../components/LoadingSpinner";
@@ -21,29 +20,20 @@ import { api } from "../services/api";
 import { sumWalletBalances, filterBalancesForActiveWallet } from "../utils/walletBalance";
 import { computePortfolioUsd } from "../utils/portfolioValue";
 import { getTokenUsdPrices } from "../utils/tokenPrices";
-import { formatNativeAmount } from "../utils/formatAmount";
-import { resolveWalletAddressesForFilter, syncDeviceWalletInBackground } from "../services/wallet/syncDeviceWallet";
+import { prepareWalletContext, resolveWalletAddressesForBalanceFilter, syncDeviceWalletInBackground } from "../services/wallet/syncDeviceWallet";
+import { useInitialScreenLoad } from "../hooks/useInitialScreenLoad";
+import { useTabBarInset } from "../hooks/useTabBarInset";
 import { svg } from "../svg";
 
 type BalanceRow = {
     network: UsdtNetwork;
     usdtBalance: number | null;
-    nativeBalance: number | null;
-    nativeSymbol: string;
-};
-
-const NATIVE_SYMBOLS: Record<UsdtNetwork, string> = {
-    TRC20: "TRX",
-    ERC20: "ETH",
-    BEP20: "BNB",
-    POLYGON: "POL",
-    SOL: "SOL",
 };
 
 const BalanceDetail: React.FC = () => {
-    const navigation: any = useNavigation();
     const { t, locale } = useTranslation();
     const { colors, FONTS } = useTheme();
+    const tabBarInset = useTabBarInset(8);
     const [rows, setRows] = useState<BalanceRow[]>([]);
     const [prices, setPrices] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
@@ -52,69 +42,52 @@ const BalanceDetail: React.FC = () => {
 
     const dateLocale = locale === "es" ? "es-ES" : "en-US";
 
-    const load = useCallback((isRefresh = false) => {
+    const load = useCallback(async (isRefresh = false) => {
         const silent = hasLoadedRef.current;
         if (isRefresh) setRefreshing(true);
         else if (!silent) setLoading(true);
 
-        void (async () => {
-            try {
-                syncDeviceWalletInBackground({ force: isRefresh });
-                const [activeAddresses, tokenPrices, cached] = await Promise.all([
-                    resolveWalletAddressesForFilter(),
-                    getTokenUsdPrices(),
-                    api.getWalletBalances(),
-                ]);
-                setPrices(tokenPrices);
-
-                const applyRows = (
-                    source: Awaited<ReturnType<typeof api.getWalletBalances>>["data"]["balances"]
-                ) => {
-                    const rows = filterBalancesForActiveWallet(source, activeAddresses);
-                    const map = new Map(
-                        rows.map((row) => [
-                            row.network,
-                            {
-                                network: row.network as UsdtNetwork,
-                                usdtBalance: row.usdtBalance,
-                                nativeBalance: row.nativeBalance ?? null,
-                                nativeSymbol:
-                                    row.nativeSymbol ||
-                                    NATIVE_SYMBOLS[row.network as UsdtNetwork] ||
-                                    row.network,
-                            },
-                        ])
-                    );
-                    const ordered = USDT_NETWORKS.filter((network) => map.has(network)).map(
-                        (network) => map.get(network)!
-                    );
-                    setRows(ordered);
-                };
-
-                applyRows(cached.data.balances);
-                hasLoadedRef.current = true;
-                setLoading(false);
-
-                if (isRefresh) {
-                    void api
-                        .getWalletBalances({ live: true })
-                        .then((live) => applyRows(live.data.balances))
-                        .catch(() => {});
-                }
-            } catch {
-                if (!hasLoadedRef.current) setRows([]);
-            } finally {
-                setLoading(false);
-                setRefreshing(false);
+        try {
+            const [activeAddresses, tokenPrices, cached] = await Promise.all([
+                isRefresh ? prepareWalletContext() : resolveWalletAddressesForBalanceFilter(),
+                getTokenUsdPrices(),
+                api.getWalletBalances({ live: isRefresh }),
+            ]);
+            if (!isRefresh && !silent) {
+                syncDeviceWalletInBackground();
             }
-        })();
+            setPrices(tokenPrices);
+
+            const applyRows = (
+                source: Awaited<ReturnType<typeof api.getWalletBalances>>["data"]["balances"] | null | undefined
+            ) => {
+                const rows = filterBalancesForActiveWallet(source ?? [], activeAddresses);
+                const map = new Map(
+                    rows.map((row) => [
+                        row.network,
+                        {
+                            network: row.network as UsdtNetwork,
+                            usdtBalance: row.usdtBalance,
+                        },
+                    ])
+                );
+                const ordered = USDT_NETWORKS.filter((network) => map.has(network)).map(
+                    (network) => map.get(network)!
+                );
+                setRows(ordered);
+            };
+
+            applyRows(cached.data?.balances);
+            hasLoadedRef.current = true;
+        } catch {
+            if (!hasLoadedRef.current) setRows([]);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
     }, []);
 
-    useFocusEffect(
-        useCallback(() => {
-            load(false);
-        }, [load])
-    );
+    useInitialScreenLoad(() => load(false));
 
     const totalPortfolio = useMemo(() => computePortfolioUsd(rows, prices), [rows, prices]);
     const totalUsdt = useMemo(() => sumWalletBalances(rows), [rows]);
@@ -157,7 +130,6 @@ const BalanceDetail: React.FC = () => {
                 scrollContent: {
                     paddingHorizontal: 20,
                     paddingTop: 8,
-                    paddingBottom: 32,
                 },
                 totalLabel: {
                     ...FONTS.Mulish_600SemiBold,
@@ -297,13 +269,6 @@ const BalanceDetail: React.FC = () => {
         });
     };
 
-    const nativeUsd = (balance: number | null | undefined, symbol: string) => {
-        const amount = balance != null && Number.isFinite(balance) ? balance : 0;
-        return amount * (prices[String(symbol).toUpperCase()] ?? 0);
-    };
-
-    const formatNativeToken = (value: number | null | undefined) => formatNativeAmount(value, dateLocale);
-
     const formatFiat = (value: number | null | undefined) => {
         const amount = value != null && Number.isFinite(value) ? value : 0;
         return `$${amount.toLocaleString(dateLocale, {
@@ -389,7 +354,7 @@ const BalanceDetail: React.FC = () => {
                         </View>
                         <ScrollView
                             style={{ flex: 1 }}
-                            contentContainerStyle={styles.scrollContent}
+                            contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarInset }]}
                             refreshControl={
                                 <RefreshControl
                                     refreshing={refreshing}
@@ -411,7 +376,9 @@ const BalanceDetail: React.FC = () => {
                                                     network={row.network}
                                                     size={28}
                                                 />
-                                                <Text style={styles.chainTitle}>{chainLabel}</Text>
+                                                <Text style={styles.chainTitle}>
+                                                    {chainLabel} ({networkShort})
+                                                </Text>
                                             </View>
                                             <View style={styles.chainCard}>
                                                 {renderTokenRow(
@@ -429,30 +396,7 @@ const BalanceDetail: React.FC = () => {
                                                             />
                                                         </View>
                                                     </View>,
-                                                    false
-                                                )}
-                                                {renderTokenRow(
-                                                    `${row.network}-native`,
-                                                    row.nativeSymbol,
-                                                    "",
-                                                    row.nativeBalance,
-                                                    formatFiat(
-                                                        nativeUsd(row.nativeBalance, row.nativeSymbol)
-                                                    ),
-                                                    <components.NetworkLogo
-                                                        network={row.network}
-                                                        size={36}
-                                                    />,
-                                                    true,
-                                                    formatNativeToken,
-                                                    row.nativeBalance != null &&
-                                                        row.nativeBalance > 0
-                                                        ? () =>
-                                                              navigation.navigate("Withdraw", {
-                                                                  network: row.network,
-                                                                  asset: "NATIVE",
-                                                              })
-                                                        : undefined
+                                                    true
                                                 )}
                                             </View>
                                         </View>

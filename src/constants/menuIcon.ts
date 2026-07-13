@@ -2,10 +2,10 @@
 export const MENU_ICON_SIZE = 20;
 
 /** Uniform stroke weight for outline menu icons (24×24 viewBox). */
-export const MENU_ICON_STROKE = 1.8;
+export const MENU_ICON_STROKE = 2;
 
 /** Dashboard quick-action icons (24×24 viewBox). */
-export const ACTION_ICON_SIZE = 28;
+export const ACTION_ICON_SIZE = 22;
 export const ACTION_ICON_STROKE = 2;
 
 /** @deprecated Use MENU_ICON_SIZE */

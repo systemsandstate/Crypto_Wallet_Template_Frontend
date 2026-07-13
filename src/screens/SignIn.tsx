@@ -24,10 +24,7 @@ const SignIn: React.FC = ({ navigation, route }: any) => {
         }
     }, [route.params?.sessionExpired, navigation, t.common.sessionExpired]);
 
-    const header = useMemo(
-        () => <components.Header title={t.auth.signIn} goBack={true} />,
-        [t.auth.signIn]
-    );
+    const header = useMemo(() => <components.Header goBack={true} />, []);
 
     return (
         <components.AuthScreenLayout header={header}>

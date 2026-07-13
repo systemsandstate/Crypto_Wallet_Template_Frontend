@@ -2,6 +2,7 @@ import { View, Text, TextInput, Platform, StyleSheet, NativeSyntheticEvent, Text
 import React, { memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 
 import { useTheme } from "../hooks/useTheme";
+import { DENSITY } from "../constants/density";
 
 export type Props = {
     placeholder: string;
@@ -71,7 +72,7 @@ const InputField: React.FC<Props> = ({
         () =>
             StyleSheet.create({
                 container: {
-                    height: 50,
+                    height: DENSITY.inputHeight,
                     width: "100%",
                     backgroundColor: colors.white,
                     paddingHorizontal: IS_WEB ? 0 : 20,
@@ -85,7 +86,7 @@ const InputField: React.FC<Props> = ({
                 input: {
                     flex: 1,
                     minWidth: 0,
-                    fontSize: 16,
+                    fontSize: 14,
                     color: colors.mainDark,
                     backgroundColor: "transparent",
                     padding: 0,
@@ -201,6 +202,8 @@ const InputField: React.FC<Props> = ({
         }
     }, [onChangeText]);
 
+    const isPassword = Boolean(secureTextEntry);
+
     const androidAutofillProps =
         Platform.OS === "android"
             ? authRole
@@ -224,7 +227,6 @@ const InputField: React.FC<Props> = ({
     }, []);
 
     const displayValue = IS_WEB ? value : nativeText;
-    const isPassword = Boolean(secureTextEntry);
 
     const field = (
         <View

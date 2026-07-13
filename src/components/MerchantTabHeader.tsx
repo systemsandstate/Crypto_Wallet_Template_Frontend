@@ -3,19 +3,17 @@ import { View, Text, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useTheme } from "../hooks/useTheme";
+import { DENSITY } from "../constants/density";
 import HeaderMenuButton from "./HeaderMenuButton";
 
 type Props = {
     eyebrow?: string;
     title: string;
     subtitle?: string;
-    /** Optional second line under subtitle (e.g. "Multi-chain"). */
     subtitleSecondLine?: string;
-    /** Renders on the right of the subtitle block. */
     subtitleAccessory?: React.ReactNode;
-    /** Optional top row inside the header (e.g. balance + settings). */
+    leading?: React.ReactNode;
     topRow?: React.ReactNode;
-    /** Optional control(s) to the left of the settings gear. */
     headerTrailing?: React.ReactNode;
     children?: React.ReactNode;
     paddingBottom?: number;
@@ -29,33 +27,41 @@ const MerchantTabHeader: React.FC<Props> = ({
     subtitleSecondLine,
     subtitleAccessory,
     topRow,
+    leading,
     headerTrailing,
     children,
-    paddingBottom = 20,
+    paddingBottom: paddingBottomProp,
     showSettings = true,
 }) => {
     const { colors, FONTS } = useTheme();
+    const paddingBottom = paddingBottomProp ?? (leading ? 8 : 10);
 
     const styles = useMemo(
         () =>
             StyleSheet.create({
                 wrap: {
                     backgroundColor: colors.headerBg,
-                    borderBottomLeftRadius: 24,
-                    borderBottomRightRadius: 24,
-                    overflow: "visible",
+                    borderBottomWidth: StyleSheet.hairlineWidth,
+                    borderBottomColor: colors.border,
                 },
                 inner: {
-                    paddingHorizontal: 20,
-                    paddingTop: 8,
+                    paddingHorizontal: DENSITY.pagePaddingH,
+                    paddingTop: 6,
                 },
                 topRow: {
-                    marginBottom: 10,
+                    marginBottom: 6,
                 },
                 headerRow: {
                     flexDirection: "row",
                     alignItems: "flex-start",
                     justifyContent: "space-between",
+                },
+                leading: {
+                    marginRight: 10,
+                    flexShrink: 0,
+                },
+                headerRowWithLeading: {
+                    alignItems: "center",
                 },
                 trailingRow: {
                     flexDirection: "row",
@@ -65,8 +71,8 @@ const MerchantTabHeader: React.FC<Props> = ({
                     flexShrink: 0,
                 },
                 menuSlot: {
-                    width: 40,
-                    height: 40,
+                    width: DENSITY.iconButton,
+                    height: DENSITY.iconButton,
                     alignItems: "center",
                     justifyContent: "center",
                 },
@@ -78,18 +84,20 @@ const MerchantTabHeader: React.FC<Props> = ({
                 eyebrow: {
                     ...FONTS.Mulish_400Regular,
                     color: colors.headerMuted,
-                    fontSize: 14,
-                    marginBottom: 4,
+                    fontSize: 12,
+                    marginBottom: 1,
                 },
                 title: {
-                    ...FONTS.H3,
-                    color: "#FFFFFF",
+                    ...FONTS.Mulish_700Bold,
+                    fontSize: 18,
+                    lineHeight: 22,
+                    color: colors.mainDark,
                 },
                 subtitleRow: {
                     flexDirection: "row",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    marginTop: 6,
+                    marginTop: 4,
                     gap: 10,
                     minWidth: 0,
                 },
@@ -100,15 +108,15 @@ const MerchantTabHeader: React.FC<Props> = ({
                 subtitle: {
                     ...FONTS.Mulish_400Regular,
                     color: colors.headerMuted,
-                    fontSize: 14,
-                    lineHeight: 18,
+                    fontSize: 12,
+                    lineHeight: 16,
                 },
                 subtitleAccessory: {
                     flexShrink: 0,
                     marginLeft: "auto",
                 },
                 children: {
-                    marginTop: 16,
+                    marginTop: 14,
                 },
             }),
         [colors, FONTS]
@@ -139,7 +147,8 @@ const MerchantTabHeader: React.FC<Props> = ({
             <SafeAreaView edges={["top"]}>
                 <View style={styles.inner}>
                     {topRow ? <View style={styles.topRow}>{topRow}</View> : null}
-                    <View style={styles.headerRow}>
+                    <View style={[styles.headerRow, leading ? styles.headerRowWithLeading : null]}>
+                        {leading ? <View style={styles.leading}>{leading}</View> : null}
                         <View style={styles.textBlock}>
                             {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
                             <Text style={styles.title}>{title}</Text>
@@ -150,7 +159,7 @@ const MerchantTabHeader: React.FC<Props> = ({
                                 {headerTrailing}
                                 {showSettings ? (
                                     <View style={styles.menuSlot}>
-                                        <HeaderMenuButton variant="onHeader" />
+                                        <HeaderMenuButton variant="default" triggerStyle="header" />
                                     </View>
                                 ) : null}
                             </View>

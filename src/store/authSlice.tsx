@@ -1,5 +1,4 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { Platform } from 'react-native';
 import { Merchant, setAuthToken } from '../services/api';
 import { getStoredAvatarUrl, setStoredAvatarUrl } from '../utils/avatarStorage';
 
@@ -29,7 +28,11 @@ const authSlice = createSlice({
       state.accessToken = action.payload.accessToken;
       state.isAuthenticated = true;
       state.avatarUrl =
-        Platform.OS === 'web' ? getStoredAvatarUrl(action.payload.merchant.id) : null;
+        action.payload.merchant.avatarUrl ??
+        getStoredAvatarUrl(action.payload.merchant.id);
+      if (action.payload.merchant.avatarUrl) {
+        setStoredAvatarUrl(action.payload.merchant.id, action.payload.merchant.avatarUrl);
+      }
       setAuthToken(action.payload.accessToken);
     },
     setAvatarUrl: (

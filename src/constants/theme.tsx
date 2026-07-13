@@ -15,6 +15,7 @@ export type AppColors = {
     white: string;
     bgColor: string;
     green: string;
+    red: string;
     grey1: string;
     linkColor: string;
     transparent: string;
@@ -35,45 +36,47 @@ export type AppColors = {
 };
 
 const LIGHT_COLORS: AppColors = {
-    mainDark: "#1B1D4D",
-    bodyTextColor: "#4C4C60",
+    mainDark: "#1A1F36",
+    bodyTextColor: "#6B7280",
     white: "#FFFFFF",
-    bgColor: "#EDF0F2",
-    green: "#3EB290",
-    grey1: "#D8D9DB",
-    linkColor: "#FF5887",
+    bgColor: "#F5F7FA",
+    green: "#059669",
+    red: "#DC2626",
+    grey1: "#E5E7EB",
+    linkColor: "#2563EB",
     transparent: "transparent",
-    border: "#EBEBEB",
-    surfaceMuted: "#F8F9FB",
-    rowPress: "#F5F5F5",
-    headerBg: "#1B1D4D",
-    headerMuted: "#CED6E1",
-    selectedBg: "#EEF3FF",
-    accentBlue: "#5B8DEF",
-    shellBg: "#D8DEE8",
-    overlay: "rgba(237, 240, 242, 0.35)",
-    inputBorder: "#E2E8F0",
-    placeholder: "#868698",
-    icon: "#4C4C60",
+    border: "#E5E7EB",
+    surfaceMuted: "#F9FAFB",
+    rowPress: "#F3F4F6",
+    headerBg: "#FFFFFF",
+    headerMuted: "#6B7280",
+    selectedBg: "#EFF6FF",
+    accentBlue: "#2563EB",
+    shellBg: "#FFFFFF",
+    overlay: "rgba(17, 24, 39, 0.4)",
+    inputBorder: "#E5E7EB",
+    placeholder: "#9CA3AF",
+    icon: "#6B7280",
     pureWhite: "#FFFFFF",
 };
 
 const DARK_COLORS: AppColors = {
-    mainDark: "#E8EAF0",
+    mainDark: "#F2F3F7",
     bodyTextColor: "#9DA3B8",
     white: "#1A1A22",
     bgColor: "#0E0E13",
-    green: "#3EB290",
+    green: "#4CC9A0",
+    red: "#F07171",
     grey1: "#3A3A48",
-    linkColor: "#FF7AA0",
+    linkColor: "#E0BD54",
     transparent: "transparent",
     border: "#2A2A36",
     surfaceMuted: "#22222C",
     rowPress: "#252530",
     headerBg: "#12121C",
     headerMuted: "#8B93A8",
-    selectedBg: "#252B3D",
-    accentBlue: "#6B9FFF",
+    selectedBg: "#2E2A22",
+    accentBlue: "#E0BD54",
     shellBg: "#08080C",
     overlay: "rgba(14, 14, 19, 0.55)",
     inputBorder: "#333340",
@@ -82,8 +85,9 @@ const DARK_COLORS: AppColors = {
     pureWhite: "#FFFFFF",
 };
 
-export function getColors(isDark: boolean): AppColors {
-    return isDark ? DARK_COLORS : LIGHT_COLORS;
+/** Light banking-style UI — production default. */
+export function getColors(_isDark?: boolean): AppColors {
+    return LIGHT_COLORS;
 }
 
 const COLORS = { ...LIGHT_COLORS };
@@ -91,33 +95,33 @@ const COLORS = { ...LIGHT_COLORS };
 const FONTS = {
     H1: {
         ...fontFamily("Mulish_700Bold", "700"),
-        fontSize: 44,
-        lineHeight: 48 * 1.2,
+        fontSize: 36,
+        lineHeight: 40,
     },
     H2: {
         ...fontFamily("Mulish_700Bold", "700"),
-        fontSize: 36,
-        lineHeight: 36 * 1.2,
+        fontSize: 30,
+        lineHeight: 34,
     },
     H3: {
         ...fontFamily("Mulish_700Bold", "700"),
-        fontSize: 28,
-        lineHeight: 28 * 1.2,
+        fontSize: 24,
+        lineHeight: 28,
     },
     H4: {
         ...fontFamily("Mulish_500Medium", "500"),
-        fontSize: 20,
-        lineHeight: 20 * 1.2,
+        fontSize: 17,
+        lineHeight: 21,
     },
     H5: {
         ...fontFamily("Mulish_600SemiBold", "600"),
-        fontSize: 16,
-        lineHeight: 16 * 1.3,
+        fontSize: 14,
+        lineHeight: 18,
     },
     H6: {
         ...fontFamily("Mulish_600SemiBold", "600"),
-        fontSize: 14,
-        lineHeight: 14 * 1.6,
+        fontSize: 13,
+        lineHeight: 17,
     },
     Mulish_400Regular: fontFamily("Mulish_400Regular", "400"),
     Mulish_500Medium: fontFamily("Mulish_500Medium", "500"),

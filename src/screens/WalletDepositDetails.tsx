@@ -1,16 +1,16 @@
 import {
     Text,
     View,
-    Image,
     StyleSheet,
     Linking,
     TouchableOpacity} from "react-native";
 import React, { useCallback, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect } from "@react-navigation/native";
+import { useInitialScreenLoad } from "../hooks/useInitialScreenLoad";
 import { useAppSelector } from "../hooks/useAppSelector";
 
 import AddressBookFormModal, { AddressBookFormValues } from "../components/AddressBookFormModal";
+import TransactionDetailAvatar from "../components/TransactionDetailAvatar";
 import { components } from "../components";
 import { theme } from "../constants";
 import { api, WalletTransfer, invalidateCachedGet, isCachedGetFresh } from "../services/api";
@@ -32,6 +32,11 @@ import {
     updateAddressBookEntry,
     type AddressBookEntry} from "../services/addressBookStorage";
 import { findAddressBookEntry } from "../utils/addressBookMatch";
+import {
+    formatShortTransactionId,
+    resolveCounterpartyLabel,
+    type CounterpartyLabel,
+} from "../utils/resolveCounterpartyLabel";
 import { RootState } from "../store/store";
 import { navigateUp } from "../navigation/navigateUp";
 
@@ -47,6 +52,8 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
     const initialDeposit = route.params?.deposit as WalletTransfer | undefined;
     const [deposit, setDeposit] = useState<WalletTransfer | undefined>(initialDeposit);
     const [addressBook, setAddressBook] = useState<AddressBookEntry[]>([]);
+    const [fromLabel, setFromLabel] = useState<CounterpartyLabel | null>(null);
+    const [toLabel, setToLabel] = useState<CounterpartyLabel | null>(null);
     const [modalVisible, setModalVisible] = useState(false);
     const [modalMode, setModalMode] = useState<"create" | "edit">("create");
     const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
@@ -56,30 +63,56 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
         network: "BEP20"});
     const [savingContact, setSavingContact] = useState(false);
 
-    const reloadAddressBook = useCallback(async () => {
-        if (!merchant?.id) {
-            setAddressBook([]);
-            return;
-        }
-        const entries = await loadAddressBook(merchant.id);
+    const loadDetails = useCallback(async () => {
+        const entries = merchant?.id ? await loadAddressBook(merchant.id) : [];
         setAddressBook(entries);
-    }, [merchant?.id]);
 
-    useFocusEffect(
-        useCallback(() => {
-            void reloadAddressBook();
-            if (!initialDeposit?.id) return;
-            if (!isCachedGetFresh("/merchant/wallets/transfers", 15_000)) {
-                invalidateCachedGet("/merchant/wallets/transfers");
+        const labelStrings = {
+            appUser: t.withdraw.recipientAppUser,
+            contact: t.withdraw.recipientContact,
+            external: t.withdraw.recipientExternal,
+            unknown: t.transaction.counterpartyUnknown,
+            self: t.transaction.yourAccount,
+        };
+        const network = (initialDeposit?.network ?? "BEP20") as UsdtNetwork;
+
+        const [fromResolved, toResolved] = await Promise.all([
+            resolveCounterpartyLabel(initialDeposit?.fromAddress, network, entries, labelStrings),
+            resolveCounterpartyLabel(initialDeposit?.toAddress, network, entries, labelStrings),
+        ]);
+        setFromLabel(fromResolved);
+        setToLabel(toResolved);
+
+        if (!initialDeposit?.id) return;
+        if (!isCachedGetFresh("/merchant/wallets/transfers", 15_000)) {
+            invalidateCachedGet("/merchant/wallets/transfers");
+        }
+        try {
+            const res = await api.getWalletTransfers();
+            const fresh = (res.data.transfers ?? []).find((row) => row.id === initialDeposit.id);
+            if (fresh) {
+                setDeposit(fresh);
+                const freshNetwork = fresh.network as UsdtNetwork;
+                const [freshFrom, freshTo] = await Promise.all([
+                    resolveCounterpartyLabel(fresh.fromAddress, freshNetwork, entries, labelStrings),
+                    resolveCounterpartyLabel(fresh.toAddress, freshNetwork, entries, labelStrings),
+                ]);
+                setFromLabel(freshFrom);
+                setToLabel(freshTo);
             }
-            api.getWalletTransfers()
-                .then((res) => {
-                    const fresh = res.data.transfers.find((row) => row.id === initialDeposit.id);
-                    if (fresh) setDeposit(fresh);
-                })
-                .catch(() => {});
-        }, [initialDeposit?.id, reloadAddressBook])
-    );
+        } catch {
+            // keep route params deposit
+        }
+    }, [
+        initialDeposit?.fromAddress,
+        initialDeposit?.id,
+        initialDeposit?.network,
+        initialDeposit?.toAddress,
+        merchant?.id,
+        t,
+    ]);
+
+    useInitialScreenLoad(loadDetails);
 
     const copyText = useCallback(
         async (label: string, value: string) => {
@@ -133,13 +166,13 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
                     await addAddressBookEntry(merchant.id, values);
                     showToast(t.addressBook.savedToast);
                 }
-                await reloadAddressBook();
+                await loadAddressBook(merchant.id).then(setAddressBook);
                 closeModal();
             } finally {
                 setSavingContact(false);
             }
         },
-        [closeModal, editingEntryId, merchant?.id, modalMode, reloadAddressBook, t]
+        [closeModal, editingEntryId, merchant?.id, modalMode, t]
     );
 
     const openExplorer = useCallback(() => {
@@ -170,22 +203,100 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
         ? findAddressBookEntry(addressBook, deposit.fromAddress, depositNetwork)
         : undefined;
 
+    const counterpartyKindHint = (label: CounterpartyLabel | null) => {
+        if (!label) return null;
+        if (label.kind === "app") return t.withdraw.recipientAppUser;
+        if (label.kind === "contact") return t.withdraw.recipientContact;
+        if (label.kind === "self") return t.transaction.yourAccount;
+        if (label.kind === "external") return t.withdraw.recipientExternal;
+        return null;
+    };
+
     const isSend = deposit.type === "SEND";
+    const headerCounterparty = isSend ? toLabel : fromLabel;
     const formattedAmount =
         deposit.currency === "USDT"
             ? formatUsdtAmount(deposit.amount, dateLocale)
             : formatNativeAmount(deposit.amount, dateLocale);
 
-    const AddressDetail = ({
+    const CounterpartyDetail = ({
         leftTitle,
+        label,
         address,
         allowAddressBook = false,
         savedEntry}: {
         leftTitle: string;
+        label: CounterpartyLabel | null;
         address: string;
         allowAddressBook?: boolean;
         savedEntry?: AddressBookEntry;
     }) => (
+        <View
+            style={{
+                paddingVertical: 17,
+                borderBottomWidth: 1,
+                borderBottomColor: "#CED6E1"}}
+        >
+            <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                    <Text
+                        style={{
+                            ...theme.FONTS.Mulish_400Regular,
+                            fontSize: 16,
+                            lineHeight: 16 * 1.6,
+                            color: theme.COLORS.bodyTextColor,
+                            marginBottom: 4}}
+                    >
+                        {leftTitle}
+                    </Text>
+                    <Text
+                        style={{
+                            ...theme.FONTS.Mulish_600SemiBold,
+                            fontSize: 16,
+                            lineHeight: 22,
+                            color: theme.COLORS.mainDark}}
+                    >
+                        {label?.name || t.transaction.counterpartyUnknown}
+                    </Text>
+                    {counterpartyKindHint(label) ? (
+                        <Text
+                            style={{
+                                ...theme.FONTS.Mulish_400Regular,
+                                fontSize: 12,
+                                lineHeight: 18,
+                                color: theme.COLORS.bodyTextColor,
+                                marginTop: 4}}
+                        >
+                            {counterpartyKindHint(label)}
+                        </Text>
+                    ) : null}
+                </View>
+                {allowAddressBook && address ? (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                        {savedEntry ? (
+                            <TouchableOpacity
+                                onPress={() => openEditModal(savedEntry)}
+                                accessibilityRole="button"
+                                accessibilityLabel={t.addressBook.editContact}
+                            >
+                                <svg.AddressBookSvg color={theme.COLORS.mainDark} size={20} />
+                            </TouchableOpacity>
+                        ) : (
+                            <TouchableOpacity
+                                onPress={() => openSaveModal(address, depositNetwork)}
+                                accessibilityRole="button"
+                                accessibilityLabel={t.addressBook.savePromptTitle}
+                            >
+                                <svg.AddressBookSvg color={theme.COLORS.mainDark} size={20} />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                ) : null}
+            </View>
+        </View>
+    );
+
+    const TransactionIdDetail = ({ txHash }: { txHash: string }) => (
         <View
             style={{
                 paddingVertical: 17,
@@ -202,67 +313,38 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
                         flex: 1,
                         marginRight: 12}}
                 >
-                    {leftTitle}
+                    {t.transaction.txHash}
                 </Text>
-                {address ? (
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                        {allowAddressBook ? (
-                            savedEntry ? (
-                                <TouchableOpacity
-                                    onPress={() => openEditModal(savedEntry)}
-                                    accessibilityRole="button"
-                                    accessibilityLabel={t.addressBook.editContact}
-                                    style={{
-                                        maxWidth: 120,
-                                        backgroundColor: colors.surfaceMuted,
-                                        borderRadius: 8,
-                                        paddingHorizontal: 8,
-                                        paddingVertical: 4}}
-                                >
-                                    <Text
-                                        numberOfLines={1}
-                                        style={{
-                                            ...FONTS.Mulish_600SemiBold,
-                                            fontSize: 12,
-                                            color: colors.mainDark}}
-                                    >
-                                        {savedEntry.name}
-                                    </Text>
-                                </TouchableOpacity>
-                            ) : (
-                                <TouchableOpacity
-                                    onPress={() => openSaveModal(address, depositNetwork)}
-                                    accessibilityRole="button"
-                                    accessibilityLabel={t.addressBook.savePromptTitle}
-                                >
-                                    <svg.AddressBookSvg color={theme.COLORS.mainDark} size={20} />
-                                </TouchableOpacity>
-                            )
-                        ) : null}
-                        <TouchableOpacity
-                            onPress={() => copyText(leftTitle, address)}
-                            accessibilityRole="button"
-                            accessibilityLabel={t.wallet.copyAddress}
-                        >
-                            <svg.CopySvg color={theme.COLORS.mainDark} size={20} />
-                        </TouchableOpacity>
-                    </View>
-                ) : null}
+                <TouchableOpacity
+                    onPress={() => copyText(t.transaction.txHash, txHash)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t.transaction.copyTransactionId}
+                >
+                    <svg.CopySvg color={theme.COLORS.mainDark} size={20} />
+                </TouchableOpacity>
             </View>
             <Text
                 style={{
                     ...theme.FONTS.Mulish_600SemiBold,
-                    fontSize: 12,
-                    lineHeight: 18,
+                    fontSize: 14,
+                    lineHeight: 20,
                     color: theme.COLORS.mainDark,
                     marginTop: 8}}
             >
-                {address || t.payment.senderUnavailable}
+                {formatShortTransactionId(txHash)}
             </Text>
         </View>
     );
 
-    const DetailItem = ({ leftTitle, rightTitle }: { leftTitle: string; rightTitle: string }) => (
+    const DetailItem = ({
+        leftTitle,
+        rightTitle,
+        rightTitleColor,
+    }: {
+        leftTitle: string;
+        rightTitle: string;
+        rightTitleColor?: string;
+    }) => (
         <View
             style={{
                 flexDirection: "row",
@@ -286,7 +368,7 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
             <Text
                 style={{
                     ...theme.FONTS.H6,
-                    color: theme.COLORS.mainDark,
+                    color: rightTitleColor ?? theme.COLORS.mainDark,
                     textAlign: "right",
                     flexShrink: 1}}
             >
@@ -304,9 +386,9 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
                     contentContainerStyle={{ paddingBottom: tabBarInset }}
                 >
                     <components.MerchantContent>
-                        <Image
-                            source={require("../assets/icons/26.png")}
-                            style={{ width: 60, height: 60, alignSelf: "center", marginBottom: 30 }}
+                        <TransactionDetailAvatar
+                            counterparty={headerCounterparty}
+                            isSend={isSend}
                         />
                         <Text
                             style={{
@@ -369,16 +451,22 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
                                         ? formatUsdtAmount(deposit.amount, dateLocale)
                                         : formatNativeAmount(deposit.amount, dateLocale)
                                 } ${deposit.currency}`}
+                                rightTitleColor={isSend ? theme.COLORS.red : theme.COLORS.green}
                             />
-                            <AddressDetail
+                            <CounterpartyDetail
                                 leftTitle={t.transaction.from}
+                                label={fromLabel}
                                 address={deposit.fromAddress}
                                 allowAddressBook
                                 savedEntry={savedFromEntry}
                             />
-                            <AddressDetail leftTitle={t.transaction.to} address={deposit.toAddress} />
+                            <CounterpartyDetail
+                                leftTitle={t.transaction.to}
+                                label={toLabel}
+                                address={deposit.toAddress}
+                            />
                             {deposit.txHash ? (
-                                <AddressDetail leftTitle={t.transaction.txHash} address={deposit.txHash} />
+                                <TransactionIdDetail txHash={deposit.txHash} />
                             ) : (
                                 <DetailItem
                                     leftTitle={t.transaction.txHash}
@@ -411,7 +499,6 @@ const WalletDepositDetails: React.FC = ({ navigation, route }: any) => {
                 description={modalMode === "create" ? t.addressBook.savePromptMessage : undefined}
                 initialValues={formValues}
                 addressReadOnly
-                networkReadOnly
                 saving={savingContact}
                 onClose={closeModal}
                 onSubmit={handleSubmitContact}

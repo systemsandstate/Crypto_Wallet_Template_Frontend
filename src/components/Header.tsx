@@ -5,6 +5,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { svg } from "../svg";
 import { useTheme } from "../hooks/useTheme";
 import { navigateUp } from "../navigation/navigateUp";
+import { DENSITY } from "../constants/density";
 
 type Props = {
     containerStyle?: object;
@@ -52,7 +53,7 @@ const Header: React.FC<Props> = ({
                     flexDirection: "row",
                     justifyContent: "center",
                     alignItems: "center",
-                    height: 47,
+                    height: DENSITY.headerBarHeight,
                     position: "relative",
                 },
                 barBorder: {
@@ -65,8 +66,8 @@ const Header: React.FC<Props> = ({
                     alignItems: "center",
                 },
                 backButton: {
-                    paddingHorizontal: 20,
-                    paddingVertical: 12,
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
                 },
                 title: {
                     textAlign: "center",

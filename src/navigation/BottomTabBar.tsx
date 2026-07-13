@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity, Platform, StyleSheet } from "react-native";
 import React from "react";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,6 +8,7 @@ import { useTranslation } from "../hooks/useTranslation";
 import { useTheme } from "../hooks/useTheme";
 import { TAB_BAR_CONTENT_HEIGHT } from "../hooks/useTabBarInset";
 import { MENU_ICON_SIZE } from "../constants/menuIcon";
+import { DENSITY } from "../constants/density";
 
 export { TAB_BAR_HEIGHT, useTabBarInset } from "../hooks/useTabBarInset";
 
@@ -34,7 +35,7 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
     };
 
     const renderIcon = (name: Tab, active: boolean) => {
-        const color = active ? colors.linkColor : colors.bodyTextColor;
+        const color = active ? colors.accentBlue : colors.icon;
         switch (name) {
             case Tab.Dashboard:
                 return <svg.HomeSvg color={color} size={TAB_ICON_SIZE} />;
@@ -53,8 +54,11 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
         <View
             style={{
                 backgroundColor: colors.white,
-                borderTopLeftRadius: 10,
-                borderTopRightRadius: 10,
+                borderTopWidth: StyleSheet.hairlineWidth,
+                borderTopColor: colors.border,
+                ...(Platform.OS === "web"
+                    ? ({ boxShadow: "0 -1px 0 rgba(0,0,0,0.04)" } as object)
+                    : { elevation: 0 }),
             }}
         >
             <View
@@ -63,7 +67,7 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
                     justifyContent: "space-around",
                     paddingHorizontal: 12,
                     paddingBottom: bottomPadding,
-                    paddingTop: 15,
+                    paddingTop: DENSITY.tabBarPaddingTop,
                     minHeight: TAB_BAR_CONTENT_HEIGHT + bottomPadding,
                 }}
             >
@@ -90,11 +94,11 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
                         >
                             <View
                                 style={{
-                                    width: TAB_ICON_SIZE,
-                                    height: TAB_ICON_SIZE,
+                                    width: TAB_ICON_SIZE + 2,
+                                    height: TAB_ICON_SIZE + 2,
                                     alignItems: "center",
                                     justifyContent: "center",
-                                    marginBottom: 6,
+                                    marginBottom: 2,
                                 }}
                             >
                                 {renderIcon(name, isFocused)}
@@ -102,8 +106,8 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
                             <Text
                                 style={{
                                     ...FONTS.Mulish_600SemiBold,
-                                    fontSize: 10,
-                                    color: isFocused ? colors.linkColor : colors.mainDark,
+                                    fontSize: DENSITY.tabBarLabel,
+                                    color: isFocused ? colors.accentBlue : colors.bodyTextColor,
                                 }}
                             >
                                 {labels[name]}
@@ -115,5 +119,6 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
         </View>
     );
 };
+
 
 export default BottomTabBar;

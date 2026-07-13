@@ -3,16 +3,17 @@ import {
     Text,
     ScrollView,
     TouchableOpacity,
-        StyleSheet,
+    StyleSheet,
 } from "react-native";
 import LoadingSpinner from "../components/LoadingSpinner";
 import React, { useCallback, useMemo, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
+import { useInitialScreenLoad } from "../hooks/useInitialScreenLoad";
+import { useTabBarInset } from "../hooks/useTabBarInset";
 import { useAppSelector } from "../hooks/useAppSelector";
 
 import { components } from "../components";
-import NetworkLogo from "../components/NetworkLogo";
 import { useTranslation } from "../hooks/useTranslation";
 import { useTheme } from "../hooks/useTheme";
 import { RootState } from "../store/store";
@@ -20,20 +21,33 @@ import { loadAddressBook, type AddressBookEntry } from "../services/addressBookS
 import { UsdtNetwork } from "../constants/usdtNetworks";
 import { getLocalizedNetworkLabel } from "../i18n/network";
 import { formatMessage } from "../i18n";
+import {
+    entrySupportsNetwork,
+    getAddressBookEntryAddress,
+} from "../utils/addressBookNetworks";
 
 type RouteParams = {
     network?: UsdtNetwork;
+};
+
+const avatarColor = (seed: string) => {
+    const palette = ["#2563EB", "#059669", "#7C3AED", "#D97706", "#DB2777", "#0891B2"];
+    let hash = 0;
+    for (let i = 0; i < seed.length; i += 1) {
+        hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return palette[Math.abs(hash) % palette.length];
 };
 
 const AddressBookPicker: React.FC = ({ navigation, route }: any) => {
     const routeNetwork = (route.params as RouteParams | undefined)?.network;
     const { t } = useTranslation();
     const { colors, FONTS } = useTheme();
+    const tabBarInset = useTabBarInset(8);
     const merchant = useAppSelector((state: RootState) => state.auth.merchant);
     const [allEntries, setAllEntries] = useState<AddressBookEntry[]>([]);
-    const [selectedNetwork, setSelectedNetwork] = useState<UsdtNetwork>(routeNetwork ?? "TRC20");
+    const selectedNetwork = routeNetwork ?? "BEP20";
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState("");
     const [selectedId, setSelectedId] = useState<string | null>(null);
 
     const load = useCallback(async () => {
@@ -48,49 +62,37 @@ const AddressBookPicker: React.FC = ({ navigation, route }: any) => {
         setLoading(false);
     }, [merchant?.id]);
 
+    useInitialScreenLoad(load);
+
     useFocusEffect(
         useCallback(() => {
-            if (routeNetwork) {
-                setSelectedNetwork(routeNetwork);
-            }
             setSelectedId(null);
-            setSearch("");
-            void load();
-        }, [load, routeNetwork])
+        }, [routeNetwork])
     );
 
     const entries = useMemo(
-        () => allEntries.filter((entry) => entry.network === selectedNetwork),
+        () => allEntries.filter((entry) => entrySupportsNetwork(entry, selectedNetwork)),
         [allEntries, selectedNetwork]
     );
-
-    const filtered = useMemo(() => {
-        const query = search.trim().toLowerCase();
-        if (!query) return entries;
-        return entries.filter(
-            (entry) =>
-                entry.name.toLowerCase().includes(query) ||
-                entry.address.toLowerCase().includes(query)
-        );
-    }, [entries, search]);
 
     const selected = entries.find((entry) => entry.id === selectedId);
 
     const handleConfirm = () => {
         if (!selected) return;
+        const pickedSendAddress = getAddressBookEntryAddress(selected, selectedNetwork);
+        if (!pickedSendAddress) return;
+        const displayValue = selected.email?.trim() || pickedSendAddress;
         navigation.navigate(
             "Withdraw",
             {
-                pickedAddress: selected.address,
-                pickedNetwork: selected.network,
+                pickedAddress: displayValue,
+                pickedSendAddress,
+                pickedContactName: selected.name,
+                pickedNetwork: selectedNetwork,
+                lockNetwork: Boolean(routeNetwork),
             },
             { merge: true }
         );
-    };
-
-    const handleNetworkChange = (network: UsdtNetwork) => {
-        setSelectedNetwork(network);
-        setSelectedId(null);
     };
 
     const networkLabel = getLocalizedNetworkLabel(selectedNetwork, t);
@@ -100,59 +102,59 @@ const AddressBookPicker: React.FC = ({ navigation, route }: any) => {
             StyleSheet.create({
                 subtitle: {
                     ...FONTS.Mulish_400Regular,
-                    fontSize: 14,
+                    fontSize: 13,
                     color: colors.bodyTextColor,
-                    lineHeight: 14 * 1.6,
+                    lineHeight: 18,
                     marginBottom: 14,
-                    textAlign: "center",
                 },
                 card: {
+                    flexDirection: "row",
+                    alignItems: "center",
                     backgroundColor: colors.white,
                     borderRadius: 12,
-                    padding: 14,
-                    marginBottom: 10,
+                    padding: 12,
+                    marginBottom: 8,
                     borderWidth: 2,
                     borderColor: "transparent",
                 },
-                cardHeader: {
-                    flexDirection: "row",
-                    alignItems: "center",
-                    marginBottom: 8,
-                },
                 cardSelected: {
-                    borderColor: colors.linkColor,
+                    borderColor: colors.accentBlue,
                     backgroundColor: colors.surfaceMuted,
+                },
+                avatar: {
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginRight: 12,
+                },
+                avatarText: {
+                    ...FONTS.Mulish_700Bold,
+                    fontSize: 15,
+                    color: colors.pureWhite,
                 },
                 meta: {
                     flex: 1,
-                    marginLeft: 12,
                     minWidth: 0,
                 },
                 name: {
-                    ...FONTS.H6,
-                    color: colors.mainDark,
-                    marginBottom: 4,
-                },
-                network: {
                     ...FONTS.Mulish_600SemiBold,
-                    fontSize: 12,
-                    color: colors.linkColor,
+                    fontSize: 14,
+                    color: colors.mainDark,
+                    marginBottom: 2,
                 },
-                address: {
+                email: {
                     ...FONTS.Mulish_400Regular,
                     fontSize: 12,
                     color: colors.bodyTextColor,
-                    lineHeight: 18,
-                },
-                addressScroll: {
-                    flexGrow: 0,
                 },
                 empty: {
                     ...FONTS.Mulish_400Regular,
                     fontSize: 14,
                     color: colors.bodyTextColor,
                     textAlign: "center",
-                    lineHeight: 14 * 1.6,
+                    lineHeight: 20,
                     paddingHorizontal: 12,
                 },
                 emptyWrap: {
@@ -179,42 +181,27 @@ const AddressBookPicker: React.FC = ({ navigation, route }: any) => {
             <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
                 <components.Header title={t.addressBook.pickTitle} goBack={true} />
                 <ScrollView
-                    contentContainerStyle={{ flexGrow: 1, paddingBottom: 16 }}
+                    contentContainerStyle={{ flexGrow: 1, paddingBottom: tabBarInset }}
                     keyboardShouldPersistTaps="handled"
                 >
                     <components.MerchantContent style={{ flex: 1, paddingTop: 16 }}>
-                        <components.NetworkSelector
-                            value={selectedNetwork}
-                            onChange={handleNetworkChange}
-                        />
-
                         <Text style={styles.subtitle}>
                             {formatMessage(t.withdraw.addressBookForNetwork, { network: networkLabel })}
                         </Text>
-
-                        <components.InputField
-                            placeholder={t.addressBook.searchPlaceholder}
-                            value={search}
-                            onChangeText={setSearch}
-                            autoCapitalize="none"
-                            containerStyle={{ marginBottom: 16 }}
-                        />
 
                         {loading ? (
                             <View style={styles.emptyWrap}>
                                 <LoadingSpinner size={40} />
                             </View>
-                        ) : filtered.length === 0 ? (
+                        ) : entries.length === 0 ? (
                             <View style={styles.emptyWrap}>
-                                <Text style={styles.empty}>
-                                    {entries.length === 0
-                                        ? t.withdraw.addressBookEmptyForNetwork
-                                        : t.addressBook.noSearchResults}
-                                </Text>
+                                <Text style={styles.empty}>{t.withdraw.addressBookEmptyForNetwork}</Text>
                             </View>
                         ) : (
-                            filtered.map((entry) => {
+                            entries.map((entry) => {
                                 const isSelected = entry.id === selectedId;
+                                const initial = (entry.name.trim()[0] || "?").toUpperCase();
+                                const bg = avatarColor(entry.name);
                                 return (
                                     <TouchableOpacity
                                         key={entry.id}
@@ -222,25 +209,17 @@ const AddressBookPicker: React.FC = ({ navigation, route }: any) => {
                                         activeOpacity={0.75}
                                         onPress={() => setSelectedId(entry.id)}
                                     >
-                                        <View style={styles.cardHeader}>
-                                            <NetworkLogo network={entry.network} size={36} />
-                                            <View style={styles.meta}>
-                                                <Text style={styles.name}>{entry.name}</Text>
-                                                <Text style={styles.network}>
-                                                    {getLocalizedNetworkLabel(entry.network, t)} ({entry.network})
-                                                </Text>
-                                            </View>
+                                        <View style={[styles.avatar, { backgroundColor: bg }]}>
+                                            <Text style={styles.avatarText}>{initial}</Text>
                                         </View>
-                                        <ScrollView
-                                            horizontal
-                                            showsHorizontalScrollIndicator={false}
-                                            style={styles.addressScroll}
-                                            contentContainerStyle={{ paddingRight: 4 }}
-                                        >
-                                            <Text style={styles.address} selectable>
-                                                {entry.address}
+                                        <View style={styles.meta}>
+                                            <Text style={styles.name} numberOfLines={1}>
+                                                {entry.name}
                                             </Text>
-                                        </ScrollView>
+                                            <Text style={styles.email} numberOfLines={1}>
+                                                {entry.email?.trim() || t.addressBook.noEmailOnFile}
+                                            </Text>
+                                        </View>
                                     </TouchableOpacity>
                                 );
                             })

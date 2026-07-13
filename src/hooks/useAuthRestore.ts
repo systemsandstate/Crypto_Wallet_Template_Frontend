@@ -9,7 +9,7 @@ import { hydrateTheme, loadStoredTheme } from "../store/themeSlice";
 import { safeReset } from "../utils/safeNavigation";
 import { syncPushTokenWithBackend } from "../services/pushNotifications";
 import { syncDeviceWalletInBackground } from "../services/wallet/syncDeviceWallet";
-import { setWalletMerchantContext } from "../services/wallet/walletStorage";
+import { clearWalletSession, setWalletMerchantContext } from "../services/wallet/walletStorage";
 
 function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
     return Promise.race([
@@ -32,7 +32,7 @@ export function useAuthRestore() {
         let cancelled = false;
 
         (async () => {
-            const [locale, isDark, token] = await Promise.all([
+            const [locale, , token] = await Promise.all([
                 withTimeout(loadStoredLocale(), 1500, DEFAULT_LOCALE),
                 withTimeout(loadStoredTheme(), 1500, false),
                 withTimeout(hydrateAuthToken(), 1500, null),
@@ -40,7 +40,7 @@ export function useAuthRestore() {
 
             if (!cancelled) {
                 dispatch(hydrateLocale(locale));
-                dispatch(hydrateTheme(isDark));
+                dispatch(hydrateTheme());
             }
 
             if (!token || cancelled || restoredRef.current) return;
@@ -53,6 +53,7 @@ export function useAuthRestore() {
                 );
                 if (!res || cancelled || restoredRef.current) {
                     setAuthToken(null);
+                    void clearWalletSession();
                     dispatch(logout());
                     return;
                 }
@@ -72,6 +73,7 @@ export function useAuthRestore() {
             } catch {
                 if (cancelled) return;
                 setAuthToken(null);
+                void clearWalletSession();
                 dispatch(logout());
             }
         })();

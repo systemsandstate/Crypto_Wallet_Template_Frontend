@@ -24,8 +24,9 @@ const TabNavigator: React.FC = () => (
         tabBar={(props) => <BottomTabBar {...props} />}
         screenOptions={{
             headerShown: false,
-            lazy: false,
+            lazy: true,
             freezeOnBlur: false,
+            sceneContainerStyle: { backgroundColor: "transparent" },
         }}
     >
         <Tab.Screen name="Dashboard" component={HomeStackNavigator} />

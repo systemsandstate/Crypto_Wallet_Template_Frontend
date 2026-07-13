@@ -4,11 +4,10 @@ import {
     Modal,
     StyleSheet,
     TouchableOpacity,
-    ScrollView, 
-    Platform,
-    Share} from "react-native";
+    ScrollView,
+} from "react-native";
 import LoadingSpinner from "./LoadingSpinner";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "react-native-qrcode-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -23,7 +22,10 @@ import { copyToClipboard } from "../utils/copyToClipboard";
 import { appAlert } from '../utils/appAlert';
 import { showToast } from "../utils/toast";
 import { buildWalletQrPayload, splitAddressLines } from "../utils/walletQrPayload";
+import { buildReceiveShareMessage } from "../utils/buildReceiveShareMessage";
+import { shareReceivePayment, type QrSvgRef } from "../utils/shareReceivePayment";
 import { svg } from "../svg";
+import { useAppSelector } from "../hooks/useAppSelector";
 
 const USDT_LOGO = require("../assets/usdt-logo.png");
 
@@ -40,10 +42,12 @@ const ReceiveNetworkModal: React.FC<Props> = ({ visible, onClose, onSetupWallet 
     const { t, locale } = useTranslation();
     const { colors, FONTS } = useTheme();
     const insets = useSafeAreaInsets();
+    const merchant = useAppSelector((state) => state.auth.merchant);
     const [wallets, setWallets] = useState<MerchantWallet[]>([]);
     const [loading, setLoading] = useState(false);
     const [selectedNetwork, setSelectedNetwork] = useState<UsdtNetwork>("BEP20");
     const [onChainBalance, setOnChainBalance] = useState<number | null | undefined>(undefined);
+    const qrRef = useRef<QrSvgRef | null>(null);
 
     const dateLocale = locale === "es" ? "es-ES" : "en-US";
 
@@ -60,7 +64,7 @@ const ReceiveNetworkModal: React.FC<Props> = ({ visible, onClose, onSetupWallet 
     const loadWallets = useCallback(() => {
         setLoading(true);
         api.getWallets()
-            .then((res) => setWallets(res.data.wallets))
+            .then((res) => setWallets(res.data?.wallets ?? []))
             .catch((err) => appAlert.alert(t.common.error, err.message))
             .finally(() => setLoading(false));
     }, [t.common.error]);
@@ -94,7 +98,7 @@ const ReceiveNetworkModal: React.FC<Props> = ({ visible, onClose, onSetupWallet 
         api.getWalletBalances()
             .then((res) => {
                 if (cancelled) return;
-                const row = res.data.balances.find((b) => b.network === selectedNetwork);
+                const row = (res.data?.balances ?? []).find((b) => b.network === selectedNetwork);
                 setOnChainBalance(row?.usdtBalance ?? null);
             })
             .catch(() => {
@@ -129,7 +133,7 @@ const ReceiveNetworkModal: React.FC<Props> = ({ visible, onClose, onSetupWallet 
     const qrValue = useMemo(
         () =>
             selectedAddress
-                ? buildWalletQrPayload(selectedNetwork, selectedAddress, null)
+                ? buildWalletQrPayload(selectedNetwork, selectedAddress, null, "USDT")
                 : "",
         [selectedAddress, selectedNetwork]
     );
@@ -139,32 +143,45 @@ const ReceiveNetworkModal: React.FC<Props> = ({ visible, onClose, onSetupWallet 
         if (!selectedAddress) return;
         const copied = await copyToClipboard(selectedAddress);
         if (copied) {
-            showToast(formatMessage(t.transaction.copiedToClipboard, { label: networkLabel }));
+            showToast(
+                formatMessage(t.wallet.accountNumberCopied, { network: selectedNetwork })
+            );
         } else {
             showToast(t.transaction.couldNotCopy, "error");
         }
     }, [networkLabel, selectedAddress, t]);
 
     const handleShare = useCallback(async () => {
-        if (!selectedAddress) return;
-        const message = formatMessage(t.wallet.shareMessage, {
+        if (!selectedAddress || !qrValue) return;
+
+        const message = buildReceiveShareMessage({
+            t,
             network: selectedNetwork,
-            address: selectedAddress});
+            address: selectedAddress,
+            assetSymbol: "USDT",
+            isUsdt: true,
+        });
+
         try {
-            if (Platform.OS === "web" && typeof navigator !== "undefined" && navigator.share) {
-                await navigator.share({ title: t.wallet.receiveTitle, text: message });
-                return;
-            }
-            await Share.share({ message, title: t.wallet.receiveTitle });
-        } catch {
-            const copied = await copyToClipboard(message);
-            if (copied) {
+            const result = await shareReceivePayment({
+                title: t.wallet.receiveTitle,
+                subject: t.wallet.shareSubject,
+                message,
+                qrValue,
+                qrSvgRef: qrRef.current,
+            });
+
+            if (result === "shared") {
+                showToast(t.wallet.shareOpened);
+            } else if (result === "email") {
+                showToast(t.wallet.shareEmailFallback);
+            } else if (result === "copied") {
                 showToast(t.wallet.shareCopiedFallback);
-            } else {
-                showToast(t.wallet.shareFailed, "error");
             }
+        } catch {
+            showToast(t.wallet.shareFailed, "error");
         }
-    }, [selectedAddress, selectedNetwork, t]);
+    }, [qrValue, selectedAddress, selectedNetwork, t]);
 
     const balanceDisplay =
         onChainBalance === undefined
@@ -281,6 +298,12 @@ const ReceiveNetworkModal: React.FC<Props> = ({ visible, onClose, onSetupWallet 
                     alignItems: "center",
                     marginBottom: 18,
                     paddingHorizontal: 4},
+                networkHint: {
+                    ...FONTS.Mulish_400Regular,
+                    fontSize: 12,
+                    color: colors.bodyTextColor,
+                    textAlign: "center",
+                },
                 addressLine: {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 12,
@@ -354,6 +377,9 @@ const ReceiveNetworkModal: React.FC<Props> = ({ visible, onClose, onSetupWallet 
                     {qrValue ? (
                         <View style={styles.qrWrap}>
                             <QRCode
+                                getRef={(ref) => {
+                                    qrRef.current = ref;
+                                }}
                                 value={qrValue}
                                 size={148}
                                 logo={USDT_LOGO}
@@ -366,6 +392,12 @@ const ReceiveNetworkModal: React.FC<Props> = ({ visible, onClose, onSetupWallet 
                     ) : null}
 
                     <View style={styles.addressBlock}>
+                        <Text style={[styles.networkHint, { marginBottom: 8 }]}>
+                            {formatMessage(t.payment.qrNetworkReceive, {
+                                network: networkLabel,
+                                short: selectedNetwork,
+                            })}
+                        </Text>
                         {addressLines.map((line, i) => (
                             <Text key={i} style={styles.addressLine} selectable>
                                 {line}

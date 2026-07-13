@@ -1,29 +1,40 @@
 import { View, Text, StyleSheet, RefreshControl, TouchableOpacity } from "react-native";
 import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useAppSelector } from "../hooks/useAppSelector";
 
 import { svg } from "../svg";
 import { components } from "../components";
-import WalletDepositListItem from "../components/WalletDepositListItem";
-import { api, PaymentRequest, WalletTransfer, invalidateCachedGet, isCachedGetFresh } from "../services/api";
+import DashboardHomeHeader from "../components/DashboardHomeHeader";
+import DashboardTransactionRow from "../components/DashboardTransactionRow";
+import DashboardWalletCards from "../components/DashboardWalletCards";
+import { api, PaymentRequest, WalletTransfer, invalidateCachedGet } from "../services/api";
 import {
     filterBalancesForActiveWallet,
     filterTransfersForActiveWallet,
     filterTransfersForDisplay,
     buildRecentActivityRows,
     sumWalletBalances,
+    resolveNetworkBalanceMap,
 } from "../utils/walletBalance";
+import { filterPaymentsForActivityFeed } from "../utils/walletActivityFeed";
+import { registerDashboardRefresh } from "../utils/dashboardRefresh";
 import { computePortfolioUsd } from "../utils/portfolioValue";
 import { getTokenUsdPrices } from "../utils/tokenPrices";
-import { listLocalWallets } from "../services/wallet/walletStorage";
-import { resolveWalletAddressesForFilter, syncDeviceWalletInBackground } from "../services/wallet/syncDeviceWallet";
+import { resolveWalletAddressesForBalanceFilter, prepareWalletContext, syncDeviceWalletInBackground } from "../services/wallet/syncDeviceWallet";
 import { RootState } from "../store/store";
 import { useTranslation } from "../hooks/useTranslation";
 import { useTheme } from "../hooks/useTheme";
 import type { WalletQuickAction } from "../components/WalletQuickActions";
-import { registerDashboardRefresh } from "../utils/dashboardRefresh";
 import { createMerchantTabPageStyles } from "../styles/merchantTabPageChrome";
+import { useCounterpartyLabelsForTransfers } from "../hooks/useCounterpartyLabelsForTransfers";
+import PayByEmailModal from "../components/PayByEmailModal";
+import type { SendPlan } from "../utils/buildSendPlan";
+import { USDT_NETWORKS, UsdtNetwork } from "../constants/usdtNetworks";
+import { openTransferScreen } from "../utils/openTransferScreen";
+import { asArray } from "../utils/asArray";
+import { formatUsdtAmount } from "../utils/formatAmount";
+import { DENSITY } from "../constants/density";
 
 const sumAmounts = (items: PaymentRequest[]) =>
     items.reduce((total, item) => total + (parseFloat(item.amount) || 0), 0);
@@ -40,12 +51,19 @@ type RecentRow =
 
 const Dashboard: React.FC = () => {
     const navigation: any = useNavigation();
-    const { t } = useTranslation();
-    const { colors, FONTS, isDark } = useTheme();
+    const { t, dateLocale } = useTranslation();
+    const { colors, FONTS } = useTheme();
     const merchant = useAppSelector((state: RootState) => state.auth.merchant);
     const [recentRows, setRecentRows] = useState<RecentRow[]>([]);
+    const recentDeposits = useMemo(
+        () =>
+            recentRows
+                .filter((row): row is Extract<RecentRow, { kind: "deposit" }> => row.kind === "deposit")
+                .map((row) => row.deposit),
+        [recentRows]
+    );
+    const getCounterpartyLabel = useCounterpartyLabelsForTransfers(recentDeposits);
     const [refreshing, setRefreshing] = useState(false);
-    const [activeWalletName, setActiveWalletName] = useState<string | null>(null);
     const [stats, setStats] = useState({
         pending: 0,
         pendingAmount: 0,
@@ -55,143 +73,116 @@ const Dashboard: React.FC = () => {
     });
     const hasLoadedRef = useRef(false);
     const lastBalanceRef = useRef<number | null>(null);
-    const activeWalletIdRef = useRef<string | null>(null);
     const depositsRef = useRef<WalletTransfer[]>([]);
     const paymentsRef = useRef<PaymentRequest[]>([]);
     const dashboardInFlightRef = useRef(false);
-    const lastLoadAtRef = useRef(0);
-    const FOCUS_RELOAD_MS = 15_000;
+    const initialLoadDoneRef = useRef(false);
+    const activeAddressesRef = useRef<Array<{ network: string; address: string }>>([]);
+    const [networkBalances, setNetworkBalances] = useState<Partial<Record<UsdtNetwork, number | null>>>({});
 
     const pageChromeStyles = useMemo(
         () =>
             StyleSheet.create({
                 ...createMerchantTabPageStyles(colors),
                 content: {
-                    paddingTop: 16,
-                    paddingBottom: 24,
+                    paddingTop: 4,
+                    paddingBottom: 16,
+                    gap: DENSITY.sectionGap,
                 },
-                walletChip: {
+                transactionsCard: {
+                    backgroundColor: colors.white,
+                    borderRadius: DENSITY.cardRadius,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    paddingHorizontal: DENSITY.listRowPaddingH,
+                    paddingTop: 2,
+                    paddingBottom: 4,
+                },
+                transactionsHeader: {
                     flexDirection: "row",
                     alignItems: "center",
-                    gap: 6,
-                    backgroundColor: "rgba(255,255,255,0.16)",
-                    borderRadius: 16,
-                    paddingVertical: 6,
-                    paddingHorizontal: 10,
-                    maxWidth: 160,
+                    justifyContent: "space-between",
+                    paddingVertical: 8,
+                    borderBottomWidth: StyleSheet.hairlineWidth,
+                    borderBottomColor: colors.border,
+                    marginBottom: 2,
                 },
-                walletChipIcon: {
-                    width: 18,
-                    height: 18,
-                    borderRadius: 9,
-                    backgroundColor: colors.accentBlue,
-                    alignItems: "center",
-                    justifyContent: "center",
+                transactionsTitle: {
+                    ...FONTS.Mulish_700Bold,
+                    fontSize: DENSITY.sectionTitle,
+                    color: colors.mainDark,
                 },
-                walletChipText: {
+                viewAll: {
                     ...FONTS.Mulish_600SemiBold,
-                    fontSize: 13,
-                    color: "#FFFFFF",
-                    flexShrink: 1,
+                    fontSize: 12,
+                    color: colors.accentBlue,
                 },
-                shell: {
-                    marginTop: 12,
-                    borderRadius: 18,
-                    backgroundColor: isDark ? "#22222C" : "#12121C",
-                    borderWidth: isDark ? 1 : 0,
-                    borderColor: isDark ? colors.border : "transparent",
-                    paddingHorizontal: 12,
-                    paddingTop: 18,
-                    paddingBottom: 20,
+                emptyText: {
+                    ...FONTS.Mulish_400Regular,
+                    fontSize: 13,
+                    color: colors.bodyTextColor,
+                    textAlign: "center",
+                    paddingVertical: 20,
                 },
             }),
-        [FONTS, colors, isDark]
+        [FONTS, colors]
     );
 
-    const iconColor = colors.pureWhite;
+    const actionIconColor = colors.accentBlue;
 
     const handleReceive = useCallback(() => {
         navigation.navigate("ReceiveSelect");
     }, [navigation]);
 
-    const quickActions = useMemo<WalletQuickAction[]>(
-        () => [
-            {
-                key: "send",
-                label: t.common.send,
-                icon: <svg.SendSvg color={iconColor} size={22} />,
-                onPress: () => navigation.navigate("SendSelect"),
-            },
-            {
-                key: "receive",
-                label: t.wallet.receiveTitle,
-                icon: <svg.ReceiveSvg color={iconColor} size={22} />,
-                onPress: handleReceive,
-            },
-            {
-                key: "request",
-                label: t.dashboard.request,
-                icon: <svg.QrCodeSvg color={iconColor} size={22} />,
-                onPress: () => navigation.navigate("CreateInvoice"),
-            },
-            {
-                key: "history",
-                label: t.dashboard.history,
-                icon: <svg.HistorySvg color={iconColor} size={22} />,
-                onPress: () => navigation.getParent()?.navigate("History"),
-            },
-        ],
-        [handleReceive, iconColor, navigation, t]
-    );
-
-    const openWallets = useCallback(() => {
-        const root = navigation.getParent()?.getParent();
-        if (root) {
-            root.navigate("Wallets");
-            return;
-        }
-        navigation.navigate("Wallets");
+    const handleScanToPay = useCallback(async () => {
+        await openTransferScreen(navigation, { returnScreen: "Home", openScan: true });
     }, [navigation]);
 
-    const refreshActiveWallet = useCallback(async (): Promise<boolean> => {
-        try {
-            const wallets = await listLocalWallets();
-            const active = wallets.find((wallet) => wallet.isActive);
-            const nextId = active?.id ?? null;
-            const nextName = active?.name ?? null;
-            const walletChanged =
-                activeWalletIdRef.current != null &&
-                nextId != null &&
-                activeWalletIdRef.current !== nextId;
-            if (walletChanged) {
-                lastBalanceRef.current = 0;
-                setStats({
-                    pending: 0,
-                    pendingAmount: 0,
-                    depositCount: 0,
-                    depositAmount: 0,
-                    walletBalance: 0,
-                });
-                setRecentRows([]);
-                depositsRef.current = [];
-                paymentsRef.current = [];
-                hasLoadedRef.current = false;
+    const handlePayByEmailReady = useCallback(
+        (input: { network: UsdtNetwork; plan: SendPlan }) => {
+            navigation.push("Withdraw", {
+                network: input.network,
+                returnScreen: "Home",
+                initialSendPlan: input.plan,
+                openConfirm: true,
+            });
+        },
+        [navigation]
+    );
+
+    const [payByEmailVisible, setPayByEmailVisible] = useState(false);
+
+    const handleViewHistory = useCallback(() => {
+        navigation.getParent()?.navigate("History");
+    }, [navigation]);
+
+    const handleOpenNetworkCard = useCallback(
+        (network: UsdtNetwork) => {
+            navigation.navigate("WalletReceive", { network });
+        },
+        [navigation]
+    );
+
+    const syncNetworkBalances = useCallback(
+        (
+            balances: Awaited<ReturnType<typeof api.getWalletBalances>>["data"]["balances"] | null | undefined,
+            activeAddresses: Array<{ network: string; address: string }>
+        ) => {
+            const map = resolveNetworkBalanceMap(balances ?? [], activeAddresses);
+            const next: Partial<Record<UsdtNetwork, number | null>> = {};
+            for (const network of USDT_NETWORKS) {
+                const value = map[network];
+                next[network] = typeof value === "number" ? value : null;
             }
-            activeWalletIdRef.current = nextId;
-            setActiveWalletName(nextName);
-            return walletChanged;
-        } catch {
-            activeWalletIdRef.current = null;
-            setActiveWalletName(null);
-            return false;
-        }
-    }, []);
+            setNetworkBalances(next);
+        },
+        []
+    );
 
     const resolveReceivedStats = useCallback(
         (usdtBalance: number, deposits: WalletTransfer[]) => {
             const depositAmount = sumDepositAmounts(deposits);
             const depositCount = usdtDeposits(deposits).length;
-            // Balance updates from live RPC before chain history is indexed — keep received in sync.
             if (usdtBalance > depositAmount + 0.000001) {
                 return {
                     depositAmount: usdtBalance,
@@ -203,24 +194,58 @@ const Dashboard: React.FC = () => {
         []
     );
 
+    const quickActions = useMemo<WalletQuickAction[]>(
+        () => [
+            {
+                key: "send",
+                label: t.dashboard.sendMoney,
+                icon: <svg.SendSvg color={actionIconColor} size={DENSITY.quickActionIcon} />,
+                onPress: () => navigation.navigate("SendFundSelect"),
+            },
+            {
+                key: "qr",
+                label: t.dashboard.qrPay,
+                icon: <svg.QrCodeSvg color={actionIconColor} size={DENSITY.quickActionIcon} />,
+                onPress: () => void handleScanToPay(),
+            },
+            {
+                key: "receive",
+                label: t.common.getPaid,
+                icon: <svg.ReceiveSvg color={actionIconColor} size={DENSITY.quickActionIcon} />,
+                onPress: handleReceive,
+            },
+            {
+                key: "history",
+                label: t.tabs.history,
+                icon: <svg.HistorySvg color={actionIconColor} size={DENSITY.quickActionIcon} />,
+                onPress: handleViewHistory,
+            },
+        ],
+        [actionIconColor, handleReceive, handleScanToPay, handleViewHistory, navigation, t]
+    );
+
     const applyDashboardData = useCallback(
         (
-            items: PaymentRequest[],
-            deposits: WalletTransfer[],
-            balances: Awaited<ReturnType<typeof api.getWalletBalances>>["data"]["balances"],
+            items: PaymentRequest[] | null | undefined,
+            deposits: WalletTransfer[] | null | undefined,
+            balances: Awaited<ReturnType<typeof api.getWalletBalances>>["data"]["balances"] | null | undefined,
             prices: Record<string, number>
         ) => {
-            paymentsRef.current = items;
-            depositsRef.current = deposits;
+            const safeItems = items ?? [];
+            const safeDeposits = deposits ?? [];
+            const safeBalances = balances ?? [];
+            paymentsRef.current = safeItems;
+            depositsRef.current = safeDeposits;
 
-            const pendingItems = items.filter((p) => p.status === "PENDING");
-            const paymentRows: RecentRow[] = items.map((payment) => ({
+            const pendingItems = safeItems.filter((p) => p.status === "PENDING");
+            const activityPayments = filterPaymentsForActivityFeed(safeItems, safeDeposits);
+            const paymentRows: RecentRow[] = activityPayments.map((payment) => ({
                 kind: "payment",
                 key: `payment:${payment.id}`,
                 sortAt: new Date(payment.paidAt || payment.createdAt).getTime(),
                 payment,
             }));
-            const depositRows: RecentRow[] = deposits.map((deposit) => ({
+            const depositRows: RecentRow[] = safeDeposits.map((deposit) => ({
                 kind: "deposit",
                 key: deposit.id,
                 sortAt: new Date(deposit.timestamp).getTime(),
@@ -228,10 +253,10 @@ const Dashboard: React.FC = () => {
             }));
             const merged = buildRecentActivityRows(paymentRows, depositRows, 8);
 
-            const walletBalance = computePortfolioUsd(balances, prices);
-            const usdtBalance = sumWalletBalances(balances);
+            const walletBalance = computePortfolioUsd(safeBalances, prices);
+            const usdtBalance = sumWalletBalances(safeBalances);
             lastBalanceRef.current = walletBalance;
-            const received = resolveReceivedStats(usdtBalance, deposits);
+            const received = resolveReceivedStats(usdtBalance, safeDeposits);
 
             setRecentRows(merged);
             setStats({
@@ -247,11 +272,12 @@ const Dashboard: React.FC = () => {
 
     const applyBalanceSnapshot = useCallback(
         (
-            balances: Awaited<ReturnType<typeof api.getWalletBalances>>["data"]["balances"],
+            balances: Awaited<ReturnType<typeof api.getWalletBalances>>["data"]["balances"] | null | undefined,
             prices: Record<string, number>
         ) => {
-            const walletBalance = computePortfolioUsd(balances, prices);
-            const usdtBalance = sumWalletBalances(balances);
+            const safeBalances = balances ?? [];
+            const walletBalance = computePortfolioUsd(safeBalances, prices);
+            const usdtBalance = sumWalletBalances(safeBalances);
             lastBalanceRef.current = walletBalance;
             const received = resolveReceivedStats(usdtBalance, depositsRef.current);
 
@@ -275,11 +301,11 @@ const Dashboard: React.FC = () => {
             if (!silent) setRefreshing(true);
 
             try {
-                syncDeviceWalletInBackground({ force: live });
                 if (live) {
                     invalidateCachedGet("/merchant/wallets/transfers");
                     invalidateCachedGet("/payments/requests");
                 }
+                syncDeviceWalletInBackground({ force: live });
 
                 const [
                     addressesSettled,
@@ -288,121 +314,103 @@ const Dashboard: React.FC = () => {
                     paymentsSettled,
                     transfersSettled,
                 ] = await Promise.allSettled([
-                    resolveWalletAddressesForFilter(),
+                    live ? prepareWalletContext() : resolveWalletAddressesForBalanceFilter(),
                     getTokenUsdPrices(),
-                    live ? api.getWalletBalances({ live: true }) : api.getWalletBalances(),
+                    api.getWalletBalances({ live: true }),
                     api.listPayments({ limit: 50 }),
                     api.getWalletTransfers(),
                 ]);
 
-                const activeAddresses =
-                    addressesSettled.status === "fulfilled" ? addressesSettled.value : [];
+                const activeAddresses = asArray(
+                    addressesSettled.status === "fulfilled" ? addressesSettled.value : undefined
+                );
                 const prices =
                     pricesSettled.status === "fulfilled"
                         ? pricesSettled.value
-                        : { USDT: 1, BNB: 600, ETH: 2500, TRX: 0.12, POL: 0.45, SOL: 150 };
+                        : { USDT: 1, BNB: 600, ETH: 2500, TRX: 0.12 };
 
-                const balances =
+                const rawBalances = asArray(
                     balancesSettled.status === "fulfilled"
-                        ? filterBalancesForActiveWallet(
-                              balancesSettled.value.data.balances,
-                              activeAddresses
-                          )
-                        : [];
+                        ? balancesSettled.value?.data?.balances
+                        : undefined
+                );
+                const balances = filterBalancesForActiveWallet(rawBalances, activeAddresses);
+                activeAddressesRef.current = activeAddresses;
+                syncNetworkBalances(balances, activeAddresses);
 
-                if (balances.length > 0) {
-                    applyBalanceSnapshot(balances, prices);
-                    if (!silent) setRefreshing(false);
-                }
+                applyBalanceSnapshot(balances, prices);
+                if (!silent) setRefreshing(false);
 
-                const items =
+                const items = asArray(
                     paymentsSettled.status === "fulfilled"
-                        ? paymentsSettled.value.data.items
-                        : paymentsRef.current;
-                const depositsRaw =
+                        ? paymentsSettled.value?.data?.items
+                        : paymentsRef.current
+                );
+                const depositsRaw = asArray(
                     transfersSettled.status === "fulfilled"
-                        ? transfersSettled.value.data.transfers
-                        : depositsRef.current;
+                        ? transfersSettled.value?.data?.transfers
+                        : depositsRef.current
+                );
                 const deposits = filterTransfersForDisplay(
                     filterTransfersForActiveWallet(depositsRaw, activeAddresses)
                 );
 
                 applyDashboardData(items, deposits, balances, prices);
                 hasLoadedRef.current = true;
+            } catch {
+                // Avoid unhandled promise rejections when API payloads omit arrays.
             } finally {
                 dashboardInFlightRef.current = false;
                 if (!silent) setRefreshing(false);
             }
         },
-        [applyBalanceSnapshot, applyDashboardData]
+        [applyBalanceSnapshot, applyDashboardData, syncNetworkBalances]
     );
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
         try {
-            await refreshActiveWallet();
             await loadDashboard({ silent: true, live: true });
         } finally {
             setRefreshing(false);
         }
-    }, [loadDashboard, refreshActiveWallet]);
+    }, [loadDashboard]);
 
     useEffect(() => {
-        return registerDashboardRefresh(() => {
-            invalidateCachedGet("/merchant/wallets/transfers");
-            invalidateCachedGet("/payments/requests");
-            loadDashboard({ silent: true });
-        });
+        if (initialLoadDoneRef.current) return;
+        initialLoadDoneRef.current = true;
+        void loadDashboard();
     }, [loadDashboard]);
 
     useFocusEffect(
         useCallback(() => {
-            void (async () => {
-                const walletChanged = await refreshActiveWallet();
-                syncDeviceWalletInBackground({ force: walletChanged });
-                const silent = hasLoadedRef.current;
-                if (
-                    silent &&
-                    !walletChanged &&
-                    Date.now() - lastLoadAtRef.current < FOCUS_RELOAD_MS &&
-                    isCachedGetFresh("/merchant/wallets/balances", 12_000)
-                ) {
-                    return;
-                }
-                await loadDashboard({ silent });
-                lastLoadAtRef.current = Date.now();
-            })();
-        }, [loadDashboard, refreshActiveWallet])
+            if (!hasLoadedRef.current) return;
+            void loadDashboard({ silent: true, live: true });
+        }, [loadDashboard])
     );
+
+    useEffect(() => {
+        return registerDashboardRefresh(() => {
+            void loadDashboard({ silent: true, live: true });
+        });
+    }, [loadDashboard]);
+
+    const formatTime = useCallback(
+        (iso: string) =>
+            new Date(iso).toLocaleString(dateLocale, {
+                hour: "numeric",
+                minute: "2-digit",
+            }),
+        [dateLocale]
+    );
+
+    const displayName =
+        merchant?.businessName?.trim().split(/\s+/)[0] ||
+        merchant?.businessName ||
+        t.common.merchant;
 
     return (
         <View style={pageChromeStyles.root}>
-            <View style={pageChromeStyles.headerWrap}>
-                <components.MerchantTabHeader
-                    eyebrow={t.dashboard.welcomeBack}
-                    title={merchant?.businessName || t.common.merchant}
-                    subtitle={t.dashboard.subtitle}
-                    subtitleAccessory={
-                        activeWalletName ? (
-                            <TouchableOpacity
-                                style={pageChromeStyles.walletChip}
-                                onPress={openWallets}
-                                activeOpacity={0.85}
-                                accessibilityRole="button"
-                                accessibilityLabel={t.wallet.walletsTitle}
-                            >
-                                <View style={pageChromeStyles.walletChipIcon}>
-                                    <svg.WalletSvg color="#FFFFFF" size={11} variant="outline" />
-                                </View>
-                                <Text style={pageChromeStyles.walletChipText} numberOfLines={1}>
-                                    {activeWalletName}
-                                </Text>
-                            </TouchableOpacity>
-                        ) : null
-                    }
-                />
-            </View>
-
             <View style={pageChromeStyles.contentArea}>
                 <components.ScreenScroll
                     refreshControl={
@@ -413,13 +421,19 @@ const Dashboard: React.FC = () => {
                             }}
                             tintColor={colors.accentBlue}
                             colors={[colors.accentBlue]}
-                            progressBackgroundColor={isDark ? "#22222C" : "#FFFFFF"}
+                            progressBackgroundColor={colors.white}
                         />
                     }
                 >
+                    <DashboardHomeHeader
+                        name={displayName}
+                        onNotificationsPress={handleViewHistory}
+                        onBalancePress={() => navigation.navigate("BalanceDetail")}
+                    />
+
                     <components.MerchantContent style={pageChromeStyles.content}>
                         <components.MerchantBalanceCard
-                            businessName={merchant?.businessName || t.common.merchant}
+                            businessName={displayName}
                             walletBalance={stats.walletBalance}
                             pendingCount={stats.pending}
                             pendingAmount={stats.pendingAmount}
@@ -431,54 +445,93 @@ const Dashboard: React.FC = () => {
                             }}
                             refreshing={refreshing}
                         />
-                        <View style={pageChromeStyles.shell}>
-                            <components.WalletQuickActions actions={quickActions} variant="onDark" />
-                        </View>
-                    </components.MerchantContent>
 
-                    <components.MerchantContent>
-                        <Text style={{ ...FONTS.H4, color: colors.mainDark, marginBottom: 12 }}>
-                            {t.dashboard.recentActivity}
-                        </Text>
-                        {recentRows.length === 0 ? (
-                            <Text
-                                style={{
-                                    color: colors.bodyTextColor,
-                                    textAlign: "center",
-                                    paddingVertical: 24,
-                                }}
-                            >
-                                {t.dashboard.noRecentActivity}
-                            </Text>
-                        ) : (
-                            recentRows.map((row) =>
-                                row.kind === "payment" ? (
-                                    <components.PaymentListItem
-                                        key={row.key}
-                                        item={row.payment}
-                                        onPress={() =>
-                                            navigation.navigate("TransactionDetails", {
-                                                payment: row.payment,
-                                                paymentId: row.payment.id,
-                                            })
-                                        }
-                                    />
-                                ) : (
-                                    <WalletDepositListItem
-                                        key={row.key}
-                                        item={row.deposit}
-                                        onPress={() =>
-                                            navigation.navigate("WalletDepositDetails", {
-                                                deposit: row.deposit,
-                                            })
-                                        }
-                                    />
-                                )
-                            )
-                        )}
+                        <components.WalletQuickActions
+                            title={t.dashboard.quickActions}
+                            actions={quickActions}
+                            variant="banking"
+                        />
+
+                        <DashboardWalletCards
+                            balances={networkBalances}
+                            onCardPress={handleOpenNetworkCard}
+                        />
+
+                        <View style={pageChromeStyles.transactionsCard}>
+                            <View style={pageChromeStyles.transactionsHeader}>
+                                <Text style={pageChromeStyles.transactionsTitle}>
+                                    {t.dashboard.lastTransactions}
+                                </Text>
+                                <TouchableOpacity
+                                    onPress={handleViewHistory}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={t.dashboard.viewAll}
+                                >
+                                    <Text style={pageChromeStyles.viewAll}>{t.dashboard.viewAll}</Text>
+                                </TouchableOpacity>
+                            </View>
+                            {recentRows.length === 0 ? (
+                                <Text style={pageChromeStyles.emptyText}>
+                                    {t.dashboard.noRecentActivity}
+                                </Text>
+                            ) : (
+                                recentRows.map((row) => {
+                                    if (row.kind === "payment") {
+                                        const payment = row.payment;
+                                        const name =
+                                            payment.reference?.trim() || t.transaction.counterpartyUnknown;
+                                        return (
+                                            <DashboardTransactionRow
+                                                key={row.key}
+                                                name={name}
+                                                timeLabel={formatTime(payment.paidAt || payment.createdAt)}
+                                                amountLabel={`+$${formatUsdtAmount(payment.amount, dateLocale)}`}
+                                                isCredit
+                                                onPress={() =>
+                                                    navigation.navigate("TransactionDetails", {
+                                                        payment,
+                                                        paymentId: payment.id,
+                                                    })
+                                                }
+                                            />
+                                        );
+                                    }
+
+                                    const deposit = row.deposit;
+                                    const counterparty = getCounterpartyLabel(deposit);
+                                    const isSend = deposit.type === "SEND";
+                                    const name =
+                                        counterparty?.name ||
+                                        (isSend
+                                            ? t.transaction.counterpartyUnknown
+                                            : t.payment.depositReceived);
+                                    const amount = `$${formatUsdtAmount(deposit.amount, dateLocale)}`;
+
+                                    return (
+                                        <DashboardTransactionRow
+                                            key={row.key}
+                                            name={name}
+                                            timeLabel={formatTime(deposit.timestamp)}
+                                            amountLabel={isSend ? `-${amount}` : `+${amount}`}
+                                            isCredit={!isSend}
+                                            onPress={() =>
+                                                navigation.navigate("WalletDepositDetails", {
+                                                    deposit,
+                                                })
+                                            }
+                                        />
+                                    );
+                                })
+                            )}
+                        </View>
                     </components.MerchantContent>
                 </components.ScreenScroll>
             </View>
+            <PayByEmailModal
+                visible={payByEmailVisible}
+                onClose={() => setPayByEmailVisible(false)}
+                onReadyToConfirm={handlePayByEmailReady}
+            />
         </View>
     );
 };

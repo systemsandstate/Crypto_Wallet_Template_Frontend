@@ -2,8 +2,10 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { triggerWalletSetupRefresh } from '../../utils/walletSetupRefresh';
+import { filterSupportedWalletAddresses } from '../../utils/walletSync';
 
 const WALLET_STORAGE_KEY = 'merchantWalletEncrypted';
+const LEGACY_WALLET_MERCHANT_KEY = `${WALLET_STORAGE_KEY}:merchantId`;
 const WALLET_SETUP_KEY = 'merchantWalletSetupComplete';
 const WALLET_ADDRESSES_KEY = 'merchantWalletAddresses';
 const WALLET_VAULT_KEY = 'merchantWalletVault';
@@ -21,20 +23,15 @@ export type LocalWalletRecord = {
   encryptedMnemonic: string;
   addresses: StoredWalletAddress[];
   createdAt: string;
+  /** Plain TRON EOA from mnemonic — used to derive GasFree receive address. */
+  trc20OwnerEoa?: string;
   /** App install that created this wallet — wallets from other devices are hidden. */
   deviceId?: string;
   /** Set only when the user completes WalletSetup on this device (not migration/sync). */
   createdViaSetup?: boolean;
 };
 
-export type LocalWalletSummary = {
-  id: string;
-  name: string;
-  addresses: StoredWalletAddress[];
-  createdAt: string;
-  isActive: boolean;
-};
-
+/** One wallet per merchant account (vault may temporarily hold migrations). */
 type WalletVault = {
   version: 3;
   activeWalletId: string | null;
@@ -47,15 +44,25 @@ const invalidateVaultCache = (): void => {
   vaultCache = null;
 };
 
-const nextWalletNameFromVault = (vault: WalletVault): string => {
-  const used = new Set(vault.wallets.map((w) => w.name.trim().toLowerCase()));
-  let index = vault.wallets.length + 1;
-  let name = `Main Wallet ${index}`;
-  while (used.has(name.toLowerCase())) {
-    index += 1;
-    name = `Main Wallet ${index}`;
+const DEFAULT_WALLET_NAME = 'My Wallet';
+
+/** Collapse any multi-wallet vault down to a single active record. */
+const toSingleWalletVault = (vault: WalletVault): WalletVault => {
+  if (vault.wallets.length <= 1) {
+    const only = vault.wallets[0] ?? null;
+    return {
+      version: 3,
+      activeWalletId: only?.id ?? null,
+      wallets: only ? [only] : [],
+    };
   }
-  return name;
+  const active =
+    vault.wallets.find((w) => w.id === vault.activeWalletId) ?? vault.wallets[0];
+  return {
+    version: 3,
+    activeWalletId: active.id,
+    wallets: [active],
+  };
 };
 
 const useSecureStore = Platform.OS !== 'web';
@@ -104,8 +111,22 @@ const isLargePayloadKey = (key: string): boolean =>
   key.startsWith(`${WALLET_VAULT_KEY}:`) ||
   key === WALLET_VAULT_KEY;
 
-const isLikelyEncryptedMnemonic = (value: string): boolean =>
-  value.length >= 80 && (value.startsWith('{') || value.startsWith('['));
+const isLikelyEncryptedMnemonic = (value: string): boolean => {
+  if (value.length < 80 || (!value.startsWith('{') && !value.startsWith('['))) {
+    return false;
+  }
+  try {
+    const parsed = JSON.parse(value) as {
+      crypto?: { cipher?: string; kdf?: string };
+      Crypto?: { cipher?: string; kdf?: string };
+    };
+    // ethers v6 writes "Crypto"; some tooling uses lowercase "crypto".
+    const crypto = parsed.crypto ?? parsed.Crypto;
+    return Boolean(crypto?.cipher && crypto?.kdf);
+  } catch {
+    return value.length >= 80;
+  }
+};
 
 const isLikelyVaultPayload = (value: string): boolean => {
   if (value.length < 100) return false;
@@ -240,6 +261,74 @@ const clearLegacyWalletKeys = async (): Promise<void> => {
   await writeKey(WALLET_SETUP_KEY, null);
   await writeKey(WALLET_ADDRESSES_KEY, null);
   await writeKey(`${WALLET_STORAGE_KEY}:deviceId`, null);
+  await writeKey(LEGACY_WALLET_MERCHANT_KEY, null);
+};
+
+/** Drop cached legacy wallet + active merchant on logout; per-merchant vaults stay on device. */
+export const clearWalletSession = async (): Promise<void> => {
+  invalidateVaultCache();
+  await writeKey(ACTIVE_MERCHANT_KEY, null);
+  await clearLegacyWalletKeys();
+};
+
+const listMerchantVaultIds = async (): Promise<string[]> => {
+  const prefix = `${WALLET_VAULT_KEY}:`;
+  if (Platform.OS === 'web') {
+    if (typeof localStorage === 'undefined') return [];
+    const ids: string[] = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith(prefix)) continue;
+      const merchantId = key.slice(prefix.length);
+      if (merchantId && localStorage.getItem(key)) ids.push(merchantId);
+    }
+    return ids;
+  }
+
+  const keys = await AsyncStorage.getAllKeys();
+  return keys
+    .filter((key) => key.startsWith(prefix))
+    .map((key) => key.slice(prefix.length))
+    .filter(Boolean);
+};
+
+const hasOtherMerchantVaults = async (merchantId: string): Promise<boolean> => {
+  const ids = await listMerchantVaultIds();
+  return ids.some((id) => id !== merchantId);
+};
+
+/** Global legacy keys belong to one merchant — never import into a different account. */
+const canUseLegacyWalletForMerchant = async (merchantId: string): Promise<boolean> => {
+  const legacyOwner = await readKey(LEGACY_WALLET_MERCHANT_KEY);
+  if (legacyOwner) return legacyOwner === merchantId;
+  // Untagged legacy (pre multi-account): only migrate when no other merchant vault exists.
+  return !(await hasOtherMerchantVaults(merchantId));
+};
+
+const dedupeWalletAcrossMerchants = async (merchantId: string): Promise<void> => {
+  const vault = await loadVaultRaw(merchantId);
+  const active = vault?.wallets[0];
+  if (!active?.encryptedMnemonic) return;
+
+  const merchantIds = await listMerchantVaultIds();
+  let canonicalMerchantId: string | null = null;
+  let earliestCreatedAt = active.createdAt;
+
+  for (const id of merchantIds) {
+    const candidateVault = await loadVaultRaw(id);
+    const candidate = candidateVault?.wallets[0];
+    if (candidate?.encryptedMnemonic !== active.encryptedMnemonic) continue;
+
+    if (!canonicalMerchantId || candidate.createdAt < earliestCreatedAt) {
+      canonicalMerchantId = id;
+      earliestCreatedAt = candidate.createdAt;
+    }
+  }
+
+  if (canonicalMerchantId && canonicalMerchantId !== merchantId) {
+    await saveVault(emptyVault(), merchantId);
+    invalidateVaultCache();
+  }
 };
 
 /** Call after login so vault reads are scoped to the signed-in merchant. */
@@ -247,6 +336,7 @@ export const setWalletMerchantContext = async (merchantId: string): Promise<void
   invalidateVaultCache();
   await writeKey(ACTIVE_MERCHANT_KEY, merchantId);
   await purgeInvalidDeviceWallets(merchantId);
+  await dedupeWalletAcrossMerchants(merchantId);
   triggerWalletSetupRefresh();
 };
 
@@ -336,9 +426,14 @@ const emptyVault = (): WalletVault => ({
   wallets: [],
 });
 
-/** Only wallets explicitly set up on this device install are visible. */
-const belongsToThisDevice = (wallet: LocalWalletRecord, deviceId: string): boolean =>
-  wallet.createdViaSetup === true && wallet.deviceId === deviceId;
+/** Wallets with decryptable mnemonic on this install are usable (one wallet per account). */
+const belongsToThisDevice = (wallet: LocalWalletRecord, deviceId: string): boolean => {
+  if (!isLikelyEncryptedMnemonic(wallet.encryptedMnemonic ?? '')) return false;
+  if (wallet.createdViaSetup === true && wallet.deviceId === deviceId) return true;
+  // Adopt after device-id rotate / SecureStore wipe / old multi-device records.
+  if (!wallet.deviceId || wallet.deviceId === deviceId) return true;
+  return wallet.createdViaSetup === true;
+};
 
 const filterVaultForDevice = (vault: WalletVault, deviceId: string): WalletVault => {
   const wallets = vault.wallets.filter((w) => belongsToThisDevice(w, deviceId));
@@ -350,27 +445,27 @@ const filterVaultForDevice = (vault: WalletVault, deviceId: string): WalletVault
 };
 
 const purgeInvalidDeviceWallets = async (merchantId: string): Promise<void> => {
-  const raw = await readKey(vaultKeyForMerchant(merchantId));
-  if (!raw) return;
+  const deviceId = await getOrCreateDeviceId();
+  const vault = await loadVaultRaw(merchantId);
 
-  try {
-    const parsed = normalizeVault(JSON.parse(raw) as WalletVault);
-    if (!parsed) return;
-
-    const deviceId = await getOrCreateDeviceId();
-    const pruned = filterVaultForDevice(parsed, deviceId);
-    await saveVault(pruned, merchantId);
-
-    if (pruned.wallets.length === 0) {
-      await clearLegacyWalletKeys();
-    }
-  } catch {
-    await writeKey(vaultKeyForMerchant(merchantId), null);
-    await clearLegacyWalletKeys();
+  if (!vault?.wallets.length) {
+    return;
   }
+
+  const adopted = adoptNativeLegacyWallets(vault, deviceId);
+  const pruned = filterVaultForDevice(adopted, deviceId);
+
+  if (pruned.wallets.length) {
+    if (vaultChanged(vault, adopted) || vaultChanged(adopted, pruned)) {
+      await saveVault(pruned, merchantId);
+    }
+    return;
+  }
+
+  await saveVault(emptyVault(), merchantId);
 };
 
-const syncLegacyKeys = async (vault: WalletVault): Promise<void> => {
+const syncLegacyKeys = async (vault: WalletVault, merchantId: string): Promise<void> => {
   const active = vault.wallets.find((w) => w.id === vault.activeWalletId) ?? vault.wallets[0] ?? null;
   if (!active) {
     await clearLegacyWalletKeys();
@@ -380,6 +475,7 @@ const syncLegacyKeys = async (vault: WalletVault): Promise<void> => {
     writeKey(WALLET_STORAGE_KEY, active.encryptedMnemonic),
     writeKey(WALLET_SETUP_KEY, 'true'),
     writeKey(WALLET_ADDRESSES_KEY, JSON.stringify(active.addresses)),
+    writeKey(LEGACY_WALLET_MERCHANT_KEY, merchantId),
     active.deviceId
       ? writeKey(`${WALLET_STORAGE_KEY}:deviceId`, active.deviceId)
       : Promise.resolve(),
@@ -388,7 +484,7 @@ const syncLegacyKeys = async (vault: WalletVault): Promise<void> => {
 
 const saveVault = async (vault: WalletVault, merchantId: string): Promise<void> => {
   await writeKey(vaultKeyForMerchant(merchantId), JSON.stringify(vault));
-  await syncLegacyKeys(vault);
+  await syncLegacyKeys(vault, merchantId);
   vaultCache = { merchantId, vault };
 };
 
@@ -397,12 +493,13 @@ const normalizeVault = (parsed: WalletVault | null): WalletVault | null => {
   const wallets = parsed.wallets.filter(
     (w) => w?.id && w?.encryptedMnemonic && Array.isArray(w.addresses)
   );
-  if (!wallets.length && parsed.version !== 2 && parsed.version !== 3) return null;
-  return {
+  const version = Number((parsed as { version?: number }).version);
+  if (!wallets.length && version !== 2 && version !== 3) return null;
+  return toSingleWalletVault({
     version: 3,
     activeWalletId: parsed.activeWalletId ?? wallets[0]?.id ?? null,
     wallets,
-  };
+  });
 };
 
 const migrateGlobalVaultToMerchant = async (merchantId: string): Promise<WalletVault | null> => {
@@ -418,7 +515,8 @@ const migrateGlobalVaultToMerchant = async (merchantId: string): Promise<WalletV
     const parsed = normalizeVault(JSON.parse(raw) as WalletVault);
     if (!parsed?.wallets.length) return null;
     const deviceId = await getOrCreateDeviceId();
-    const scoped = filterVaultForDevice(parsed, deviceId);
+    const adopted = adoptNativeLegacyWallets(parsed, deviceId);
+    const scoped = filterVaultForDevice(adopted, deviceId);
     if (scoped.wallets.length) {
       await saveVault(scoped, merchantId);
     }
@@ -446,17 +544,19 @@ const loadVaultRaw = async (merchantId: string): Promise<WalletVault | null> => 
 };
 
 const adoptNativeLegacyWallets = (vault: WalletVault, deviceId: string): WalletVault => {
-  if (Platform.OS === 'web') return vault;
-
   let changed = false;
-  const wallets = vault.wallets.map((wallet) => {
-    if (wallet.createdViaSetup) return wallet;
-    if (!wallet.encryptedMnemonic) return wallet;
-    if (wallet.deviceId && wallet.deviceId !== deviceId) return wallet;
+  const wallets = (vault.wallets ?? []).map((wallet) => {
+    if (!isLikelyEncryptedMnemonic(wallet.encryptedMnemonic ?? '')) return wallet;
+
+    // One wallet per account: bind any decryptable local record to this install.
+    const needsAdopt =
+      wallet.createdViaSetup !== true || !wallet.deviceId || wallet.deviceId !== deviceId;
+    if (!needsAdopt) return wallet;
+
     changed = true;
     return {
       ...wallet,
-      deviceId: wallet.deviceId ?? deviceId,
+      deviceId,
       createdViaSetup: true,
     };
   });
@@ -465,22 +565,20 @@ const adoptNativeLegacyWallets = (vault: WalletVault, deviceId: string): WalletV
 };
 
 const migrateLegacyToVault = async (merchantId: string, deviceId: string): Promise<WalletVault> => {
-  const encrypted = await readKey(WALLET_STORAGE_KEY);
-  const setup = await readKey(WALLET_SETUP_KEY);
-  const addresses = parseAddresses(await readKey(WALLET_ADDRESSES_KEY));
-
-  if (!encrypted || setup !== 'true') {
+  if (!(await canUseLegacyWalletForMerchant(merchantId))) {
     return emptyVault();
   }
 
-  const legacyDevice = await readKey(`${WALLET_STORAGE_KEY}:deviceId`);
-  if (legacyDevice && legacyDevice !== deviceId) {
+  const encrypted = await readKey(WALLET_STORAGE_KEY);
+  const addresses = parseAddresses(await readKey(WALLET_ADDRESSES_KEY));
+
+  if (!encrypted || !isLikelyEncryptedMnemonic(encrypted)) {
     return emptyVault();
   }
 
   const wallet: LocalWalletRecord = {
     id: newWalletId(),
-    name: 'Main Wallet 1',
+    name: DEFAULT_WALLET_NAME,
     encryptedMnemonic: encrypted,
     addresses,
     createdAt: new Date().toISOString(),
@@ -500,7 +598,17 @@ const migrateLegacyToVault = async (merchantId: string, deviceId: string): Promi
 
 const vaultChanged = (before: WalletVault, after: WalletVault): boolean =>
   before.wallets.length !== after.wallets.length ||
-  before.wallets.some((w, i) => w.id !== after.wallets[i]?.id);
+  before.activeWalletId !== after.activeWalletId ||
+  before.wallets.some((w, i) => {
+    const next = after.wallets[i];
+    return (
+      !next ||
+      w.id !== next.id ||
+      w.deviceId !== next.deviceId ||
+      w.createdViaSetup !== next.createdViaSetup ||
+      w.encryptedMnemonic !== next.encryptedMnemonic
+    );
+  });
 
 const loadVault = async (): Promise<WalletVault> => {
   const merchantId = await getWalletMerchantId();
@@ -517,16 +625,12 @@ const loadVault = async (): Promise<WalletVault> => {
   if (existing) {
     const adopted = adoptNativeLegacyWallets(existing, deviceId);
     vault = filterVaultForDevice(adopted, deviceId);
-    if (vaultChanged(existing, adopted)) {
-      await saveVault(adopted, merchantId);
+    if (vaultChanged(existing, vault)) {
+      await saveVault(vault, merchantId);
     }
   } else {
     vault = await migrateLegacyToVault(merchantId, deviceId);
     vault = filterVaultForDevice(vault, deviceId);
-  }
-
-  if (existing && vaultChanged(existing, vault)) {
-    await saveVault(vault, merchantId);
   }
 
   if (vault.wallets.length > 0 && !vault.activeWalletId) {
@@ -535,71 +639,61 @@ const loadVault = async (): Promise<WalletVault> => {
   }
 
   if (vault.wallets.length === 0) {
-    await clearLegacyWalletKeys();
+    const legacyEncrypted = await readKey(WALLET_STORAGE_KEY);
+    if (
+      legacyEncrypted &&
+      isLikelyEncryptedMnemonic(legacyEncrypted) &&
+      (await canUseLegacyWalletForMerchant(merchantId))
+    ) {
+      const recovered = filterVaultForDevice(
+        adoptNativeLegacyWallets(await migrateLegacyToVault(merchantId, deviceId), deviceId),
+        deviceId
+      );
+      if (recovered.wallets.length) {
+        vault = recovered;
+        await saveVault(vault, merchantId);
+      }
+    } else if (!legacyEncrypted) {
+      await clearLegacyWalletKeys();
+    }
   }
 
   vaultCache = { merchantId, vault };
   return vault;
 };
 
-export const nextWalletName = async (): Promise<string> => {
-  const vault = await loadVault();
-  return nextWalletNameFromVault(vault);
-};
-
-export const listLocalWallets = async (): Promise<LocalWalletSummary[]> => {
-  const vault = await loadVault();
-  return vault.wallets.map((wallet) => ({
-    id: wallet.id,
-    name: wallet.name,
-    addresses: wallet.addresses,
-    createdAt: wallet.createdAt,
-    isActive: wallet.id === vault.activeWalletId,
-  }));
-};
-
 export const getActiveWalletRecord = async (): Promise<LocalWalletRecord | null> => {
   const vault = await loadVault();
-  if (!vault.activeWalletId) return null;
-  return vault.wallets.find((w) => w.id === vault.activeWalletId) ?? null;
+  return vault.wallets[0] ?? null;
 };
 
-export const addLocalWallet = async (input: {
-  name?: string;
-  encryptedMnemonic: string;
-  addresses: StoredWalletAddress[];
-}): Promise<LocalWalletRecord> => {
-  const merchantId = await getWalletMerchantId();
-  if (!merchantId) {
-    throw new Error('Sign in before creating a wallet.');
-  }
+export const persistTrc20OwnerEoa = async (ownerEoa: string): Promise<void> => {
+  const trimmed = ownerEoa.trim();
+  if (!trimmed) return;
 
-  const deviceId = await getOrCreateDeviceId();
+  const merchantId = await getWalletMerchantId();
+  if (!merchantId) return;
+
   const vault = await loadVault();
-  const wallet: LocalWalletRecord = {
-    id: newWalletId(),
-    name: input.name?.trim() || nextWalletNameFromVault(vault),
-    encryptedMnemonic: input.encryptedMnemonic,
-    addresses: input.addresses,
-    createdAt: new Date().toISOString(),
-    deviceId,
-    createdViaSetup: true,
-  };
-  vault.wallets.push(wallet);
-  vault.activeWalletId = wallet.id;
-  await saveVault(vault, merchantId);
-  await writeKey(`${WALLET_STORAGE_KEY}:deviceId`, deviceId);
-  return wallet;
+  const active = vault.wallets[0];
+  if (!active) return;
+
+  if (active.trc20OwnerEoa === trimmed) return;
+
+  active.trc20OwnerEoa = trimmed;
+  await saveVault(toSingleWalletVault({ ...vault, wallets: [active] }), merchantId);
+  invalidateVaultCache();
 };
 
 /**
- * Create or re-activate a wallet on this device from Wallet Setup.
- * Importing a recovery phrase restores wallets created on other phones or browsers.
+ * Create or replace the single wallet on this device from Wallet Setup.
+ * One account = one wallet; importing again overwrites the previous local wallet.
  */
 export const restoreLocalWalletFromSetup = async (input: {
   name?: string;
   encryptedMnemonic: string;
   addresses: StoredWalletAddress[];
+  trc20OwnerEoa?: string;
 }): Promise<LocalWalletRecord> => {
   const merchantId = await getWalletMerchantId();
   if (!merchantId) {
@@ -608,73 +702,37 @@ export const restoreLocalWalletFromSetup = async (input: {
 
   const deviceId = await getOrCreateDeviceId();
   const vault = await loadVault();
-  const existing = vault.wallets.find((wallet) => walletsMatch(wallet.addresses, input.addresses));
+  const existing = vault.wallets[0];
 
-  if (existing) {
+  if (existing && walletsMatch(existing.addresses, input.addresses)) {
     existing.encryptedMnemonic = input.encryptedMnemonic;
     existing.createdViaSetup = true;
     existing.deviceId = deviceId;
-    vault.activeWalletId = existing.id;
-    await saveVault(vault, merchantId);
+    if (input.trc20OwnerEoa?.trim()) existing.trc20OwnerEoa = input.trc20OwnerEoa.trim();
+    if (input.name?.trim()) existing.name = input.name.trim();
+    await saveVault(toSingleWalletVault({ ...vault, wallets: [existing] }), merchantId);
     await writeKey(`${WALLET_STORAGE_KEY}:deviceId`, deviceId);
+    invalidateVaultCache();
     return existing;
   }
 
   const wallet: LocalWalletRecord = {
-    id: newWalletId(),
-    name: input.name?.trim() || nextWalletNameFromVault(vault),
+    id: existing?.id ?? newWalletId(),
+    name: input.name?.trim() || existing?.name || DEFAULT_WALLET_NAME,
     encryptedMnemonic: input.encryptedMnemonic,
-    addresses: input.addresses,
-    createdAt: new Date().toISOString(),
+    addresses: filterSupportedWalletAddresses(input.addresses),
+    trc20OwnerEoa: input.trc20OwnerEoa?.trim() || existing?.trc20OwnerEoa,
+    createdAt: existing?.createdAt ?? new Date().toISOString(),
     deviceId,
     createdViaSetup: true,
   };
-  vault.wallets.push(wallet);
-  vault.activeWalletId = wallet.id;
-  await saveVault(vault, merchantId);
+  await saveVault(
+    { version: 3, activeWalletId: wallet.id, wallets: [wallet] },
+    merchantId
+  );
   await writeKey(`${WALLET_STORAGE_KEY}:deviceId`, deviceId);
+  invalidateVaultCache();
   return wallet;
-};
-
-export const setActiveWallet = async (walletId: string): Promise<LocalWalletRecord | null> => {
-  const merchantId = await getWalletMerchantId();
-  if (!merchantId) return null;
-
-  const vault = await loadVault();
-  const wallet = vault.wallets.find((w) => w.id === walletId);
-  if (!wallet) return null;
-  vault.activeWalletId = walletId;
-  await saveVault(vault, merchantId);
-  return wallet;
-};
-
-export const renameLocalWallet = async (walletId: string, name: string): Promise<boolean> => {
-  const trimmed = name.trim();
-  if (!trimmed) return false;
-  const merchantId = await getWalletMerchantId();
-  if (!merchantId) return false;
-
-  const vault = await loadVault();
-  const wallet = vault.wallets.find((w) => w.id === walletId);
-  if (!wallet) return false;
-  wallet.name = trimmed;
-  await saveVault(vault, merchantId);
-  return true;
-};
-
-export const removeLocalWallet = async (walletId: string): Promise<boolean> => {
-  const merchantId = await getWalletMerchantId();
-  if (!merchantId) return false;
-
-  const vault = await loadVault();
-  const index = vault.wallets.findIndex((w) => w.id === walletId);
-  if (index < 0) return false;
-  vault.wallets.splice(index, 1);
-  if (vault.activeWalletId === walletId) {
-    vault.activeWalletId = vault.wallets[0]?.id ?? null;
-  }
-  await saveVault(vault, merchantId);
-  return true;
 };
 
 export const updateActiveWalletAddresses = async (
@@ -684,42 +742,103 @@ export const updateActiveWalletAddresses = async (
   if (!merchantId) return;
 
   const vault = await loadVault();
-  const active = vault.wallets.find((w) => w.id === vault.activeWalletId);
+  const active = vault.wallets[0];
   if (!active) return;
 
-  active.addresses = addresses;
-  await saveVault(vault, merchantId);
+  active.addresses = filterSupportedWalletAddresses(addresses);
+  await saveVault(toSingleWalletVault({ ...vault, wallets: [active] }), merchantId);
 };
 
-/** @deprecated Prefer addLocalWallet — kept for callers that only store one encrypted blob. */
 export const saveEncryptedWallet = async (encryptedJson: string): Promise<void> => {
+  const merchantId = await getWalletMerchantId();
+  if (!merchantId) {
+    throw new Error('Sign in before creating a wallet.');
+  }
+
   const vault = await loadVault();
-  const active = vault.wallets.find((w) => w.id === vault.activeWalletId);
+  const active = vault.wallets[0];
   if (active) {
     active.encryptedMnemonic = encryptedJson;
-    const merchantId = await getWalletMerchantId();
-    if (merchantId) await saveVault(vault, merchantId);
+    await saveVault(toSingleWalletVault({ ...vault, wallets: [active] }), merchantId);
     return;
   }
-  await addLocalWallet({
+
+  const deviceId = await getOrCreateDeviceId();
+  const wallet: LocalWalletRecord = {
+    id: newWalletId(),
+    name: DEFAULT_WALLET_NAME,
     encryptedMnemonic: encryptedJson,
     addresses: [],
-  });
+    createdAt: new Date().toISOString(),
+    deviceId,
+    createdViaSetup: true,
+  };
+  await saveVault(
+    { version: 3, activeWalletId: wallet.id, wallets: [wallet] },
+    merchantId
+  );
+  await writeKey(`${WALLET_STORAGE_KEY}:deviceId`, deviceId);
+};
+
+export const loadEncryptedWalletCandidates = async (): Promise<string[]> => {
+  const merchantId = await getWalletMerchantId();
+  const active = await getActiveWalletRecord();
+  const seen = new Set<string>();
+  const candidates: string[] = [];
+
+  if (active?.encryptedMnemonic && isLikelyEncryptedMnemonic(active.encryptedMnemonic)) {
+    candidates.push(active.encryptedMnemonic);
+    seen.add(active.encryptedMnemonic);
+  }
+
+  if (!merchantId) return candidates;
+
+  const legacy = await readKey(WALLET_STORAGE_KEY);
+  if (
+    typeof legacy === 'string' &&
+    isLikelyEncryptedMnemonic(legacy) &&
+    !seen.has(legacy) &&
+    (await canUseLegacyWalletForMerchant(merchantId))
+  ) {
+    candidates.push(legacy);
+  }
+
+  return candidates;
+};
+
+export const repairEncryptedWalletIfNeeded = async (workingEncrypted: string): Promise<void> => {
+  const active = await getActiveWalletRecord();
+  if (active?.encryptedMnemonic === workingEncrypted) return;
+  await saveEncryptedWallet(workingEncrypted);
 };
 
 export const loadEncryptedWallet = async (): Promise<string | null> => {
-  const active = await getActiveWalletRecord();
-  if (active?.encryptedMnemonic && isLikelyEncryptedMnemonic(active.encryptedMnemonic)) {
-    return active.encryptedMnemonic;
+  const candidates = await loadEncryptedWalletCandidates();
+  return candidates[0] ?? null;
+};
+
+/** Rehydrate vault/legacy wallet storage so PIN unlock can read encrypted mnemonic. */
+export const ensureLocalWalletForUnlock = async (): Promise<boolean> => {
+  if ((await loadEncryptedWalletCandidates()).length > 0) return true;
+
+  const merchantId = await getWalletMerchantId();
+  if (!merchantId) return false;
+
+  const legacyEncrypted = await readKey(WALLET_STORAGE_KEY);
+  if (!legacyEncrypted || !isLikelyEncryptedMnemonic(legacyEncrypted)) {
+    return false;
   }
-  const legacy = await readKey(WALLET_STORAGE_KEY);
-  if (legacy && isLikelyEncryptedMnemonic(legacy)) return legacy;
-  return null;
+
+  invalidateVaultCache();
+  const deviceId = await getOrCreateDeviceId();
+  await migrateLegacyToVault(merchantId, deviceId);
+  invalidateVaultCache();
+  return (await loadEncryptedWalletCandidates()).length > 0;
 };
 
 export const isWalletSetupLocally = async (): Promise<boolean> => {
-  const vault = await loadVault();
-  return vault.wallets.length > 0;
+  if ((await loadEncryptedWalletCandidates()).length > 0) return true;
+  return ensureLocalWalletForUnlock();
 };
 
 export const saveWalletAddresses = async (wallets: StoredWalletAddress[]): Promise<void> => {
@@ -727,13 +846,31 @@ export const saveWalletAddresses = async (wallets: StoredWalletAddress[]): Promi
 };
 
 export const hydrateLocalWalletAddresses = async (): Promise<StoredWalletAddress[] | null> => {
-  const active = await getActiveWalletRecord();
-  if (active?.addresses?.length) return active.addresses;
+  const { repairWalletAddresses } = await import('./walletCore');
 
-  const legacy = parseAddresses(await readKey(WALLET_ADDRESSES_KEY));
-  if (legacy.length) {
-    await updateActiveWalletAddresses(legacy);
-    return legacy;
+  const active = await getActiveWalletRecord();
+  if (active?.addresses?.length) {
+    const repaired = filterSupportedWalletAddresses(repairWalletAddresses(active.addresses));
+    const changed =
+      repaired.length !== active.addresses.length ||
+      repaired.some((row, i) => row.address !== active.addresses[i]?.address || row.network !== active.addresses[i]?.network);
+    if (changed) {
+      await updateActiveWalletAddresses(repaired);
+      void import('../api')
+        .then(({ api }) => api.syncWallets(repaired))
+        .catch(() => undefined);
+    }
+    return repaired;
+  }
+
+  const merchantId = await getWalletMerchantId();
+  if (merchantId && (await canUseLegacyWalletForMerchant(merchantId))) {
+    const legacy = parseAddresses(await readKey(WALLET_ADDRESSES_KEY));
+    if (legacy.length) {
+      const repaired = filterSupportedWalletAddresses(repairWalletAddresses(legacy));
+      await updateActiveWalletAddresses(repaired);
+      return repaired;
+    }
   }
 
   return null;

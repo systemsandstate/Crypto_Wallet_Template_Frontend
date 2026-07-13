@@ -10,7 +10,6 @@ import {
 import LoadingSpinner from "../components/LoadingSpinner";
 import React, { useCallback, useMemo, useState, useRef } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect, useRoute } from "@react-navigation/native";
 
 import { components } from "../components";
 import { USDT_NETWORKS, UsdtNetwork } from "../constants/usdtNetworks";
@@ -19,16 +18,15 @@ import { useTheme } from "../hooks/useTheme";
 import { getLocalizedNetworkLabel } from "../i18n/network";
 import { api } from "../services/api";
 import { resolveNetworkBalanceMap } from "../utils/walletBalance";
-import { resolveActiveWalletAddresses, syncDeviceWalletInBackground } from "../services/wallet/syncDeviceWallet";
+import { prepareWalletContext } from "../services/wallet/syncDeviceWallet";
+import { useInitialScreenLoad } from "../hooks/useInitialScreenLoad";
+import { useTabBarInset } from "../hooks/useTabBarInset";
 import { svg } from "../svg";
-import type { NetworkFilter } from "./SendNetworkSelect";
-
-/** Networks shown as quick chips before the “more” pill. */
-const QUICK_FILTER_NETWORKS: UsdtNetwork[] = ["ERC20", "SOL", "BEP20", "TRC20"];
-
-type SendSelectRouteParams = {
-    networkFilter?: NetworkFilter;
-};
+import { DENSITY } from "../constants/density";
+import { pickFundedNetworkLabel } from "../utils/pickFundedSendNetwork";
+import PayByEmailModal from "../components/PayByEmailModal";
+import QuickPayActionsRow from "../components/QuickPayActionsRow";
+import type { SendPlan } from "../utils/buildSendPlan";
 
 const SendEmptyIllustration: React.FC<{ color: string }> = ({ color }) => (
     <View style={{ alignItems: "center", marginBottom: 20 }}>
@@ -74,16 +72,15 @@ const SendEmptyIllustration: React.FC<{ color: string }> = ({ color }) => (
 const SendSelect: React.FC = ({ navigation }: any) => {
     const { t, locale } = useTranslation();
     const { colors, FONTS } = useTheme();
-    const route = useRoute();
+    const tabBarInset = useTabBarInset(8);
     const [search, setSearch] = useState("");
-    const [filter, setFilter] = useState<NetworkFilter>("ALL");
     const [balances, setBalances] = useState<Record<string, number | null>>({});
     const [loading, setLoading] = useState(true);
     const hasLoadedRef = useRef(false);
     const [receiveModalVisible, setReceiveModalVisible] = useState(false);
+    const [payByEmailVisible, setPayByEmailVisible] = useState(false);
 
     const dateLocale = locale === "es" ? "es-ES" : "en-US";
-    const moreNetworkCount = USDT_NETWORKS.length;
 
     const fundedNetworks = useMemo(
         () =>
@@ -94,37 +91,24 @@ const SendSelect: React.FC = ({ navigation }: any) => {
         [balances]
     );
 
-    const loadBalances = useCallback(() => {
+    const loadBalances = useCallback(async () => {
         const silent = hasLoadedRef.current;
         if (!silent) setLoading(true);
-        void (async () => {
-            syncDeviceWalletInBackground();
-            try {
-                const [activeAddresses, cached] = await Promise.all([
-                    resolveActiveWalletAddresses(),
-                    api.getWalletBalances(),
-                ]);
-                setBalances(resolveNetworkBalanceMap(cached.data.balances, activeAddresses));
-                hasLoadedRef.current = true;
-                setLoading(false);
-            } catch {
-                if (!hasLoadedRef.current) setBalances({});
-                setLoading(false);
-            }
-        })();
+        try {
+            const [activeAddresses, cached] = await Promise.all([
+                prepareWalletContext(),
+                api.getWalletBalances({ live: true }),
+            ]);
+            setBalances(resolveNetworkBalanceMap(cached.data.balances ?? [], activeAddresses));
+        } catch {
+            if (!hasLoadedRef.current) setBalances({});
+        } finally {
+            hasLoadedRef.current = true;
+            setLoading(false);
+        }
     }, []);
 
-    useFocusEffect(
-        useCallback(() => {
-            const params = route.params as SendSelectRouteParams | undefined;
-            if (params?.networkFilter !== undefined) {
-                setFilter(params.networkFilter);
-                navigation.setParams({ networkFilter: undefined });
-            }
-            setSearch("");
-            loadBalances();
-        }, [loadBalances, navigation, route.params])
-    );
+    useInitialScreenLoad(loadBalances, () => setSearch(""));
 
     const matchesSearch = useCallback(
         (network: UsdtNetwork, query: string) => {
@@ -142,10 +126,8 @@ const SendSelect: React.FC = ({ navigation }: any) => {
 
     const assets = useMemo(() => {
         const query = search.trim().toLowerCase();
-        return fundedNetworks
-            .filter((network) => filter === "ALL" || filter === network)
-            .filter((network) => matchesSearch(network, query));
-    }, [filter, search, matchesSearch, fundedNetworks]);
+        return fundedNetworks.filter((network) => matchesSearch(network, query));
+    }, [search, matchesSearch, fundedNetworks]);
 
     const styles = useMemo(
         () =>
@@ -154,10 +136,10 @@ const SendSelect: React.FC = ({ navigation }: any) => {
                     flexDirection: "row",
                     alignItems: "center",
                     backgroundColor: colors.surfaceMuted,
-                    borderRadius: 24,
-                    paddingHorizontal: 14,
-                    marginBottom: 8,
-                    minHeight: 44,
+                    borderRadius: 20,
+                    paddingHorizontal: 12,
+                    marginBottom: 6,
+                    minHeight: DENSITY.searchBarHeight,
                     borderWidth: 1,
                     borderColor: colors.border,
                 },
@@ -177,73 +159,10 @@ const SendSelect: React.FC = ({ navigation }: any) => {
                         ? ({ outlineStyle: "none", outlineWidth: 0 } as object)
                         : {}),
                 },
-                filterRow: {
-                    flexDirection: "row",
-                    gap: 10,
-                    paddingRight: 8,
-                    alignItems: "center",
-                },
-                filterScroll: {
-                    flexGrow: 0,
-                    marginBottom: 8,
-                },
-                filterAll: {
-                    width: 48,
-                    height: 48,
-                    borderRadius: 12,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: colors.white,
-                    borderWidth: 2,
-                    borderColor: colors.border,
-                },
-                filterAllActive: {
-                    borderColor: colors.accentBlue,
-                },
-                filterAllText: {
-                    ...FONTS.Mulish_600SemiBold,
-                    fontSize: 13,
-                    color: colors.mainDark,
-                },
-                filterChip: {
-                    width: 48,
-                    height: 48,
-                    borderRadius: 12,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: colors.white,
-                    borderWidth: 2,
-                    borderColor: colors.border,
-                    overflow: "hidden",
-                },
-                filterChipActive: {
-                    borderColor: colors.accentBlue,
-                },
-                morePill: {
-                    flexDirection: "row",
-                    alignItems: "center",
-                    height: 48,
-                    paddingHorizontal: 14,
-                    borderRadius: 24,
-                    backgroundColor: colors.surfaceMuted,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    gap: 4,
-                },
-                morePillText: {
-                    ...FONTS.Mulish_600SemiBold,
-                    fontSize: 14,
-                    color: colors.mainDark,
-                },
-                moreChevron: {
-                    ...FONTS.Mulish_400Regular,
-                    fontSize: 11,
-                    color: colors.bodyTextColor,
-                },
                 assetRow: {
                     flexDirection: "row",
                     alignItems: "center",
-                    paddingVertical: 12,
+                    paddingVertical: DENSITY.listRowPaddingV,
                     borderBottomWidth: StyleSheet.hairlineWidth,
                     borderBottomColor: colors.border,
                 },
@@ -261,9 +180,9 @@ const SendSelect: React.FC = ({ navigation }: any) => {
                     borderColor: colors.border,
                 },
                 assetLogoWrap: {
-                    width: 44,
-                    height: 44,
-                    marginRight: 12,
+                    width: DENSITY.listIcon,
+                    height: DENSITY.listIcon,
+                    marginRight: 10,
                 },
                 assetMeta: {
                     flex: 1,
@@ -278,7 +197,7 @@ const SendSelect: React.FC = ({ navigation }: any) => {
                 },
                 assetSymbol: {
                     ...FONTS.Mulish_700Bold,
-                    fontSize: 16,
+                    fontSize: 14,
                     color: colors.mainDark,
                 },
                 networkPill: {
@@ -294,7 +213,7 @@ const SendSelect: React.FC = ({ navigation }: any) => {
                 },
                 assetName: {
                     ...FONTS.Mulish_400Regular,
-                    fontSize: 13,
+                    fontSize: 11,
                     color: colors.bodyTextColor,
                 },
                 assetRight: {
@@ -303,12 +222,12 @@ const SendSelect: React.FC = ({ navigation }: any) => {
                 },
                 fiatValue: {
                     ...FONTS.Mulish_700Bold,
-                    fontSize: 16,
+                    fontSize: 14,
                     color: colors.mainDark,
                 },
                 cryptoValue: {
                     ...FONTS.Mulish_400Regular,
-                    fontSize: 13,
+                    fontSize: 11,
                     color: colors.bodyTextColor,
                     marginTop: 2,
                 },
@@ -338,8 +257,8 @@ const SendSelect: React.FC = ({ navigation }: any) => {
                 },
                 pageBody: {
                     flex: 1,
-                    paddingHorizontal: 20,
-                    paddingTop: 8,
+                    paddingHorizontal: DENSITY.pagePaddingH,
+                    paddingTop: 6,
                 },
                 assetList: {
                     flex: 1,
@@ -347,9 +266,7 @@ const SendSelect: React.FC = ({ navigation }: any) => {
                         ? ({ minHeight: 0, overflow: "hidden" } as object)
                         : {}),
                 },
-                assetListContent: {
-                    paddingBottom: 24,
-                },
+                assetListContent: {},
                 assetListContentGrow: {
                     flexGrow: 1,
                 },
@@ -374,13 +291,55 @@ const SendSelect: React.FC = ({ navigation }: any) => {
     };
 
     const showEmptyState = !loading && assets.length === 0;
-    const hasActiveSearch = search.trim().length > 0 || filter !== "ALL";
+    const hasActiveSearch = search.trim().length > 0;
+
+    const handleScanToPay = useCallback(() => {
+        const network =
+            pickFundedNetworkLabel(balances, [...USDT_NETWORKS], 0, 0) ?? "BEP20";
+        navigation.navigate("Withdraw", { network, returnScreen: "SendSelect", openScan: true });
+    }, [balances, navigation]);
+
+    const handlePayByEmailReady = useCallback(
+        (input: { network: UsdtNetwork; plan: SendPlan }) => {
+            navigation.push("Withdraw", {
+                network: input.network,
+                returnScreen: "SendSelect",
+                initialSendPlan: input.plan,
+                openConfirm: true,
+            });
+        },
+        [navigation]
+    );
+
+    const quickPayActions = useMemo(
+        () => [
+            {
+                key: "scan",
+                title: t.withdraw.scanToPayBanner,
+                icon: <svg.QrCodeSvg color={colors.accentBlue} size={18} />,
+                onPress: handleScanToPay,
+                accessibilityLabel: t.withdraw.scanToPayBanner,
+            },
+            {
+                key: "email",
+                title: t.payByEmail.bannerTitle,
+                icon: <svg.EmailSvg color={colors.accentBlue} size={18} />,
+                onPress: () => setPayByEmailVisible(true),
+                accessibilityLabel: t.payByEmail.title,
+            },
+        ],
+        [colors.accentBlue, handleScanToPay, t]
+    );
 
     return (
         <View style={{ flex: 1, backgroundColor: colors.bgColor }}>
             <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
                 <components.Header title={t.withdraw.title} goBack={true} />
                 <View style={styles.pageBody}>
+                    <View style={{ marginBottom: 12 }}>
+                        <QuickPayActionsRow actions={quickPayActions} />
+                    </View>
+
                     <View style={styles.searchWrap}>
                         <Text style={styles.searchIcon}>⌕</Text>
                         <TextInput
@@ -395,52 +354,11 @@ const SendSelect: React.FC = ({ navigation }: any) => {
                     </View>
 
                     <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        nestedScrollEnabled
-                        style={styles.filterScroll}
-                        contentContainerStyle={styles.filterRow}
-                    >
-                        <TouchableOpacity
-                            style={[styles.filterAll, filter === "ALL" && styles.filterAllActive]}
-                            onPress={() => setFilter("ALL")}
-                            accessibilityRole="button"
-                            accessibilityLabel={t.withdraw.sendAllNetworks}
-                        >
-                            <Text style={styles.filterAllText}>{t.withdraw.sendAllNetworks}</Text>
-                        </TouchableOpacity>
-                        {QUICK_FILTER_NETWORKS.map((network) => (
-                            <TouchableOpacity
-                                key={network}
-                                style={[
-                                    styles.filterChip,
-                                    filter === network && styles.filterChipActive,
-                                ]}
-                                onPress={() => setFilter(network)}
-                                accessibilityRole="button"
-                                accessibilityLabel={getLocalizedNetworkLabel(network, t)}
-                            >
-                                <components.NetworkLogo network={network} size={28} />
-                            </TouchableOpacity>
-                        ))}
-                        <TouchableOpacity
-                            style={styles.morePill}
-                            onPress={() =>
-                                navigation.navigate("SendNetworkSelect", { filter })
-                            }
-                            accessibilityRole="button"
-                            accessibilityLabel={t.withdraw.moreNetworks}
-                        >
-                            <Text style={styles.morePillText}>{moreNetworkCount}</Text>
-                            <Text style={styles.moreChevron}>▼</Text>
-                        </TouchableOpacity>
-                    </ScrollView>
-
-                    <ScrollView
                         style={styles.assetList}
                         contentContainerStyle={[
                             styles.assetListContent,
                             (loading || showEmptyState) && styles.assetListContentGrow,
+                            { paddingBottom: tabBarInset },
                         ]}
                         keyboardShouldPersistTaps="handled"
                         nestedScrollEnabled
@@ -468,7 +386,6 @@ const SendSelect: React.FC = ({ navigation }: any) => {
                         ) : (
                             assets.map((network) => {
                                 const balance = balances[network];
-                                const networkLabel = getLocalizedNetworkLabel(network, t);
                                 return (
                                     <TouchableOpacity
                                         key={network}
@@ -477,18 +394,16 @@ const SendSelect: React.FC = ({ navigation }: any) => {
                                         onPress={() => navigation.navigate("Withdraw", { network })}
                                     >
                                         <View style={styles.assetLogoWrap}>
-                                            <svg.UsdtMarkSvg size={44} />
+                                            <svg.UsdtMarkSvg size={DENSITY.listIcon} />
                                             <View style={styles.networkBadge}>
-                                                <components.NetworkLogo network={network} size={14} />
+                                                <components.NetworkLogo network={network} size={DENSITY.listIconBadge} />
                                             </View>
                                         </View>
                                         <View style={styles.assetMeta}>
                                             <View style={styles.assetTitleRow}>
                                                 <Text style={styles.assetSymbol}>USDT</Text>
                                                 <View style={styles.networkPill}>
-                                                    <Text style={styles.networkPillText}>
-                                                        {networkLabel}
-                                                    </Text>
+                                                    <Text style={styles.networkPillText}>{network}</Text>
                                                 </View>
                                             </View>
                                             <Text style={styles.assetName}>{t.withdraw.tetherUsd}</Text>
@@ -513,6 +428,11 @@ const SendSelect: React.FC = ({ navigation }: any) => {
                 onSetupWallet={() =>
                     navigation.getParent()?.navigate("Profile", { screen: "WalletSetup" })
                 }
+            />
+            <PayByEmailModal
+                visible={payByEmailVisible}
+                onClose={() => setPayByEmailVisible(false)}
+                onReadyToConfirm={handlePayByEmailReady}
             />
         </View>
     );

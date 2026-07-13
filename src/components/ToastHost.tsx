@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useTheme } from "../hooks/useTheme";
+import { getTabBarOccupiedHeight } from "../hooks/useTabBarInset";
 import { subscribeToast, ToastType } from "../utils/toast";
 
 const ToastHost: React.FC = () => {
@@ -27,21 +28,29 @@ const ToastHost: React.FC = () => {
     if (!visible) return null;
 
     const isError = type === "error";
+    const backgroundColor = isError ? "#4A2222" : colors.mainDark;
+    const textColor = isError ? "#FFEAEA" : colors.bgColor;
+    const borderColor = isError ? "#E85858" : colors.accentBlue;
+
+    const toastBottom = getTabBarOccupiedHeight(insets.bottom) + 72;
 
     return (
         <View
             style={[
                 styles.host,
                 {
-                    bottom: Math.max(insets.bottom, 16) + 16,
-                    backgroundColor: isError ? "#5c2a2a" : colors.mainDark,
+                    bottom: toastBottom,
+                    backgroundColor,
+                    borderColor,
                 },
             ]}
             pointerEvents="none"
             accessibilityLiveRegion="polite"
             accessibilityRole="text"
         >
-            <Text style={[styles.text, { ...FONTS.Mulish_600SemiBold }]}>{message}</Text>
+            <Text style={[styles.text, { ...FONTS.Mulish_600SemiBold, color: textColor }]}>
+                {message}
+            </Text>
         </View>
     );
 };
@@ -49,32 +58,32 @@ const ToastHost: React.FC = () => {
 const styles = StyleSheet.create({
     host: {
         position: "absolute",
-        left: 24,
-        right: 24,
+        left: 20,
+        right: 20,
         alignSelf: "center",
         maxWidth: 420,
         marginHorizontal: "auto",
-        paddingHorizontal: 18,
-        paddingVertical: 12,
-        borderRadius: 10,
+        paddingHorizontal: 20,
+        paddingVertical: 14,
+        borderRadius: 12,
+        borderWidth: 1,
         zIndex: 9999,
         ...(Platform.OS === "web"
             ? ({
-                  boxShadow: "0 4px 16px rgba(0, 0, 0, 0.2)",
+                  boxShadow: "0 8px 32px rgba(0, 0, 0, 0.55)",
               } as object)
             : {
                   shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.2,
-                  shadowRadius: 8,
-                  elevation: 8,
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.35,
+                  shadowRadius: 12,
+                  elevation: 12,
               }),
     },
     text: {
-        color: "#fff",
-        fontSize: 14,
+        fontSize: 15,
         textAlign: "center",
-        lineHeight: 20,
+        lineHeight: 22,
     },
 });
 

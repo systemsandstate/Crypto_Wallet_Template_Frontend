@@ -15,12 +15,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Button from "./Button";
 import { useTranslation } from "../hooks/useTranslation";
 import { useTheme } from "../hooks/useTheme";
-import { parseScannedWalletAddress } from "../utils/parseScannedWalletAddress";
+import {
+    parseScannedWalletPayload,
+    type ScannedWalletPayload,
+} from "../utils/parseScannedWalletAddress";
 
 type Props = {
     visible: boolean;
     onClose: () => void;
-    onScan: (address: string) => void;
+    onScan: (payload: ScannedWalletPayload) => void;
 };
 
 const QrScanModal: React.FC<Props> = ({ visible, onClose, onScan }) => {
@@ -44,8 +47,8 @@ const QrScanModal: React.FC<Props> = ({ visible, onClose, onScan }) => {
 
     const applyAddress = useCallback(
         (raw: string) => {
-            const parsed = parseScannedWalletAddress(raw);
-            if (!parsed) return;
+            const parsed = parseScannedWalletPayload(raw);
+            if (!parsed?.address) return;
             onScan(parsed);
             onClose();
         },

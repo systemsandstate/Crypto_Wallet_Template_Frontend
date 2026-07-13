@@ -2,21 +2,26 @@ import { View, Text, TouchableOpacity } from "react-native";
 import React, { useMemo } from "react";
 
 import { WalletTransfer } from "../services/api";
-import { NETWORK_SHORT } from "../constants/usdtNetworks";
 import { useTranslation } from "../hooks/useTranslation";
 import { useTheme } from "../hooks/useTheme";
+import { DENSITY } from "../constants/density";
 import { formatUsdtAmount, formatNativeAmount } from "../utils/formatAmount";
+import { formatMessage } from "../i18n";
+import type { CounterpartyLabel } from "../utils/resolveCounterpartyLabel";
 
 type Props = {
     item: WalletTransfer;
     onPress: () => void;
     showDate?: boolean;
+    counterparty?: CounterpartyLabel | null;
 };
 
-const shortAddress = (address: string) =>
-    address.length > 12 ? `${address.slice(0, 6)}...${address.slice(-4)}` : address;
-
-const WalletDepositListItem: React.FC<Props> = ({ item, onPress, showDate }) => {
+const WalletDepositListItem: React.FC<Props> = ({
+    item,
+    onPress,
+    showDate,
+    counterparty,
+}) => {
     const { t, dateLocale } = useTranslation();
     const { colors, FONTS } = useTheme();
 
@@ -32,22 +37,18 @@ const WalletDepositListItem: React.FC<Props> = ({ item, onPress, showDate }) => 
         : `${t.payment.walletReceive} · ${item.currency}`;
 
     const subtitle = useMemo(() => {
-        const network =
-            item.network && NETWORK_SHORT[item.network as keyof typeof NETWORK_SHORT]
-                ? NETWORK_SHORT[item.network as keyof typeof NETWORK_SHORT]
-                : item.network;
         const parts: string[] = [];
 
-        if (isSend) {
-            parts.push(t.payment.sentOnChain);
-            if (item.toAddress) parts.push(`${t.transaction.to} ${shortAddress(item.toAddress)}`);
+        if (counterparty?.name) {
+            parts.push(
+                isSend
+                    ? formatMessage(t.transaction.sentTo, { name: counterparty.name })
+                    : formatMessage(t.transaction.receivedFrom, { name: counterparty.name })
+            );
         } else {
-            parts.push(t.payment.depositReceived);
-            if (item.fromAddress) parts.push(`${t.transaction.from} ${shortAddress(item.fromAddress)}`);
+            parts.push(isSend ? t.payment.sentOnChain : t.payment.depositReceived);
         }
 
-        if (network) parts.push(network);
-        if (item.txHash) parts.push(`${item.txHash.slice(0, 10)}…`);
         if (showDate) {
             parts.push(
                 new Date(item.timestamp).toLocaleString(dateLocale, {
@@ -58,31 +59,39 @@ const WalletDepositListItem: React.FC<Props> = ({ item, onPress, showDate }) => 
         }
 
         return parts.join(" · ");
-    }, [dateLocale, isSend, item, showDate, t]);
+    }, [counterparty?.name, dateLocale, isSend, item.timestamp, showDate, t]);
 
     return (
-        <TouchableOpacity
-            onPress={onPress}
+        <View
             style={{
                 backgroundColor: colors.white,
                 borderRadius: 10,
-                padding: 14,
-                marginBottom: 8,
+                borderWidth: 1,
+                borderColor: colors.border,
+                padding: DENSITY.listRowPaddingH,
+                marginBottom: 6,
                 flexDirection: "row",
                 alignItems: "center",
             }}
         >
-            <View style={{ flex: 1, minWidth: 0, paddingRight: 10 }}>
+            <TouchableOpacity
+                style={{ flex: 1, minWidth: 0, paddingRight: 10 }}
+                onPress={onPress}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+            >
                 <Text style={{ ...FONTS.H6, color: colors.mainDark }}>{title}</Text>
-                <Text style={{ fontSize: 12, color: colors.bodyTextColor }} numberOfLines={2}>
+                <Text style={{ fontSize: 11, color: colors.bodyTextColor }} numberOfLines={2}>
                     {subtitle}
                 </Text>
+            </TouchableOpacity>
+            <View style={{ alignItems: "flex-end", flexShrink: 0 }}>
+                <Text style={{ ...FONTS.H6, color: isSend ? colors.red : colors.green }}>
+                    {isSend ? "−" : "+"}
+                    {amountLabel} {item.currency}
+                </Text>
             </View>
-            <Text style={{ ...FONTS.H6, color: isSend ? colors.mainDark : colors.green, flexShrink: 0 }}>
-                {isSend ? "−" : "+"}
-                {amountLabel} {item.currency}
-            </Text>
-        </TouchableOpacity>
+        </View>
     );
 };
 

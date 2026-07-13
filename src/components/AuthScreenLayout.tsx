@@ -11,6 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 import { useTheme } from "../hooks/useTheme";
+import { DENSITY } from "../constants/density";
 
 type Props = {
     header?: React.ReactNode;
@@ -39,7 +40,7 @@ const AuthScreenLayout: React.FC<Props> = ({ header, children, cardStyle }) => {
                 scrollContent: {
                     flexGrow: 1,
                     justifyContent: "center",
-                    paddingVertical: 20,
+                    paddingVertical: 16,
                 },
                 centeredBody: {
                     width: "100%",
@@ -49,20 +50,31 @@ const AuthScreenLayout: React.FC<Props> = ({ header, children, cardStyle }) => {
                 card: {
                     width: "100%",
                     backgroundColor: colors.white,
-                    borderRadius: 20,
-                    paddingVertical: 28,
+                    borderRadius: DENSITY.cardRadius,
+                    paddingVertical: 22,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    overflow: "hidden",
                     ...(Platform.OS === "android"
-                        ? { elevation: 8 }
+                        ? { elevation: 2 }
                         : Platform.OS === "web"
                           ? ({
-                                boxShadow: "0 12px 40px rgba(6, 38, 100, 0.12)",
+                                boxShadow: "0 2px 10px rgba(0, 0, 0, 0.05)",
                             } as object)
                           : {
-                                shadowColor: "#062664",
-                                shadowOffset: { width: 0, height: 12 },
-                                shadowOpacity: 0.14,
-                                shadowRadius: 28,
+                                shadowColor: "#000000",
+                                shadowOffset: { width: 0, height: 4 },
+                                shadowOpacity: 0.06,
+                                shadowRadius: 12,
                             }),
+                },
+                accent: {
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 3,
+                    backgroundColor: colors.accentBlue,
                 },
             }),
         [colors]
@@ -72,10 +84,11 @@ const AuthScreenLayout: React.FC<Props> = ({ header, children, cardStyle }) => {
         <View
             style={[
                 styles.card,
-                { maxWidth: authCardMaxWidth, paddingHorizontal: isCompact ? 20 : 24 },
+                { maxWidth: authCardMaxWidth, paddingHorizontal: isCompact ? 18 : 22 },
                 cardStyle,
             ]}
         >
+            <View style={styles.accent} />
             {children}
         </View>
     );

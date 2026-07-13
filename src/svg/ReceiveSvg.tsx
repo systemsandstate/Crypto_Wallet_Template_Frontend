@@ -8,14 +8,27 @@ type Props = {
     size?: number;
 };
 
-const ReceiveSvg: React.FC<Props> = ({ color = "#FFFFFF", size = ACTION_ICON_SIZE }) => (
+/** Receive / get paid — arrow into tray, reads clearly at small size. */
+const ReceiveSvg: React.FC<Props> = ({ color = "#2563EB", size = ACTION_ICON_SIZE }) => (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
         <Path
-            d="M12 5v14M12 19l-6-6M12 19l6-6"
+            d="M12 4v11"
+            stroke={color}
+            strokeWidth={ACTION_ICON_STROKE}
+            strokeLinecap="round"
+        />
+        <Path
+            d="M8 11l4 4 4-4"
             stroke={color}
             strokeWidth={ACTION_ICON_STROKE}
             strokeLinecap="round"
             strokeLinejoin="round"
+        />
+        <Path
+            d="M5 20h14"
+            stroke={color}
+            strokeWidth={ACTION_ICON_STROKE}
+            strokeLinecap="round"
         />
     </Svg>
 );

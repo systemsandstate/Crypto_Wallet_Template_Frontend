@@ -1,5 +1,7 @@
 import { useWindowDimensions, Platform } from "react-native";
 
+import { DENSITY } from "../constants/density";
+
 const COMPACT_WIDTH = 380;
 const TABLET_WIDTH = 768;
 const DESKTOP_WIDTH = 1024;
@@ -27,7 +29,7 @@ export function useResponsiveLayout() {
     const isTablet = width >= TABLET_WIDTH;
     const isDesktop = width >= DESKTOP_WIDTH;
     const isWide = width >= WIDE_WIDTH;
-    const horizontalPadding = isCompact ? 16 : isDesktop ? 28 : 20;
+    const horizontalPadding = isCompact ? DENSITY.pagePaddingH : isDesktop ? 20 : DENSITY.pagePaddingH;
     const appMaxWidth = getAppMaxWidth(width);
     const contentMaxWidth = appMaxWidth;
     const authCardMaxWidth = Math.min(AUTH_CARD_MAX_WIDTH, width - horizontalPadding * 2);

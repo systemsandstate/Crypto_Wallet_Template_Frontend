@@ -7,7 +7,7 @@ import {
 import LoadingSpinner from "../components/LoadingSpinner";
 import React, { useCallback, useMemo, useState } from "react";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { useFocusEffect } from "@react-navigation/native";
+import { useInitialScreenLoad } from "../hooks/useInitialScreenLoad";
 import { useAppSelector } from "../hooks/useAppSelector";
 
 import AddressBookBatchEditModal from "../components/AddressBookBatchEditModal";
@@ -23,17 +23,27 @@ import {
     updateAddressBookEntry,
     updateAddressBookEntriesBatch,
     type AddressBookEntry} from "../services/addressBookStorage";
-import { UsdtNetwork } from "../constants/usdtNetworks";
-import { getLocalizedNetworkLabel } from "../i18n/network";
+import { DEFAULT_USDT_NETWORK, USDT_NETWORKS, UsdtNetwork } from "../constants/usdtNetworks";
 import { formatMessage } from "../i18n";
 import { confirmAction } from "../utils/confirm";
 import { appAlert } from '../utils/appAlert';
 import { showToast } from "../utils/toast";
+import { api } from "../services/api";
+import { isRecipientEmail } from "../utils/isRecipientEmail";
+import { isValidSendAddress } from "../utils/isEvmAddress";
+import {
+    normalizeAddressBookAddresses,
+    pickDefaultAddressBookNetwork,
+    trimAddressBookInputs,
+} from "../utils/addressBookNetworks";
 
-const emptyForm = (network: UsdtNetwork = "TRC20"): AddressBookFormValues => ({
+const emptyForm = (network: UsdtNetwork = DEFAULT_USDT_NETWORK): AddressBookFormValues => ({
     name: "",
     address: "",
-    network});
+    network,
+    email: "",
+    addresses: {},
+});
 
 const AddressBook: React.FC = () => {
     const { t } = useTranslation();
@@ -41,7 +51,6 @@ const AddressBook: React.FC = () => {
     const insets = useSafeAreaInsets();
     const merchant = useAppSelector((state: RootState) => state.auth.merchant);
     const [entries, setEntries] = useState<AddressBookEntry[]>([]);
-    const [selectedNetwork, setSelectedNetwork] = useState<UsdtNetwork>("TRC20");
     const [loading, setLoading] = useState(true);
     const [selectionMode, setSelectionMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -64,30 +73,14 @@ const AddressBook: React.FC = () => {
         setLoading(false);
     }, [merchant?.id]);
 
-    useFocusEffect(
-        useCallback(() => {
-            void load();
-        }, [load])
-    );
+    useInitialScreenLoad(load);
 
-    const filteredEntries = useMemo(
-        () => entries.filter((entry) => entry.network === selectedNetwork),
-        [entries, selectedNetwork]
-    );
-
-    const networkLabel = getLocalizedNetworkLabel(selectedNetwork, t);
     const selectedCount = selectedIds.length;
-    const allFilteredSelected =
-        filteredEntries.length > 0 &&
-        filteredEntries.every((entry) => selectedIds.includes(entry.id));
+    const allSelected =
+        entries.length > 0 && entries.every((entry) => selectedIds.includes(entry.id));
 
     const exitSelectionMode = () => {
         setSelectionMode(false);
-        setSelectedIds([]);
-    };
-
-    const handleNetworkChange = (network: UsdtNetwork) => {
-        setSelectedNetwork(network);
         setSelectedIds([]);
     };
 
@@ -98,24 +91,24 @@ const AddressBook: React.FC = () => {
     };
 
     const handleSelectAll = () => {
-        if (allFilteredSelected) {
+        if (allSelected) {
             setSelectedIds([]);
             return;
         }
-        setSelectedIds(filteredEntries.map((entry) => entry.id));
+        setSelectedIds(entries.map((entry) => entry.id));
     };
 
     const closeModal = () => {
         setModalVisible(false);
         setEditingId(null);
-        setFormValues(emptyForm(selectedNetwork));
+        setFormValues(emptyForm());
     };
 
     const openCreate = () => {
         exitSelectionMode();
         setModalMode("create");
         setEditingId(null);
-        setFormValues(emptyForm(selectedNetwork));
+        setFormValues(emptyForm());
         setModalVisible(true);
     };
 
@@ -125,7 +118,10 @@ const AddressBook: React.FC = () => {
         setFormValues({
             name: entry.name,
             address: entry.address,
-            network: entry.network});
+            network: entry.network,
+            email: entry.email ?? "",
+            addresses: entry.addresses ?? {},
+        });
         setModalVisible(true);
     };
 
@@ -187,28 +183,145 @@ const AddressBook: React.FC = () => {
 
     const handleSubmit = async (values: AddressBookFormValues) => {
         if (!merchant?.id) return;
-        if (!values.name) {
-            appAlert.alert(t.common.error, t.addressBook.nameRequired);
-            return;
-        }
-        if (!values.address) {
-            appAlert.alert(t.common.error, t.addressBook.addressRequired);
-            return;
-        }
+
+        let payload: {
+            name: string;
+            address: string;
+            network: UsdtNetwork;
+            email?: string;
+            addresses?: Partial<Record<UsdtNetwork, string>>;
+        } = {
+            name: values.name.trim(),
+            address: values.address.trim(),
+            network: values.network,
+            email: values.email?.trim().toLowerCase() || undefined,
+        };
+
         setSaving(true);
         try {
+            if (modalMode === "create" && values.addMethod === "email") {
+                const email = values.email?.trim().toLowerCase() ?? "";
+                if (!email || !isRecipientEmail(email)) {
+                    appAlert.alert(t.common.error, t.addressBook.emailRequired);
+                    return;
+                }
+                if (entries.some((entry) => entry.email?.trim().toLowerCase() === email)) {
+                    appAlert.alert(t.common.error, t.addressBook.duplicateEmail);
+                    return;
+                }
+
+                const lookupRes = await api.lookupWalletRecipient({ email });
+                const data = lookupRes.data;
+                if (data.isSelf) {
+                    appAlert.alert(t.common.error, t.withdraw.cannotSendToSelf);
+                    return;
+                }
+                if (!data.found || !data.resolvedAddress) {
+                    appAlert.alert(t.common.error, t.withdraw.recipientEmailNotFound);
+                    return;
+                }
+
+                const resolvedNetwork =
+                    data.defaultNetwork &&
+                    (USDT_NETWORKS as readonly string[]).includes(data.defaultNetwork)
+                        ? (data.defaultNetwork as UsdtNetwork)
+                        : data.network &&
+                            (USDT_NETWORKS as readonly string[]).includes(data.network)
+                          ? (data.network as UsdtNetwork)
+                          : DEFAULT_USDT_NETWORK;
+
+                const addresses = normalizeAddressBookAddresses(
+                    data.addresses as Partial<Record<UsdtNetwork, string>> | undefined,
+                    resolvedNetwork,
+                    data.resolvedAddress.trim()
+                );
+                const primaryAddress = addresses[resolvedNetwork] ?? data.resolvedAddress.trim();
+
+                payload = {
+                    name: data.businessName?.trim() || email,
+                    address: primaryAddress,
+                    network: resolvedNetwork,
+                    email,
+                    addresses,
+                };
+            } else if (modalMode === "edit" && payload.email) {
+                const lookupRes = await api.lookupWalletRecipient({ email: payload.email });
+                const data = lookupRes.data;
+                if (!data.found || !data.resolvedAddress) {
+                    appAlert.alert(t.common.error, t.withdraw.recipientEmailNotFound);
+                    return;
+                }
+
+                const resolvedNetwork =
+                    data.defaultNetwork &&
+                    (USDT_NETWORKS as readonly string[]).includes(data.defaultNetwork)
+                        ? (data.defaultNetwork as UsdtNetwork)
+                        : data.network &&
+                            (USDT_NETWORKS as readonly string[]).includes(data.network)
+                          ? (data.network as UsdtNetwork)
+                          : DEFAULT_USDT_NETWORK;
+                const addresses = normalizeAddressBookAddresses(
+                    data.addresses as Partial<Record<UsdtNetwork, string>> | undefined,
+                    resolvedNetwork,
+                    data.resolvedAddress.trim()
+                );
+
+                payload = {
+                    name: data.businessName?.trim() || payload.email,
+                    address: addresses[resolvedNetwork] ?? data.resolvedAddress.trim(),
+                    network: resolvedNetwork,
+                    email: payload.email,
+                    addresses,
+                };
+            } else {
+                if (!payload.name) {
+                    appAlert.alert(t.common.error, t.addressBook.nameRequired);
+                    return;
+                }
+
+                const addresses = trimAddressBookInputs(values.addresses);
+                if (!Object.keys(addresses).length) {
+                    appAlert.alert(t.common.error, t.addressBook.addressRequired);
+                    return;
+                }
+
+                for (const network of USDT_NETWORKS) {
+                    const value = addresses[network];
+                    if (value && !isValidSendAddress(network, value)) {
+                        appAlert.alert(
+                            t.common.error,
+                            formatMessage(t.addressBook.invalidNetworkAccount, { network })
+                        );
+                        return;
+                    }
+                }
+
+                const defaultNetwork = pickDefaultAddressBookNetwork(addresses);
+                payload = {
+                    name: payload.name,
+                    address: addresses[defaultNetwork]!,
+                    network: defaultNetwork,
+                    email: undefined,
+                    addresses,
+                };
+            }
+
             if (modalMode === "edit" && editingId) {
-                const updated = await updateAddressBookEntry(merchant.id, editingId, values);
+                const updated = await updateAddressBookEntry(merchant.id, editingId, payload);
                 setEntries(updated);
                 showToast(t.addressBook.updatedToast);
             } else {
-                const updated = await addAddressBookEntry(merchant.id, values);
+                const updated = await addAddressBookEntry(merchant.id, payload);
                 setEntries(updated);
                 showToast(t.addressBook.savedToast);
             }
             closeModal();
             if (selectionMode) {
                 exitSelectionMode();
+            }
+        } catch {
+            if (modalMode === "create" && values.addMethod === "email") {
+                appAlert.alert(t.common.error, t.withdraw.recipientEmailNotFound);
             }
         } finally {
             setSaving(false);
@@ -293,6 +406,11 @@ const AddressBook: React.FC = () => {
                     ...FONTS.Mulish_600SemiBold,
                     fontSize: 12,
                     color: colors.linkColor,
+                    marginBottom: 4},
+                emailText: {
+                    ...FONTS.Mulish_400Regular,
+                    fontSize: 12,
+                    color: colors.bodyTextColor,
                     marginBottom: 6},
                 address: {
                     ...FONTS.Mulish_400Regular,
@@ -356,25 +474,7 @@ const AddressBook: React.FC = () => {
                             {t.addressBook.subtitle}
                         </Text>
 
-                        <components.NetworkSelector
-                            value={selectedNetwork}
-                            onChange={handleNetworkChange}
-                        />
-
-                        <Text
-                            style={{
-                                ...FONTS.Mulish_400Regular,
-                                fontSize: 14,
-                                color: colors.bodyTextColor,
-                                lineHeight: 14 * 1.6,
-                                marginBottom: 12,
-                                marginTop: -8,
-                                textAlign: "center"}}
-                        >
-                            {formatMessage(t.withdraw.addressBookForNetwork, { network: networkLabel })}
-                        </Text>
-
-                        {!loading && filteredEntries.length > 0 ? (
+                        {!loading && entries.length > 0 ? (
                             <View style={styles.selectionBar}>
                                 {selectionMode ? (
                                     <>
@@ -391,7 +491,7 @@ const AddressBook: React.FC = () => {
                                         </Text>
                                         <TouchableOpacity onPress={handleSelectAll}>
                                             <Text style={styles.selectionAction}>
-                                                {allFilteredSelected
+                                                {allSelected
                                                     ? t.addressBook.clearSelection
                                                     : t.addressBook.selectAll}
                                             </Text>
@@ -414,16 +514,12 @@ const AddressBook: React.FC = () => {
                             <View style={styles.emptyWrap}>
                                 <LoadingSpinner size={40} />
                             </View>
-                        ) : filteredEntries.length === 0 ? (
+                        ) : entries.length === 0 ? (
                             <View style={styles.emptyWrap}>
-                                <Text style={styles.empty}>
-                                    {entries.length === 0
-                                        ? t.addressBook.empty
-                                        : t.withdraw.addressBookEmptyForNetwork}
-                                </Text>
+                                <Text style={styles.empty}>{t.addressBook.empty}</Text>
                             </View>
                         ) : (
-                            filteredEntries.map((entry) => {
+                            entries.map((entry) => {
                                 const isSelected = selectedIds.includes(entry.id);
                                 return (
                                     <TouchableOpacity
@@ -446,10 +542,9 @@ const AddressBook: React.FC = () => {
                                         ) : null}
                                         <View style={styles.cardBody}>
                                             <Text style={styles.name}>{entry.name}</Text>
-                                            <Text style={styles.network}>
-                                                {getLocalizedNetworkLabel(entry.network, t)} ({entry.network})
-                                            </Text>
-                                            <Text style={styles.address}>{entry.address}</Text>
+                                            {entry.email ? (
+                                                <Text style={styles.emailText}>{entry.email}</Text>
+                                            ) : null}
                                         </View>
                                     </TouchableOpacity>
                                 );
@@ -501,7 +596,10 @@ const AddressBook: React.FC = () => {
             <AddressBookBatchEditModal
                 visible={batchEditVisible}
                 count={selectedCount}
-                initialNetwork={selectedNetwork}
+                initialNetwork={
+                    entries.find((item) => selectedIds.includes(item.id))?.network ??
+                    DEFAULT_USDT_NETWORK
+                }
                 saving={saving}
                 onClose={() => setBatchEditVisible(false)}
                 onSubmit={handleBatchEditSubmit}

@@ -1,13 +1,18 @@
-import { api } from '../api';
+import { api, invalidateCachedGet } from '../api';
+import { filterSupportedWalletAddresses } from '../../utils/walletSync';
 import {
   hydrateLocalWalletAddresses,
   getActiveWalletRecord,
   isWalletSetupLocally,
   saveWalletAddresses,
-  setActiveWallet,
+  persistTrc20OwnerEoa,
   type StoredWalletAddress,
 } from './walletStorage';
-import { triggerDashboardRefresh } from '../../utils/dashboardRefresh';
+import {
+  canonicalizeWalletAddresses,
+  resolveTrc20ReceiveAddressForWallet,
+} from './trc20ReceiveAddress';
+import { invalidateGasFreeAccountCache } from './gasfreeTronClient';
 
 const SYNC_COOLDOWN_MS = 45_000;
 let lastSyncAt = 0;
@@ -16,16 +21,35 @@ let syncInFlight: Promise<boolean> | null = null;
 
 let addressFilterCache: { at: number; value: StoredWalletAddress[] } | null = null;
 const ADDRESS_FILTER_CACHE_MS = 30_000;
+let addressFilterInFlight: Promise<StoredWalletAddress[]> | null = null;
 
 export function invalidateWalletAddressFilterCache(): void {
   addressFilterCache = null;
+  invalidateGasFreeAccountCache();
 }
 
-const walletFingerprint = (wallets: StoredWalletAddress[]): string =>
-  wallets
+const walletFingerprint = (wallets: StoredWalletAddress[] | null | undefined): string =>
+  (wallets ?? [])
     .map((w) => `${w.network}:${w.address.trim().toLowerCase()}`)
     .sort()
     .join('|');
+
+async function canonicalizeWithOwner(
+  wallets: StoredWalletAddress[]
+): Promise<{ wallets: StoredWalletAddress[]; ownerEoa: string | null }> {
+  const active = await getActiveWalletRecord();
+  let ownerEoa = active?.trc20OwnerEoa?.trim() || null;
+  const trc20 = wallets.find((row) => row.network === 'TRC20')?.address?.trim();
+  if (trc20) {
+    const resolved = await resolveTrc20ReceiveAddressForWallet(trc20, ownerEoa);
+    if (resolved.ownerEoa && !ownerEoa) {
+      ownerEoa = resolved.ownerEoa;
+      await persistTrc20OwnerEoa(resolved.ownerEoa);
+    }
+  }
+  const canonical = await canonicalizeWalletAddresses(wallets, ownerEoa);
+  return { wallets: canonical, ownerEoa };
+}
 
 /**
  * Addresses used to filter balances/history for the active merchant wallet.
@@ -35,30 +59,56 @@ export async function resolveWalletAddressesForFilter(): Promise<StoredWalletAdd
   if (addressFilterCache && Date.now() - addressFilterCache.at < ADDRESS_FILTER_CACHE_MS) {
     return addressFilterCache.value;
   }
+  if (addressFilterInFlight) return addressFilterInFlight;
 
-  const active = await getActiveWalletRecord();
-  if (active?.addresses?.length) {
-    addressFilterCache = { at: Date.now(), value: active.addresses };
-    return active.addresses;
-  }
+  addressFilterInFlight = (async () => {
+    try {
+      const { repairWalletAddresses } = await import('./walletCore');
 
-  const local = await hydrateLocalWalletAddresses();
-  if (local?.length) {
-    addressFilterCache = { at: Date.now(), value: local };
-    return local;
-  }
+      const active = await getActiveWalletRecord();
+      if (active?.addresses?.length) {
+        const repaired = filterSupportedWalletAddresses(repairWalletAddresses(active.addresses));
+        const { wallets: canonical } = await canonicalizeWithOwner(repaired);
+        const changed = canonical.some((row, i) => row.address !== active.addresses[i]?.address);
+        if (changed) {
+          await saveWalletAddresses(canonical);
+          void api.syncWallets(canonical).catch(() => undefined);
+        }
+        addressFilterCache = { at: Date.now(), value: canonical };
+        return canonical;
+      }
 
-  try {
-    const res = await api.getWallets();
-    const value = res.data.wallets.map((row) => ({
-      network: row.network,
-      address: row.address,
-    }));
-    addressFilterCache = { at: Date.now(), value };
-    return value;
-  } catch {
-    return [];
-  }
+      const local = await hydrateLocalWalletAddresses();
+      if (local?.length) {
+        const { wallets: canonical } = await canonicalizeWithOwner(local);
+        addressFilterCache = { at: Date.now(), value: canonical };
+        return canonical;
+      }
+
+      try {
+        const res = await api.getWallets();
+        const raw = filterSupportedWalletAddresses(
+          repairWalletAddresses(
+            (res.data?.wallets ?? []).map((row) => ({
+              network: row.network,
+              address: row.address,
+            }))
+          )
+        );
+        const { wallets: canonical } = await canonicalizeWithOwner(raw);
+        addressFilterCache = { at: Date.now(), value: canonical };
+        return canonical;
+      } catch {
+        return [];
+      }
+    } catch {
+      return [];
+    } finally {
+      addressFilterInFlight = null;
+    }
+  })();
+
+  return addressFilterInFlight;
 }
 
 export async function resolveActiveWalletAddresses(): Promise<StoredWalletAddress[] | null> {
@@ -66,14 +116,66 @@ export async function resolveActiveWalletAddresses(): Promise<StoredWalletAddres
   return filtered.length ? filtered : null;
 }
 
+/** Resolve wallet addresses once, then kick off throttled background server sync. */
+export async function prepareWalletContext(): Promise<StoredWalletAddress[]> {
+  const addresses = await resolveWalletAddressesForBalanceFilter();
+  syncDeviceWalletInBackground();
+  return addresses;
+}
+
+/** Single canonical address per network for balance and history filtering. */
+export async function resolveWalletAddressesForBalanceFilter(): Promise<StoredWalletAddress[]> {
+  return resolveWalletAddressesForFilter();
+}
+
+/** Always sync the user-facing GasFree TRC20 address — never downgrade to owner EOA. */
+const reconcileWalletsForServerSync = async (
+  localWallets: StoredWalletAddress[],
+  options?: { alreadyCanonical?: boolean }
+): Promise<StoredWalletAddress[]> => {
+  const { wallets, ownerEoa } = options?.alreadyCanonical
+    ? {
+        wallets: localWallets,
+        ownerEoa: (await getActiveWalletRecord())?.trc20OwnerEoa?.trim() || null,
+      }
+    : await canonicalizeWithOwner(localWallets);
+
+  try {
+    const res = await api.getWallets();
+    const serverTrc20 = res.data?.wallets?.find((row) => row.network === 'TRC20')?.address?.trim();
+    const localTrc20 = wallets.find((row) => row.network === 'TRC20')?.address?.trim();
+    if (!serverTrc20 || !localTrc20 || serverTrc20 === localTrc20) {
+      return wallets;
+    }
+
+    const { isGasFreeConfigured } = await import('../../config/gasfree');
+    if (isGasFreeConfigured()) {
+      const { trc20WalletAddressesMatch } = await import('./trc20ReceiveAddress');
+      if (trc20WalletAddressesMatch(serverTrc20, localTrc20, ownerEoa)) {
+        return wallets;
+      }
+      // Server has stale owner EOA or old row — push canonical GasFree address.
+      return wallets;
+    }
+
+    return (wallets ?? []).map((row) =>
+      row.network === 'TRC20' ? { ...row, address: serverTrc20 } : row
+    );
+  } catch {
+    return wallets;
+  }
+};
+
 /**
  * Push active wallet addresses to the server (throttled — skips duplicate syncs within 45s).
  */
 export async function syncDeviceWalletToServer(options?: { force?: boolean }): Promise<boolean> {
   if (!(await isWalletSetupLocally())) return false;
 
-  const wallets = await resolveActiveWalletAddresses();
-  if (!wallets?.length) return false;
+  const localWallets = await resolveActiveWalletAddresses();
+  if (!localWallets?.length) return false;
+
+  const wallets = await reconcileWalletsForServerSync(localWallets, { alreadyCanonical: true });
 
   const fingerprint = walletFingerprint(wallets);
   const force = options?.force ?? false;
@@ -92,7 +194,7 @@ export async function syncDeviceWalletToServer(options?: { force?: boolean }): P
   syncInFlight = (async () => {
     try {
       const res = await api.syncWallets(wallets);
-      const synced = res.data.wallets.map((w) => ({
+      const synced = (res.data.wallets ?? wallets).map((w) => ({
         network: w.network,
         address: w.address,
       }));
@@ -100,6 +202,8 @@ export async function syncDeviceWalletToServer(options?: { force?: boolean }): P
       lastSyncAt = Date.now();
       lastSyncFingerprint = fingerprint;
       invalidateWalletAddressFilterCache();
+      invalidateCachedGet('/merchant/wallets');
+      invalidateCachedGet('/merchant/wallets/balances');
       return true;
     } catch {
       return false;
@@ -127,7 +231,10 @@ export async function syncWalletAddressesInBackground(
   wallets: StoredWalletAddress[]
 ): Promise<void> {
   try {
-    await api.syncWallets(wallets);
+    const reconciled = await reconcileWalletsForServerSync(wallets);
+    await api.syncWallets(reconciled);
+    await saveWalletAddresses(reconciled);
+    invalidateWalletAddressFilterCache();
   } catch {
     // Server sync can finish after the setup screen — local wallet is already saved.
   }
@@ -136,22 +243,9 @@ export async function syncWalletAddressesInBackground(
 export async function persistAndSyncWalletAddresses(
   wallets: StoredWalletAddress[]
 ): Promise<void> {
-  await saveWalletAddresses(wallets);
-  await api.syncWallets(wallets);
+  const reconciled = await reconcileWalletsForServerSync(wallets);
+  await saveWalletAddresses(reconciled);
+  await api.syncWallets(reconciled);
   lastSyncAt = Date.now();
-  lastSyncFingerprint = walletFingerprint(wallets);
-}
-
-/** Switch the active local wallet and sync its addresses to the server. */
-export async function activateLocalWallet(walletId: string): Promise<boolean> {
-  const wallet = await setActiveWallet(walletId);
-  if (!wallet) return false;
-
-  if (wallet.addresses.length) {
-    invalidateWalletAddressFilterCache();
-    await syncDeviceWalletToServer({ force: true });
-  }
-
-  triggerDashboardRefresh();
-  return true;
+  lastSyncFingerprint = walletFingerprint(reconciled);
 }

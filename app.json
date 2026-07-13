@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Merchant Payments",
+    "name": "Kivo",
     "slug": "merchant-payments",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -66,10 +66,10 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "name": "Merchant Payments",
+      "name": "Kivo",
       "shortName": "Payments",
       "description": "USDT QR payments for merchants",
-      "themeColor": "#1B1D4D",
+      "themeColor": "#2563EB",
       "backgroundColor": "#EDF0F2"
     },
     "extra": {
