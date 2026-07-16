@@ -62,7 +62,6 @@ const WalletHelp: React.FC = () => {
             <Text
                 style={{
                     ...FONTS.H5,
-                    textTransform: "capitalize",
                     color: isActive ? colors.linkColor : colors.mainDark,
                     flex: 1,
                     marginRight: 8,

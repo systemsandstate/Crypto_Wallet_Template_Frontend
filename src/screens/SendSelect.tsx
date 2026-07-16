@@ -296,7 +296,12 @@ const SendSelect: React.FC = ({ navigation }: any) => {
     const handleScanToPay = useCallback(() => {
         const network =
             pickFundedNetworkLabel(balances, [...USDT_NETWORKS], 0, 0) ?? "BEP20";
-        navigation.navigate("Withdraw", { network, returnScreen: "SendSelect", openScan: true });
+        navigation.navigate("Withdraw", {
+            network,
+            returnScreen: "SendSelect",
+            openScan: true,
+            qrPay: true,
+        });
     }, [balances, navigation]);
 
     const handlePayByEmailReady = useCallback(

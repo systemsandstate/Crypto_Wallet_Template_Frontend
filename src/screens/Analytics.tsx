@@ -24,10 +24,17 @@ type StatItem = {
     color: string;
 };
 
+const cardShadow = (isDark: boolean) =>
+    Platform.OS === "web"
+        ? ({
+              boxShadow: isDark ? "0 2px 12px rgba(0,0,0,0.28)" : "0 2px 10px rgba(0,0,0,0.05)",
+          } as object)
+        : { elevation: isDark ? 3 : 2 };
+
 const Analytics: React.FC = () => {
     const merchant = useAppSelector((state: RootState) => state.auth.merchant);
     const { t, dateLocale } = useTranslation();
-    const { colors, FONTS } = useTheme();
+    const { colors, FONTS, isDark } = useTheme();
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [payments, setPayments] = useState<PaymentRequest[]>([]);
@@ -173,9 +180,7 @@ const Analytics: React.FC = () => {
                     borderColor: colors.border,
                     paddingHorizontal: DENSITY.cardPaddingH,
                     paddingVertical: DENSITY.cardPadding,
-                    ...(Platform.OS === "web"
-                        ? ({ boxShadow: "0 2px 10px rgba(0,0,0,0.05)" } as object)
-                        : { elevation: 2 }),
+                    ...cardShadow(isDark),
                 },
                 balanceCard: {
                     backgroundColor: colors.white,
@@ -184,9 +189,7 @@ const Analytics: React.FC = () => {
                     borderColor: colors.border,
                     paddingHorizontal: DENSITY.cardPaddingH,
                     paddingVertical: 14,
-                    ...(Platform.OS === "web"
-                        ? ({ boxShadow: "0 2px 10px rgba(0,0,0,0.05)" } as object)
-                        : { elevation: 2 }),
+                    ...cardShadow(isDark),
                 },
                 balanceLabel: {
                     ...FONTS.Mulish_500Medium,
@@ -220,9 +223,7 @@ const Analytics: React.FC = () => {
                     paddingHorizontal: 10,
                     paddingVertical: 10,
                     overflow: "hidden",
-                    ...(Platform.OS === "web"
-                        ? ({ boxShadow: "0 2px 10px rgba(0,0,0,0.05)" } as object)
-                        : { elevation: 1 }),
+                    ...cardShadow(isDark),
                 },
                 statAccent: {
                     position: "absolute",
@@ -263,52 +264,58 @@ const Analytics: React.FC = () => {
                     maxWidth: "52%",
                     textAlign: "right",
                 },
-                flowLegend: {
-                    gap: 10,
-                    marginTop: 4,
-                },
-                flowLegendRow: {
-                    gap: 6,
-                },
-                flowLegendTop: {
+                flowLayout: {
                     flexDirection: "row",
                     alignItems: "center",
-                    justifyContent: "space-between",
+                    gap: 12,
+                },
+                flowChartSlot: {
+                    flexShrink: 0,
+                },
+                flowLegend: {
+                    flex: 1,
+                    minWidth: 0,
                     gap: 10,
                 },
-                flowLegendLeft: {
+                flowLegendRow: {
                     flexDirection: "row",
                     alignItems: "center",
                     gap: 8,
+                    paddingVertical: 8,
+                    paddingHorizontal: 10,
+                    borderRadius: 10,
+                    backgroundColor: colors.surfaceMuted,
+                },
+                flowLegendDot: {
+                    width: 10,
+                    height: 10,
+                    borderRadius: 5,
+                    flexShrink: 0,
+                },
+                flowLegendCopy: {
                     flex: 1,
                     minWidth: 0,
                 },
-                flowLegendDot: {
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
-                    flexShrink: 0,
-                },
                 flowLegendLabel: {
                     ...FONTS.Mulish_500Medium,
-                    fontSize: 13,
-                    color: colors.mainDark,
+                    fontSize: 12,
+                    color: colors.bodyTextColor,
                 },
                 flowLegendValue: {
-                    ...FONTS.Mulish_600SemiBold,
-                    fontSize: 13,
+                    ...FONTS.Mulish_700Bold,
+                    fontSize: 14,
                     color: colors.mainDark,
-                    flexShrink: 0,
+                    marginTop: 2,
                 },
-                flowLegendBar: {
-                    height: 4,
-                    borderRadius: 2,
-                    backgroundColor: colors.surfaceMuted,
+                flowLegendPct: {
+                    ...FONTS.Mulish_600SemiBold,
+                    fontSize: 11,
+                    color: colors.bodyTextColor,
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 999,
+                    backgroundColor: colors.white,
                     overflow: "hidden",
-                },
-                flowLegendFill: {
-                    height: "100%",
-                    borderRadius: 2,
                 },
                 refreshBtn: {
                     width: DENSITY.iconButton,
@@ -321,14 +328,14 @@ const Analytics: React.FC = () => {
                     borderColor: colors.border,
                 },
             }),
-        [FONTS, colors]
+        [FONTS, colors, isDark]
     );
 
     const formatAmount = (value: number) => `$${formatAnalyticsAmount(value, dateLocale)}`;
 
     const shareOfActivity = (value: number) => {
         if (snapshot.activityTotal <= 0) return 0;
-        return Math.min(100, (value / snapshot.activityTotal) * 100);
+        return Math.round((value / snapshot.activityTotal) * 100);
     };
 
     return (
@@ -405,57 +412,52 @@ const Analytics: React.FC = () => {
                                         {t.analytics.moneyFlowHint}
                                     </Text>
                                 </View>
-                                <DonutChart
-                                    segments={snapshot.segments}
-                                    centerValue={formatAmount(snapshot.activityTotal)}
-                                    centerLabel={t.analytics.totalActivity}
-                                    emptyLabel={t.analytics.noActivity}
-                                    size={188}
-                                    strokeWidth={20}
-                                    trackColor={colors.surfaceMuted}
-                                    labelColor={colors.bodyTextColor}
-                                    valueColor={colors.mainDark}
-                                />
-                                <View style={styles.flowLegend}>
-                                    {flowLegend.map((item) => {
-                                        const share = shareOfActivity(item.value);
-                                        return (
-                                            <View key={item.label} style={styles.flowLegendRow}>
-                                                <View style={styles.flowLegendTop}>
-                                                    <View style={styles.flowLegendLeft}>
-                                                        <View
-                                                            style={[
-                                                                styles.flowLegendDot,
-                                                                { backgroundColor: item.color },
-                                                            ]}
-                                                        />
+                                <View style={styles.flowLayout}>
+                                    <View style={styles.flowChartSlot}>
+                                        <DonutChart
+                                            segments={snapshot.segments}
+                                            centerValue={formatAmount(snapshot.activityTotal)}
+                                            centerLabel={t.analytics.totalActivity}
+                                            emptyLabel={t.analytics.noActivity}
+                                            size={148}
+                                            strokeWidth={18}
+                                            segmentGap={3}
+                                            trackColor={colors.border}
+                                            labelColor={colors.bodyTextColor}
+                                            valueColor={colors.mainDark}
+                                        />
+                                    </View>
+                                    <View style={styles.flowLegend}>
+                                        {flowLegend.map((item) => {
+                                            const share = shareOfActivity(item.value);
+                                            return (
+                                                <View key={item.label} style={styles.flowLegendRow}>
+                                                    <View
+                                                        style={[
+                                                            styles.flowLegendDot,
+                                                            { backgroundColor: item.color },
+                                                        ]}
+                                                    />
+                                                    <View style={styles.flowLegendCopy}>
                                                         <Text
                                                             style={styles.flowLegendLabel}
                                                             numberOfLines={1}
                                                         >
                                                             {item.label}
                                                         </Text>
+                                                        <Text style={styles.flowLegendValue}>
+                                                            {formatAmount(item.value)}
+                                                        </Text>
                                                     </View>
-                                                    <Text style={styles.flowLegendValue}>
-                                                        {formatAmount(item.value)}
-                                                    </Text>
+                                                    {snapshot.activityTotal > 0 ? (
+                                                        <Text style={styles.flowLegendPct}>
+                                                            {share}%
+                                                        </Text>
+                                                    ) : null}
                                                 </View>
-                                                {snapshot.activityTotal > 0 ? (
-                                                    <View style={styles.flowLegendBar}>
-                                                        <View
-                                                            style={[
-                                                                styles.flowLegendFill,
-                                                                {
-                                                                    width: `${share}%`,
-                                                                    backgroundColor: item.color,
-                                                                },
-                                                            ]}
-                                                        />
-                                                    </View>
-                                                ) : null}
-                                            </View>
-                                        );
-                                    })}
+                                            );
+                                        })}
+                                    </View>
                                 </View>
                             </View>
 
@@ -472,6 +474,7 @@ const Analytics: React.FC = () => {
                                     sentColor={colors.red}
                                     trackColor={colors.border}
                                     labelColor={colors.bodyTextColor}
+                                    mutedColor={colors.surfaceMuted}
                                     receivedLabel={t.analytics.legendReceived}
                                     sentLabel={t.analytics.legendSent}
                                     emptyLabel={t.analytics.noActivityWeek}

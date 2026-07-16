@@ -349,10 +349,11 @@ export const api = {
       method: 'POST',
     }),
 
-  listPayments: (params?: { status?: string; limit?: number }) => {
+  listPayments: (params?: { status?: string; limit?: number; offset?: number }) => {
     const q = new URLSearchParams();
     if (params?.status) q.set('status', params.status);
     if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.offset != null) q.set('offset', String(params.offset));
     const qs = q.toString();
     return cachedGet<{ success: boolean; data: { items: PaymentRequest[]; total: number } }>(
       `/payments/requests${qs ? `?${qs}` : ''}`

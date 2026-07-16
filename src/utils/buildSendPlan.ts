@@ -81,13 +81,20 @@ type BuildSendPlanInput = {
 
 const SUPPORTED_SEND_NETWORKS: UsdtNetwork[] = ["TRC20", "ERC20", "BEP20"];
 
+type RecipientLookupResult = {
+    preview: RecipientPreview | null;
+    sendAddress: string;
+    network?: UsdtNetwork;
+    addresses?: Partial<Record<UsdtNetwork, string>>;
+};
+
 async function lookupRecipientPreview(
     trimmed: string,
     currentNetwork: UsdtNetwork,
     merchantId: string | undefined,
     labels: BuildSendPlanInput["labels"],
     lookupNetwork?: UsdtNetwork
-): Promise<{ preview: RecipientPreview | null; sendAddress: string; network?: UsdtNetwork }> {
+): Promise<RecipientLookupResult> {
     if (isRecipientEmail(trimmed)) {
         const lookupRes = await api.lookupWalletRecipient({
             email: trimmed,
@@ -101,13 +108,15 @@ async function lookupRecipientPreview(
             };
         }
         if (data.found && data.resolvedAddress) {
-            const addressForNetwork =
-                (data.addresses as Partial<Record<UsdtNetwork, string>>)?.[currentNetwork] ||
-                data.resolvedAddress;
-            const resolvedNetwork =
+            const addresses = (data.addresses as Partial<Record<UsdtNetwork, string>> | undefined) ?? {};
+            const preferred =
                 (data.defaultNetwork as UsdtNetwork) ||
                 (data.network as UsdtNetwork) ||
                 currentNetwork;
+            const addressForNetwork =
+                addresses[preferred]?.trim() ||
+                addresses[currentNetwork]?.trim() ||
+                data.resolvedAddress;
             return {
                 preview: {
                     kind: "app",
@@ -115,7 +124,8 @@ async function lookupRecipientPreview(
                     avatarUrl: data.avatarUrl ?? null,
                 },
                 sendAddress: addressForNetwork,
-                network: currentNetwork,
+                network: preferred,
+                addresses,
             };
         }
         return {
@@ -138,6 +148,12 @@ async function lookupRecipientPreview(
         (data.network as UsdtNetwork) || currentNetwork
     );
 
+    const addresses = (data.addresses as Partial<Record<UsdtNetwork, string>> | undefined) ?? undefined;
+    const resolvedNetwork =
+        (data.defaultNetwork as UsdtNetwork) ||
+        (data.network as UsdtNetwork) ||
+        currentNetwork;
+
     if (data.found && data.isSelf) {
         return {
             preview: {
@@ -146,7 +162,8 @@ async function lookupRecipientPreview(
                 isSelf: true,
             },
             sendAddress: trimmed,
-            network: (data.network as UsdtNetwork) || currentNetwork,
+            network: resolvedNetwork,
+            addresses,
         };
     }
 
@@ -154,7 +171,8 @@ async function lookupRecipientPreview(
         return {
             preview: { kind: "app", name: data.businessName, avatarUrl: data.avatarUrl ?? null },
             sendAddress: trimmed,
-            network: (data.network as UsdtNetwork) || currentNetwork,
+            network: resolvedNetwork,
+            addresses,
         };
     }
 
@@ -211,25 +229,20 @@ async function estimateFeeForRoute(
 function buildRouteCandidates(
     input: BuildSendPlanInput,
     sendAddress: string,
-    networkHint?: UsdtNetwork
+    networkHint?: UsdtNetwork,
+    recipientAddresses?: Partial<Record<UsdtNetwork, string>>
 ): SendRouteCandidate[] {
+    // Merchant UX: never pin a rail unless a native-asset send requires it.
     if (input.lockNetwork) {
         return [{ network: input.preferredNetwork, address: sendAddress }];
     }
-    if (input.qrPayload?.addresses) {
-        const preferred =
-            input.qrPayload.defaultNetwork ??
-            networkHint ??
-            input.preferredNetwork;
-        const preferredAddress = preferred
-            ? input.qrPayload.addresses[preferred]?.trim()
-            : "";
-        if (preferred && preferredAddress) {
-            return [{ network: preferred, address: preferredAddress }];
-        }
-        const qrRoutes = routesFromQrAddresses(input.qrPayload.addresses);
+
+    const multiAddresses = input.qrPayload?.addresses ?? recipientAddresses;
+    if (multiAddresses) {
+        const qrRoutes = routesFromQrAddresses(multiAddresses);
         if (qrRoutes.length > 0) return qrRoutes;
     }
+
     if (networkHint) {
         return defaultRoute(networkHint, sendAddress);
     }
@@ -254,6 +267,7 @@ export async function buildSendPlan(
     let resolvedSendAddress = trimmed;
     let networkHint: UsdtNetwork | undefined =
         input.qrPayload?.defaultNetwork ?? input.preferredNetwork;
+    let recipientAddresses: Partial<Record<UsdtNetwork, string>> | undefined;
 
     try {
         const lookup = await lookupRecipientPreview(
@@ -266,6 +280,7 @@ export async function buildSendPlan(
         preview = lookup.preview;
         resolvedSendAddress = lookup.sendAddress;
         networkHint = lookup.network ?? networkHint;
+        recipientAddresses = lookup.addresses;
     } catch {
         resolvedSendAddress = trimmed;
     }
@@ -282,7 +297,12 @@ export async function buildSendPlan(
         return { error: { code: "self_transfer", message: input.labels.cannotSendToSelf } };
     }
 
-    const routeCandidates = buildRouteCandidates(input, resolvedSendAddress, networkHint);
+    const routeCandidates = buildRouteCandidates(
+        input,
+        resolvedSendAddress,
+        networkHint,
+        recipientAddresses
+    );
     const orderedRoutes = orderSendRouteCandidates(
         routeCandidates,
         isNative ? input.nativeBalances : input.networkBalances,
@@ -291,6 +311,15 @@ export async function buildSendPlan(
     );
 
     let lastInsufficientMessage = input.labels.insufficientAnyNetwork;
+    type ViablePlan = {
+        sendAddress: string;
+        network: UsdtNetwork;
+        feeUsdt: number | null;
+        availableBalance: number;
+        feeRank: number;
+    };
+    const viable: ViablePlan[] = [];
+    let sawGasNotConfigured = false;
 
     for (const route of orderedRoutes) {
         const network = route.network;
@@ -307,7 +336,8 @@ export async function buildSendPlan(
 
         const usesGas = !isNative && networkUsesUsdtGas(network);
         if (usesGas && !isUsdtGasConfigured(network)) {
-            return { error: { code: "gas_not_configured", message: input.labels.gasNotConfigured } };
+            sawGasNotConfigured = true;
+            continue;
         }
 
         const balance = isNative
@@ -338,23 +368,47 @@ export async function buildSendPlan(
             continue;
         }
 
+        const feeRank =
+            feeUsdt != null
+                ? feeUsdt
+                : network === "BEP20"
+                  ? 0.01
+                  : network === "TRC20"
+                    ? 0.5
+                    : 2;
+        viable.push({
+            sendAddress,
+            network,
+            feeUsdt,
+            availableBalance: balance,
+            feeRank,
+        });
+    }
+
+    if (viable.length === 0) {
+        if (sawGasNotConfigured && orderedRoutes.length > 0) {
+            return { error: { code: "gas_not_configured", message: input.labels.gasNotConfigured } };
+        }
         return {
-            plan: {
-                inputLabel: trimmed,
-                sendAddress,
-                network,
-                amount,
-                preview,
-                feeUsdt,
-                availableBalance: balance,
+            error: {
+                code: "insufficient_balance",
+                message: lastInsufficientMessage,
             },
         };
     }
 
+    viable.sort((a, b) => a.feeRank - b.feeRank);
+    const best = viable[0]!;
+
     return {
-        error: {
-            code: "insufficient_balance",
-            message: lastInsufficientMessage,
+        plan: {
+            inputLabel: trimmed,
+            sendAddress: best.sendAddress,
+            network: best.network,
+            amount,
+            preview,
+            feeUsdt: best.feeUsdt,
+            availableBalance: best.availableBalance,
         },
     };
 }

@@ -137,11 +137,7 @@ const ReceiveSelect: React.FC = ({ navigation }: any) => {
         async (row: ReceiveAssetRow) => {
             const copied = await copyToClipboard(row.address);
             if (copied) {
-                showToast(
-                    formatMessage(t.wallet.accountNumberCopied, {
-                        network: row.network,
-                    })
-                );
+                showToast(t.wallet.accountNumberCopied);
             } else {
                 showToast(t.transaction.couldNotCopy, "error");
             }
@@ -420,7 +416,7 @@ const ReceiveSelect: React.FC = ({ navigation }: any) => {
                                             <View style={styles.assetTitleRow}>
                                                 <Text style={styles.assetSymbol}>{row.symbol}</Text>
                                                 <View style={styles.networkPill}>
-                                                    <Text style={styles.networkPillText}>{row.network}</Text>
+                                                    <Text style={styles.networkPillText}>USDT</Text>
                                                 </View>
                                             </View>
                                             <Text style={styles.assetKind}>{t.withdraw.tetherUsd}</Text>

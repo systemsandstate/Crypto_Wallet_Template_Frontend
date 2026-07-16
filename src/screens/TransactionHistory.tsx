@@ -12,7 +12,7 @@ import { useTranslation } from "../hooks/useTranslation";
 import { useTheme } from "../hooks/useTheme";
 import { filterTransfersForActiveWallet, filterTransfersForDisplay } from "../utils/walletBalance";
 import { filterPaymentsForActivityFeed } from "../utils/walletActivityFeed";
-import { resolveWalletAddressesForBalanceFilter, prepareWalletContext } from "../services/wallet/syncDeviceWallet";
+import { prepareWalletContext } from "../services/wallet/syncDeviceWallet";
 import { createMerchantTabPageStyles } from "../styles/merchantTabPageChrome";
 import { useCounterpartyLabelsForTransfers } from "../hooks/useCounterpartyLabelsForTransfers";
 
@@ -20,36 +20,40 @@ type HistoryRow =
     | { kind: "payment"; key: string; sortAt: number; payment: PaymentRequest }
     | { kind: "deposit"; key: string; sortAt: number; deposit: WalletTransfer };
 
+const PAGE_SIZE = 20;
+
 const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
     const navigation: any = useNavigation();
     const { t } = useTranslation();
     const { colors, FONTS } = useTheme();
     const merchant = useAppSelector((state: RootState) => state.auth.merchant);
     const [payments, setPayments] = useState<PaymentRequest[]>([]);
+    const [paymentsTotal, setPaymentsTotal] = useState(0);
     const [deposits, setDeposits] = useState<WalletTransfer[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
     const hasLoadedRef = useRef(false);
     const loadInFlightRef = useRef(false);
     const [filter, setFilter] = useState("");
 
     const getCounterpartyLabel = useCounterpartyLabelsForTransfers(deposits);
 
-    const filters = [
-        { label: t.payment.filterAll, value: "" },
-        { label: t.payment.filterReceived, value: "DEPOSIT" },
-        { label: t.payment.filterSent, value: "SEND" },
-        { label: t.payment.filterPaid, value: "PAID" },
-        { label: t.payment.filterExpired, value: "EXPIRED" },
-        { label: t.payment.filterFailed, value: "FAILED" },
-        { label: t.payment.filterCancelled, value: "CANCELLED" },
-    ];
+    // Paid overlapped Received; Expired/Cancelled are not useful for the cashier flow.
+    const filters = useMemo(
+        () => [
+            { label: t.payment.filterAll, value: "" },
+            { label: t.payment.filterReceived, value: "DEPOSIT" },
+            { label: t.payment.filterSent, value: "SEND" },
+            { label: t.payment.filterFailed, value: "FAILED" },
+        ],
+        [t]
+    );
 
-    // Header uses borderBottomRadius 24 — overlay extends under those curves to fill gaps.
     const pageStyles = useMemo(
         () =>
             StyleSheet.create({
                 ...createMerchantTabPageStyles(colors),
-                // Covers list region + the two corner gaps under the header curve.
                 loadingOverlay: {
                     position: "absolute",
                     top: 0,
@@ -74,7 +78,7 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                     flex: 1,
                     justifyContent: "center",
                     paddingTop: 0,
-                    paddingBottom: embedded ? 24 : 24,
+                    paddingBottom: 24,
                 },
                 emptyWrap: {
                     alignItems: "center",
@@ -93,67 +97,75 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                     color: colors.accentBlue,
                     textDecorationLine: "underline",
                 },
+                loadMoreWrap: {
+                    paddingTop: 8,
+                    paddingBottom: 8,
+                },
             }),
-        [FONTS, colors, embedded]
+        [FONTS, colors]
     );
 
-    const load = useCallback((opts?: { force?: boolean }) => {
-        if (loadInFlightRef.current) return;
-        loadInFlightRef.current = true;
+    const usesPaymentRequests = filter === "" || filter === "FAILED";
 
-        const silent = hasLoadedRef.current;
-        if (!silent) setLoading(true);
+    const load = useCallback(
+        (opts?: { force?: boolean }) => {
+            if (loadInFlightRef.current) return;
+            loadInFlightRef.current = true;
 
-        void (async () => {
-            try {
-                if (opts?.force) {
-                    invalidateCachedGet("/merchant/wallets/transfers");
-                    if (
-                        filter === "" ||
-                        filter === "PAID" ||
-                        filter === "EXPIRED" ||
-                        filter === "FAILED" ||
-                        filter === "CANCELLED"
-                    ) {
-                        invalidateCachedGet("/payments/requests");
+            const silent = hasLoadedRef.current;
+            if (!silent) setLoading(true);
+
+            void (async () => {
+                try {
+                    if (opts?.force) {
+                        invalidateCachedGet("/merchant/wallets/transfers");
+                        if (usesPaymentRequests) {
+                            invalidateCachedGet("/payments/requests");
+                        }
                     }
-                }
 
-                const activeAddresses = await prepareWalletContext();
+                    const activeAddresses = await prepareWalletContext();
+                    setVisibleCount(PAGE_SIZE);
 
-                const needsTransfers =
-                    filter === "" || filter === "DEPOSIT" || filter === "SEND";
-                const transfersPromise = needsTransfers ? api.getWalletTransfers() : null;
+                    if (filter === "DEPOSIT" || filter === "SEND") {
+                        const res = await api.getWalletTransfers();
+                        const type = filter === "DEPOSIT" ? "DEPOSIT" : "SEND";
+                        const transfers = filterTransfersForDisplay(
+                            filterTransfersForActiveWallet(
+                                (res.data.transfers ?? []).filter((row) => row.type === type),
+                                activeAddresses
+                            )
+                        );
+                        setPayments([]);
+                        setPaymentsTotal(0);
+                        setDeposits(transfers);
+                        return;
+                    }
 
-                if (filter === "DEPOSIT" || filter === "SEND") {
-                    const res = await transfersPromise!;
-                    const type = filter === "DEPOSIT" ? "DEPOSIT" : "SEND";
-                    const transfers = filterTransfersForDisplay(
-                        filterTransfersForActiveWallet(
-                            (res.data.transfers ?? []).filter((row) => row.type === type),
-                            activeAddresses
-                        )
-                    );
-                    setPayments([]);
-                    setDeposits(transfers);
-                    return;
-                }
+                    if (filter === "FAILED") {
+                        const res = await api.listPayments({
+                            status: filter,
+                            limit: PAGE_SIZE,
+                            offset: 0,
+                        });
+                        setPayments(res.data.items ?? []);
+                        setPaymentsTotal(res.data.total ?? 0);
+                        setDeposits([]);
+                        return;
+                    }
 
-                const paymentsPromise =
-                    filter === ""
-                        ? api.listPayments({ limit: 50 })
-                        : api.listPayments({ status: filter, limit: 50 });
-
-                if (filter === "") {
+                    // All
                     const [paymentsResult, transfersResult] = await Promise.allSettled([
-                        paymentsPromise,
-                        transfersPromise!,
+                        api.listPayments({ limit: PAGE_SIZE, offset: 0 }),
+                        api.getWalletTransfers(),
                     ]);
-                    setPayments(
-                        paymentsResult.status === "fulfilled"
-                            ? paymentsResult.value.data.items ?? []
-                            : []
-                    );
+                    if (paymentsResult.status === "fulfilled") {
+                        setPayments(paymentsResult.value.data.items ?? []);
+                        setPaymentsTotal(paymentsResult.value.data.total ?? 0);
+                    } else {
+                        setPayments([]);
+                        setPaymentsTotal(0);
+                    }
                     const transfersRaw =
                         transfersResult.status === "fulfilled"
                             ? transfersResult.value.data.transfers ?? []
@@ -163,24 +175,21 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                             filterTransfersForActiveWallet(transfersRaw, activeAddresses)
                         )
                     );
-                    return;
+                } catch {
+                    if (!hasLoadedRef.current) {
+                        setPayments([]);
+                        setPaymentsTotal(0);
+                        setDeposits([]);
+                    }
+                } finally {
+                    hasLoadedRef.current = true;
+                    loadInFlightRef.current = false;
+                    setLoading(false);
                 }
-
-                const res = await paymentsPromise;
-                setPayments(res.data.items ?? []);
-                setDeposits([]);
-            } catch {
-                if (!hasLoadedRef.current) {
-                    setPayments([]);
-                    setDeposits([]);
-                }
-            } finally {
-                hasLoadedRef.current = true;
-                loadInFlightRef.current = false;
-                setLoading(false);
-            }
-        })();
-    }, [filter]);
+            })();
+        },
+        [filter, usesPaymentRequests]
+    );
 
     const prevFilterRef = useRef(filter);
 
@@ -195,7 +204,7 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
     useEffect(() => {
         if (prevFilterRef.current === filter) return;
         prevFilterRef.current = filter;
-        if (hasLoadedRef.current) load();
+        if (hasLoadedRef.current) load({ force: true });
     }, [filter, load]);
 
     const rows = useMemo((): HistoryRow[] => {
@@ -219,22 +228,54 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
         }));
 
         if (filter === "DEPOSIT") {
-            return depositRows
-                .filter((row) => row.deposit.type === "DEPOSIT")
-                .sort(byTime);
+            return depositRows.filter((row) => row.deposit.type === "DEPOSIT").sort(byTime);
         }
         if (filter === "SEND") {
-            return depositRows
-                .filter((row) => row.deposit.type === "SEND")
-                .sort(byTime);
+            return depositRows.filter((row) => row.deposit.type === "SEND").sort(byTime);
         }
         if (filter === "") {
             return [...paymentRows, ...depositRows].sort(byTime);
         }
-        return paymentRows
-            .filter((row) => row.payment.status === filter)
-            .sort(byTime);
+        return paymentRows.filter((row) => row.payment.status === filter).sort(byTime);
     }, [payments, deposits, filter]);
+
+    const displayedRows = useMemo(() => rows.slice(0, visibleCount), [rows, visibleCount]);
+
+    const hasMoreLocal = rows.length > visibleCount;
+    const hasMorePayments = usesPaymentRequests && payments.length < paymentsTotal;
+    const canLoadMore = hasMoreLocal || hasMorePayments;
+
+    const handleLoadMore = useCallback(async () => {
+        if (loadingMore || loadInFlightRef.current) return;
+
+        if (hasMoreLocal) {
+            setVisibleCount((count) => count + PAGE_SIZE);
+            return;
+        }
+
+        if (!hasMorePayments) return;
+
+        setLoadingMore(true);
+        try {
+            const status = filter === "FAILED" ? filter : undefined;
+            const res = await api.listPayments({
+                status,
+                limit: PAGE_SIZE,
+                offset: payments.length,
+            });
+            const nextItems = res.data.items ?? [];
+            setPayments((prev) => {
+                const seen = new Set(prev.map((item) => item.id));
+                return [...prev, ...nextItems.filter((item) => !seen.has(item.id))];
+            });
+            setPaymentsTotal(res.data.total ?? paymentsTotal);
+            setVisibleCount((count) => count + PAGE_SIZE);
+        } catch {
+            // Keep current page if the next page fails.
+        } finally {
+            setLoadingMore(false);
+        }
+    }, [filter, hasMoreLocal, hasMorePayments, loadingMore, payments.length, paymentsTotal]);
 
     const isEmptyFilter = filter === "";
     const emptyMessage = isEmptyFilter
@@ -306,31 +347,45 @@ const TransactionHistory: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                     </TouchableOpacity>
                 </View>
             ) : (
-                rows.map((row) =>
-                    row.kind === "payment" ? (
-                        <components.PaymentListItem
-                            key={row.key}
-                            item={row.payment}
-                            showDate
-                            onPress={() =>
-                                navigation.navigate("TransactionDetails", {
-                                    payment: row.payment,
-                                    paymentId: row.payment.id,
-                                })
-                            }
-                        />
-                    ) : (
-                        <WalletDepositListItem
-                            key={row.key}
-                            item={row.deposit}
-                            showDate
-                            counterparty={getCounterpartyLabel(row.deposit)}
-                            onPress={() =>
-                                navigation.navigate("WalletDepositDetails", { deposit: row.deposit })
-                            }
-                        />
-                    )
-                )
+                <>
+                    {displayedRows.map((row) =>
+                        row.kind === "payment" ? (
+                            <components.PaymentListItem
+                                key={row.key}
+                                item={row.payment}
+                                showDate
+                                onPress={() =>
+                                    navigation.navigate("TransactionDetails", {
+                                        payment: row.payment,
+                                        paymentId: row.payment.id,
+                                    })
+                                }
+                            />
+                        ) : (
+                            <WalletDepositListItem
+                                key={row.key}
+                                item={row.deposit}
+                                showDate
+                                counterparty={getCounterpartyLabel(row.deposit)}
+                                onPress={() =>
+                                    navigation.navigate("WalletDepositDetails", { deposit: row.deposit })
+                                }
+                            />
+                        )
+                    )}
+                    {canLoadMore ? (
+                        <View style={pageStyles.loadMoreWrap}>
+                            <components.Button
+                                title={t.payment.loadMore}
+                                onPress={() => void handleLoadMore()}
+                                loading={loadingMore}
+                                disabled={loadingMore}
+                                size="compact"
+                                variant="secondary"
+                            />
+                        </View>
+                    ) : null}
+                </>
             )}
         </components.MerchantContent>
     );

@@ -89,7 +89,7 @@ const LatestTransferLogsList: React.FC<Props> = ({ title, hint, logs, onSelect }
                         activeOpacity={0.75}
                         onPress={() => onSelect(log)}
                         accessibilityRole="button"
-                        accessibilityLabel={`${log.label} ${formatUsdtAmount(log.amount, dateLocale)} USDT ${log.network}`}
+                        accessibilityLabel={`${log.label} ${formatUsdtAmount(log.amount, dateLocale)} USDT`}
                     >
                         <View style={styles.rowMain}>
                             <Text style={styles.rowName} numberOfLines={1}>
@@ -99,8 +99,7 @@ const LatestTransferLogsList: React.FC<Props> = ({ title, hint, logs, onSelect }
                                 {new Date(log.timestamp).toLocaleString(dateLocale, {
                                     dateStyle: "medium",
                                     timeStyle: "short",
-                                })}{" "}
-                                · {log.network}
+                                })}
                             </Text>
                         </View>
                         <Text style={styles.rowAmount}>

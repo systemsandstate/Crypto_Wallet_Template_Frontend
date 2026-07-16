@@ -9,6 +9,8 @@ import type { RepeatSendPayload } from "../utils/repeatSendTransfer";
 type TransferNavOptions = {
     returnScreen?: "Home" | "SendSelect" | "SendFundSelect";
     openScan?: boolean;
+    /** Scan-first pay flow: no account-number form. */
+    qrPay?: boolean;
     initialSendPlan?: SendPlan;
     openConfirm?: boolean;
     repeatSend?: RepeatSendPayload;
@@ -30,10 +32,13 @@ export async function openTransferScreen(
         // fall back to default network
     }
 
+    const qrPay = opts.qrPay === true || opts.openScan === true;
+
     navigation.navigate("Withdraw", {
         network: opts.repeatSend?.network ?? network,
         returnScreen: opts.returnScreen ?? "Home",
         openScan: opts.openScan,
+        qrPay,
         initialSendPlan: opts.initialSendPlan,
         openConfirm: opts.openConfirm,
         repeatSend: opts.repeatSend,

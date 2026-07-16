@@ -14,6 +14,7 @@ import { useAppFonts } from "./src/hooks/useAppFonts";
 import { useAuthRestore } from "./src/hooks/useAuthRestore";
 import { usePushNotifications } from "./src/hooks/usePushNotifications";
 import { useWebInputStyles } from "./src/hooks/useWebInputStyles";
+import { useAppUpdates } from "./src/hooks/useAppUpdates";
 
 import AppShell from "./src/components/AppShell";
 import ToastHost from "./src/components/ToastHost";
@@ -31,6 +32,7 @@ const AppRoot: React.FC = () => {
     useWebInputStyles();
     useAuthRestore();
     usePushNotifications();
+    useAppUpdates();
 
     useEffect(() => {
         void ExpoSplashScreen.hideAsync().catch(() => {});

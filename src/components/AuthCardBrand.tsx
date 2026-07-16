@@ -1,7 +1,7 @@
 import { View, StyleSheet } from "react-native";
 import React, { memo } from "react";
 
-import KivoLogo from "./KivoLogo";
+import KivooLogo from "./KivooLogo";
 
 type Props = {
     size?: "md" | "lg";
@@ -9,7 +9,7 @@ type Props = {
 
 const AuthCardBrand: React.FC<Props> = ({ size = "lg" }) => (
     <View style={styles.wrap}>
-        <KivoLogo size={size} />
+        <KivooLogo size={size} />
     </View>
 );
 

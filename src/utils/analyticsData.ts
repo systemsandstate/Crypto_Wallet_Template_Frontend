@@ -14,6 +14,7 @@ export type AnalyticsWeekDay = {
     label: string;
     received: number;
     sent: number;
+    isToday?: boolean;
 };
 
 export type AnalyticsSnapshot = {
@@ -65,14 +66,17 @@ export function buildAnalyticsSnapshot(
     ].filter((segment) => segment.value > 0);
 
     const today = startOfDay(new Date());
+    const todayKey = dayKey(today);
     const weekBuckets = Array.from({ length: 7 }, (_, index) => {
         const date = new Date(today);
         date.setDate(today.getDate() - (6 - index));
+        const key = dayKey(date);
         return {
-            key: dayKey(date),
+            key,
             label: date.toLocaleDateString(dateLocale, { weekday: "short" }),
             received: 0,
             sent: 0,
+            isToday: key === todayKey,
         };
     });
     const weekByKey = Object.fromEntries(weekBuckets.map((day) => [day.key, day]));

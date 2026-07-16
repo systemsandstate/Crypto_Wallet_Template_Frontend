@@ -71,8 +71,11 @@ const AddressBookPicker: React.FC = ({ navigation, route }: any) => {
     );
 
     const entries = useMemo(
-        () => allEntries.filter((entry) => entrySupportsNetwork(entry, selectedNetwork)),
-        [allEntries, selectedNetwork]
+        () =>
+            routeNetwork
+                ? allEntries.filter((entry) => entrySupportsNetwork(entry, selectedNetwork))
+                : allEntries,
+        [allEntries, routeNetwork, selectedNetwork]
     );
 
     const selected = entries.find((entry) => entry.id === selectedId);
@@ -81,15 +84,16 @@ const AddressBookPicker: React.FC = ({ navigation, route }: any) => {
         if (!selected) return;
         const pickedSendAddress = getAddressBookEntryAddress(selected, selectedNetwork);
         if (!pickedSendAddress) return;
+        // Prefer email so Withdraw can auto-route across the contact's networks.
         const displayValue = selected.email?.trim() || pickedSendAddress;
         navigation.navigate(
             "Withdraw",
             {
                 pickedAddress: displayValue,
-                pickedSendAddress,
+                pickedSendAddress: selected.email?.trim() ? undefined : pickedSendAddress,
                 pickedContactName: selected.name,
-                pickedNetwork: selectedNetwork,
-                lockNetwork: Boolean(routeNetwork),
+                pickedNetwork: undefined,
+                lockNetwork: false,
             },
             { merge: true }
         );
@@ -186,7 +190,11 @@ const AddressBookPicker: React.FC = ({ navigation, route }: any) => {
                 >
                     <components.MerchantContent style={{ flex: 1, paddingTop: 16 }}>
                         <Text style={styles.subtitle}>
-                            {formatMessage(t.withdraw.addressBookForNetwork, { network: networkLabel })}
+                            {routeNetwork
+                                ? formatMessage(t.withdraw.addressBookForNetwork, {
+                                      network: networkLabel,
+                                  })
+                                : t.withdraw.addressBookActionHint}
                         </Text>
 
                         {loading ? (

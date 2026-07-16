@@ -11,6 +11,7 @@ type ParentTarget =
 const STACK_PARENTS: Record<string, string> = {
     BalanceDetail: "Home",
     CreateInvoice: "Home",
+    CashierGetPaid: "Home",
     ReceiveSelect: "Home",
     SendSelect: "Home",
     SendFundSelect: "Home",

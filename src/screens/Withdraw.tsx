@@ -63,6 +63,8 @@ type WithdrawRouteParams = {
     network?: UsdtNetwork;
     asset?: ReceiveAsset;
     openScan?: boolean;
+    /** QR Pay: scan → confirm only (hide account-number form). */
+    qrPay?: boolean;
     initialSendPlan?: SendPlan;
     openConfirm?: boolean;
     returnScreen?: "Home" | "SendSelect" | "SendFundSelect";
@@ -97,15 +99,22 @@ const Withdraw: React.FC = ({ navigation }: any) => {
     const [feeLoading, setFeeLoading] = useState(false);
     const [recipientPreview, setRecipientPreview] = useState<RecipientPreview | null>(null);
     const [scanConfirmLoading, setScanConfirmLoading] = useState(false);
+    const [qrPayMode, setQrPayMode] = useState(
+        () => Boolean((route.params as WithdrawRouteParams | undefined)?.qrPay)
+    );
     const pendingRepeatRef = useRef<RepeatSendPayload | null>(null);
 
     const dateLocale = locale === "es" ? "es-ES" : "en-US";
     const isNativeSend = asset === "NATIVE";
     const { logs: latestTransferLogs, refresh: refreshLatestTransferLogs } =
-        useLatestTransferLogs(!isNativeSend);
+        useLatestTransferLogs(!isNativeSend && !qrPayMode);
 
     const currencyLabel = isNativeSend ? NATIVE_SYMBOLS[network] : "USDT";
-    const screenTitle = isNativeSend ? t.withdraw.sendNativeTitle : t.withdraw.title;
+    const screenTitle = qrPayMode
+        ? t.dashboard.qrPay
+        : isNativeSend
+          ? t.withdraw.sendNativeTitle
+          : t.withdraw.title;
     const usesUsdtGas = !isNativeSend && networkUsesUsdtGas(network);
 
     const balancesLoadedRef = useRef(false);
@@ -126,8 +135,11 @@ const Withdraw: React.FC = ({ navigation }: any) => {
             if (params?.asset) {
                 setAsset(params.asset);
             }
-            if (params?.lockNetwork) {
+            // USDT transfers always auto-route — never lock a rail for merchant UX.
+            if (params?.lockNetwork && params?.asset === "NATIVE") {
                 setNetworkLocked(true);
+            } else if (params?.lockNetwork) {
+                setNetworkLocked(false);
             }
             if (params?.network) {
                 setNetwork(params.network);
@@ -154,6 +166,10 @@ const Withdraw: React.FC = ({ navigation }: any) => {
                     pickedContactName: undefined,
                     lockNetwork: undefined,
                 });
+            }
+            if (params?.qrPay) {
+                setQrPayMode(true);
+                navigation.setParams({ qrPay: undefined });
             }
             if (params?.openScan) {
                 setScanVisible(true);
@@ -264,6 +280,35 @@ const Withdraw: React.FC = ({ navigation }: any) => {
                     height: 40,
                     alignItems: "center",
                     justifyContent: "center"},
+                qrPayPrompt: {
+                    alignItems: "center",
+                    paddingVertical: 28,
+                    paddingHorizontal: 16,
+                    marginBottom: 8,
+                    backgroundColor: colors.white,
+                    borderRadius: 16,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                },
+                qrPayTitle: {
+                    ...FONTS.Mulish_700Bold,
+                    fontSize: 18,
+                    color: colors.mainDark,
+                    textAlign: "center",
+                    marginTop: 14,
+                    marginBottom: 8,
+                },
+                qrPaySubtext: {
+                    ...FONTS.Mulish_400Regular,
+                    fontSize: 14,
+                    color: colors.bodyTextColor,
+                    textAlign: "center",
+                    lineHeight: 20,
+                    marginBottom: 20,
+                },
+                qrPayScanBtn: {
+                    minWidth: 200,
+                },
                 networkLockedRow: {
                     flexDirection: "row",
                     alignItems: "center",
@@ -505,7 +550,10 @@ const Withdraw: React.FC = ({ navigation }: any) => {
                     networkBalances,
                     nativeBalances,
                     qrPayload: input.qrPayload,
-                    lockNetwork: input.lockNetwork ?? networkLocked,
+                    lockNetwork:
+                        (input.sendAsset ?? asset) === "NATIVE"
+                            ? (input.lockNetwork ?? networkLocked)
+                            : false,
                     labels: {
                         invalidAmount: t.payment.invalidAmount,
                         missingRecipient: t.withdraw.enterWalletAddress,
@@ -609,7 +657,7 @@ const Withdraw: React.FC = ({ navigation }: any) => {
             recipientInput: trimmed,
             amount: num,
             preferredNetwork: network,
-            lockNetwork: networkLocked,
+            lockNetwork: asset === "NATIVE" ? networkLocked : false,
         });
         if (ok) {
             setConfirmVisible(true);
@@ -745,186 +793,233 @@ const Withdraw: React.FC = ({ navigation }: any) => {
                     contentContainerStyle={{ flexGrow: 0, paddingBottom: scrollPaddingBottom }}
                 >
                     <components.MerchantContent style={{ paddingVertical: 16 }}>
-                        {networkLocked && !isNativeSend ? (
-                            <View style={styles.networkLockedRow}>
-                                <components.NetworkLogo network={network} size={22} />
-                                <Text style={styles.networkLockedLabel}>
-                                    {formatMessage(t.withdraw.sendingFrom, {
-                                        network: getLocalizedNetworkLabel(network, t),
-                                    })}
-                                </Text>
-                            </View>
-                        ) : null}
-                        <View style={styles.fieldBlock}>
-                            <Text style={styles.fieldLabel}>{t.withdraw.recipientLabel}</Text>
-                            <View style={styles.addressField}>
-                                <TextInput
-                                    style={styles.addressInput}
-                                    placeholder={t.withdraw.recipientPlaceholder}
-                                    placeholderTextColor={colors.placeholder}
-                                    value={address}
-                                    onChangeText={(text) => {
-                                        setAddress(text);
-                                        setSendToAddress("");
-                                        setRecipientPreview(null);
-                                    }}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                />
-                            </View>
-                            <View style={styles.addressActionsRow}>
-                                <TouchableOpacity
-                                    style={styles.pasteButton}
-                                    onPress={handlePaste}
-                                    accessibilityRole="button"
-                                    accessibilityLabel={t.withdraw.paste}
-                                >
-                                    <Text style={styles.pasteText}>{t.withdraw.paste}</Text>
-                                </TouchableOpacity>
-                                <View style={styles.actionDivider} />
-                                <TouchableOpacity
-                                    style={styles.iconAction}
-                                    onPress={() =>
-                                        navigation.navigate("AddressBookPicker", {
-                                            network,
-                                        })
-                                    }
-                                    accessibilityRole="button"
-                                    accessibilityLabel={t.withdraw.pickFromAddressBook}
-                                >
-                                    <svg.AddressBookSvg color={colors.accentBlue} size={22} />
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={styles.iconAction}
-                                    onPress={() => setScanVisible(true)}
-                                    accessibilityRole="button"
-                                    accessibilityLabel={t.withdraw.scanQr}
-                                >
-                                    <svg.QrCodeSvg color={colors.accentBlue} size={22} />
-                                </TouchableOpacity>
-                            </View>
-                            {recipientPreview ? (
-                                <View style={styles.recipientCard}>
-                                    <Text style={styles.recipientBadge}>
-                                        {recipientPreview.kind === "app"
-                                            ? t.withdraw.recipientAppUser
-                                            : recipientPreview.kind === "contact"
-                                              ? t.withdraw.recipientContact
-                                              : t.withdraw.recipientExternal}
-                                    </Text>
-                                    <Text style={styles.recipientTitle}>{recipientPreview.name}</Text>
-                                    {recipientPreview.kind === "app" && !recipientPreview.isSelf ? (
-                                        <Text style={styles.recipientHint}>
-                                            {formatMessage(t.withdraw.recipientAppUserHint, {
-                                                name: recipientPreview.name,
-                                            })}
-                                        </Text>
+                        {qrPayMode ? (
+                            <>
+                                {!recipientPreview && !address.trim() ? (
+                                    <View style={styles.qrPayPrompt}>
+                                        <svg.QrCodeSvg color={colors.accentBlue} size={48} />
+                                        <Text style={styles.qrPayTitle}>{t.withdraw.scanToPayBanner}</Text>
+                                        <Text style={styles.qrPaySubtext}>{t.withdraw.scanToPaySubtext}</Text>
+                                        <components.Button
+                                            title={t.withdraw.scanQrAction}
+                                            onPress={() => setScanVisible(true)}
+                                            containerStyle={styles.qrPayScanBtn}
+                                        />
+                                    </View>
+                                ) : (
+                                    <View style={styles.fieldBlock}>
+                                        <Text style={styles.fieldLabel}>{t.withdraw.recipientLabel}</Text>
+                                        <View style={styles.recipientCard}>
+                                            <Text style={styles.recipientBadge}>
+                                                {recipientPreview?.kind === "app"
+                                                    ? t.withdraw.recipientAppUser
+                                                    : recipientPreview?.kind === "contact"
+                                                      ? t.withdraw.recipientContact
+                                                      : t.withdraw.recipientExternal}
+                                            </Text>
+                                            <Text style={styles.recipientTitle}>
+                                                {recipientPreview?.name || t.withdraw.recipientExternal}
+                                            </Text>
+                                        </View>
+                                        <TouchableOpacity
+                                            style={styles.pasteButton}
+                                            onPress={() => setScanVisible(true)}
+                                            accessibilityRole="button"
+                                            accessibilityLabel={t.withdraw.scanQr}
+                                        >
+                                            <Text style={styles.pasteText}>{t.withdraw.scanQrAction}</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+
+                                {(recipientPreview || address.trim()) ? (
+                                    <View style={styles.fieldBlock}>
+                                        <Text style={styles.fieldLabel}>{t.withdraw.amountLabel}</Text>
+                                        <View
+                                            style={[
+                                                styles.amountField,
+                                                amountFocused
+                                                    ? styles.amountFieldFocused
+                                                    : styles.amountFieldBlurred,
+                                            ]}
+                                        >
+                                            <TextInput
+                                                style={styles.amountInput}
+                                                placeholder="0"
+                                                placeholderTextColor={colors.placeholder}
+                                                value={amount}
+                                                onChangeText={setAmount}
+                                                keyboardType="decimal-pad"
+                                                onFocus={() => setAmountFocused(true)}
+                                                onBlur={() => setAmountFocused(false)}
+                                            />
+                                            {amount.length > 0 && (
+                                                <TouchableOpacity
+                                                    style={styles.clearButton}
+                                                    onPress={() => setAmount("")}
+                                                    accessibilityRole="button"
+                                                    accessibilityLabel={t.wallet.clearAmount}
+                                                >
+                                                    <Text style={styles.clearText}>×</Text>
+                                                </TouchableOpacity>
+                                            )}
+                                            <Text style={styles.currencyTag}>{currencyLabel}</Text>
+                                        </View>
+                                    </View>
+                                ) : null}
+                            </>
+                        ) : (
+                            <>
+                                <View style={styles.fieldBlock}>
+                                    <Text style={styles.fieldLabel}>{t.withdraw.recipientLabel}</Text>
+                                    <View style={styles.addressField}>
+                                        <TextInput
+                                            style={styles.addressInput}
+                                            placeholder={t.withdraw.recipientPlaceholder}
+                                            placeholderTextColor={colors.placeholder}
+                                            value={address}
+                                            onChangeText={(text) => {
+                                                setAddress(text);
+                                                setSendToAddress("");
+                                                setRecipientPreview(null);
+                                            }}
+                                            autoCapitalize="none"
+                                            autoCorrect={false}
+                                        />
+                                    </View>
+                                    <View style={styles.addressActionsRow}>
+                                        <TouchableOpacity
+                                            style={styles.pasteButton}
+                                            onPress={handlePaste}
+                                            accessibilityRole="button"
+                                            accessibilityLabel={t.withdraw.paste}
+                                        >
+                                            <Text style={styles.pasteText}>{t.withdraw.paste}</Text>
+                                        </TouchableOpacity>
+                                        <View style={styles.actionDivider} />
+                                        <TouchableOpacity
+                                            style={styles.iconAction}
+                                            onPress={() => navigation.navigate("AddressBookPicker", {})}
+                                            accessibilityRole="button"
+                                            accessibilityLabel={t.withdraw.pickFromAddressBook}
+                                        >
+                                            <svg.AddressBookSvg color={colors.accentBlue} size={22} />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={styles.iconAction}
+                                            onPress={() => setScanVisible(true)}
+                                            accessibilityRole="button"
+                                            accessibilityLabel={t.withdraw.scanQr}
+                                        >
+                                            <svg.QrCodeSvg color={colors.accentBlue} size={22} />
+                                        </TouchableOpacity>
+                                    </View>
+                                    {recipientPreview ? (
+                                        <View style={styles.recipientCard}>
+                                            <Text style={styles.recipientBadge}>
+                                                {recipientPreview.kind === "app"
+                                                    ? t.withdraw.recipientAppUser
+                                                    : recipientPreview.kind === "contact"
+                                                      ? t.withdraw.recipientContact
+                                                      : t.withdraw.recipientExternal}
+                                            </Text>
+                                            <Text style={styles.recipientTitle}>{recipientPreview.name}</Text>
+                                            {recipientPreview.kind === "app" && !recipientPreview.isSelf ? (
+                                                <Text style={styles.recipientHint}>
+                                                    {formatMessage(t.withdraw.recipientAppUserHint, {
+                                                        name: recipientPreview.name,
+                                                    })}
+                                                </Text>
+                                            ) : null}
+                                        </View>
                                     ) : null}
                                 </View>
-                            ) : null}
-                        </View>
 
-                        <View style={styles.fieldBlock}>
-                            <Text style={styles.fieldLabel}>{t.withdraw.amountLabel}</Text>
-                            <View
-                                style={[
-                                    styles.amountField,
-                                    amountFocused ? styles.amountFieldFocused : styles.amountFieldBlurred,
-                                ]}
-                            >
-                                <TextInput
-                                    style={styles.amountInput}
-                                    placeholder="0"
-                                    placeholderTextColor={colors.placeholder}
-                                    value={amount}
-                                    onChangeText={setAmount}
-                                    keyboardType="decimal-pad"
-                                    onFocus={() => setAmountFocused(true)}
-                                    onBlur={() => setAmountFocused(false)}
-                                />
-                                {amount.length > 0 && (
-                                    <TouchableOpacity
-                                        style={styles.clearButton}
-                                        onPress={() => setAmount("")}
-                                        accessibilityRole="button"
-                                        accessibilityLabel={t.wallet.clearAmount}
+                                <View style={styles.fieldBlock}>
+                                    <Text style={styles.fieldLabel}>{t.withdraw.amountLabel}</Text>
+                                    <View
+                                        style={[
+                                            styles.amountField,
+                                            amountFocused
+                                                ? styles.amountFieldFocused
+                                                : styles.amountFieldBlurred,
+                                        ]}
                                     >
-                                        <Text style={styles.clearText}>×</Text>
-                                    </TouchableOpacity>
-                                )}
-                                <Text style={styles.currencyTag}>{currencyLabel}</Text>
-                                <TouchableOpacity
-                                    style={styles.maxButton}
-                                    onPress={handleMax}
-                                    accessibilityRole="button"
-                                    accessibilityLabel={t.withdraw.max}
-                                >
-                                    <Text style={styles.maxText}>{t.withdraw.max}</Text>
-                                </TouchableOpacity>
-                            </View>
-                            <Text style={styles.approxUsd}>
-                                {isNativeSend
-                                    ? `${formatMessage(t.withdraw.nativeBalanceAvailable, {
-                                          amount: (nativeBalances[network] ?? 0).toLocaleString(dateLocale, {
-                                              maximumFractionDigits: 8}),
-                                          symbol: currencyLabel})}`
-                                    : approxUsdText}
-                            </Text>
-                        </View>
+                                        <TextInput
+                                            style={styles.amountInput}
+                                            placeholder="0"
+                                            placeholderTextColor={colors.placeholder}
+                                            value={amount}
+                                            onChangeText={setAmount}
+                                            keyboardType="decimal-pad"
+                                            onFocus={() => setAmountFocused(true)}
+                                            onBlur={() => setAmountFocused(false)}
+                                        />
+                                        {amount.length > 0 && (
+                                            <TouchableOpacity
+                                                style={styles.clearButton}
+                                                onPress={() => setAmount("")}
+                                                accessibilityRole="button"
+                                                accessibilityLabel={t.wallet.clearAmount}
+                                            >
+                                                <Text style={styles.clearText}>×</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                        <Text style={styles.currencyTag}>{currencyLabel}</Text>
+                                        <TouchableOpacity
+                                            style={styles.maxButton}
+                                            onPress={handleMax}
+                                            accessibilityRole="button"
+                                            accessibilityLabel={t.withdraw.max}
+                                        >
+                                            <Text style={styles.maxText}>{t.withdraw.max}</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <Text style={styles.approxUsd}>
+                                        {isNativeSend
+                                            ? `${formatMessage(t.withdraw.nativeBalanceAvailable, {
+                                                  amount: (nativeBalances[network] ?? 0).toLocaleString(
+                                                      dateLocale,
+                                                      {
+                                                          maximumFractionDigits: 8,
+                                                      }
+                                                  ),
+                                                  symbol: currencyLabel,
+                                              })}`
+                                            : approxUsdText}
+                                    </Text>
+                                </View>
 
-                        {(showPaymentMethod || needsManualPaymentMethod) && !isNativeSend && !networkLocked ? (
-                        <View style={styles.fieldBlock}>
-                            <Text style={styles.fieldLabel}>{t.withdraw.destinationNetwork}</Text>
-                            <TouchableOpacity
-                                style={styles.networkPill}
-                                activeOpacity={0.75}
-                                onPress={() => setNetworkPickerVisible(true)}
-                                accessibilityRole="button"
-                                accessibilityLabel={t.withdraw.selectNetwork}
-                            >
-                                <components.NetworkLogo network={network} size={24} />
-                                <Text style={styles.networkPillLabel}>
-                                    {getLocalizedNetworkLabel(network, t)}
-                                </Text>
-                                <Text style={styles.chevron}>▼</Text>
-                            </TouchableOpacity>
-                            <Text style={styles.feeHint}>{t.withdraw.paymentMethodHint}</Text>
-                        </View>
-                        ) : !isNativeSend && !networkLocked ? (
-                            <TouchableOpacity
-                                onPress={() => setShowPaymentMethod(true)}
-                                accessibilityRole="button"
-                            >
-                                <Text style={styles.paymentMethodLink}>{t.withdraw.changePaymentMethod}</Text>
-                            </TouchableOpacity>
-                        ) : null}
-
-                        {!isNativeSend ? (
-                            <LatestTransferLogsList
-                                title={t.withdraw.latestTransferLogs}
-                                hint={t.withdraw.latestTransferLogsHint}
-                                logs={latestTransferLogs}
-                                onSelect={handleTransferLogSelect}
-                            />
-                        ) : null}
+                                {!isNativeSend ? (
+                                    <LatestTransferLogsList
+                                        title={t.withdraw.latestTransferLogs}
+                                        hint={t.withdraw.latestTransferLogsHint}
+                                        logs={latestTransferLogs}
+                                        onSelect={handleTransferLogSelect}
+                                    />
+                                ) : null}
+                            </>
+                        )}
                     </components.MerchantContent>
                 </components.FormScrollView>
                 </View>
 
-                <View style={[styles.sendFooter, { paddingBottom: footerPaddingBottom }]}>
-                    <components.Button
-                        title={
-                            scanConfirmLoading
-                                ? t.withdraw.estimatingFee
-                                : feeLoading
-                                  ? t.withdraw.estimatingFee
-                                  : t.withdraw.requestWithdrawal
-                        }
-                        onPress={() => void handleSubmit()}
-                        loading={feeLoading || scanConfirmLoading}
-                        disabled={feeLoading || sending || scanConfirmLoading}
-                    />
-                </View>
+                {!(qrPayMode && !address.trim()) ? (
+                    <View style={[styles.sendFooter, { paddingBottom: footerPaddingBottom }]}>
+                        <components.Button
+                            title={
+                                scanConfirmLoading
+                                    ? t.withdraw.estimatingFee
+                                    : feeLoading
+                                      ? t.withdraw.estimatingFee
+                                      : t.withdraw.requestWithdrawal
+                            }
+                            onPress={() => void handleSubmit()}
+                            loading={feeLoading || scanConfirmLoading}
+                            disabled={feeLoading || sending || scanConfirmLoading}
+                        />
+                    </View>
+                ) : null}
                 </View>
             </SafeAreaView>
 
@@ -965,6 +1060,7 @@ const Withdraw: React.FC = ({ navigation }: any) => {
                 visible={scanVisible}
                 onClose={() => setScanVisible(false)}
                 onScan={(payload) => void handleQrScan(payload)}
+                scanOnly={qrPayMode}
             />
             <WithdrawConfirmModal
                 visible={confirmVisible}

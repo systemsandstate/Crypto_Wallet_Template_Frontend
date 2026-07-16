@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet } from "react-native";
 import React, { memo, useMemo } from "react";
 
-import KivoLogo from "./KivoLogo";
+import KivooLogo from "./KivooLogo";
 import { useTheme } from "../hooks/useTheme";
 
 type Props = {
@@ -51,7 +51,7 @@ const AuthFormHeader: React.FC<Props> = ({ title, subtitle, size = "xl" }) => {
     return (
         <View style={styles.wrap}>
             <View style={styles.logoWrap}>
-                <KivoLogo size={size} />
+                <KivooLogo size={size} />
             </View>
             {title ? <Text style={styles.title}>{title}</Text> : null}
             {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}

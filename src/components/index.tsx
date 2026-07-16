@@ -10,7 +10,7 @@ import AuthCardBrand from "./AuthCardBrand";
 import AuthFormHeader from "./AuthFormHeader";
 import AuthLabeledField from "./AuthLabeledField";
 import AuthFormFooter from "./AuthFormFooter";
-import KivoLogo from "./KivoLogo";
+import KivooLogo from "./KivooLogo";
 import PaymentListItem from "./PaymentListItem";
 import MerchantBalanceCard from "./MerchantBalanceCard";
 import WalletQuickActions from "./WalletQuickActions";
@@ -37,7 +37,7 @@ const components = {
     AuthFormHeader,
     AuthLabeledField,
     AuthFormFooter,
-    KivoLogo,
+    KivooLogo,
     PaymentListItem,
     MerchantBalanceCard,
     WalletQuickActions,

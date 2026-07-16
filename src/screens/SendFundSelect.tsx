@@ -5,7 +5,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 
 import { components } from "../components";
-import DashboardWalletCards from "../components/DashboardWalletCards";
 import DashboardTransactionRow from "../components/DashboardTransactionRow";
 import { api, WalletTransfer } from "../services/api";
 import { USDT_NETWORKS, UsdtNetwork } from "../constants/usdtNetworks";
@@ -16,11 +15,13 @@ import {
     resolveNetworkBalanceMap,
     filterTransfersForActiveWallet,
     filterTransfersForDisplay,
+    sumWalletBalances,
 } from "../utils/walletBalance";
 import { prepareWalletContext } from "../services/wallet/syncDeviceWallet";
 import { useInitialScreenLoad } from "../hooks/useInitialScreenLoad";
 import { useCounterpartyLabelsForTransfers } from "../hooks/useCounterpartyLabelsForTransfers";
 import { formatUsdtAmount } from "../utils/formatAmount";
+import { openTransferScreen } from "../utils/openTransferScreen";
 
 const RECENT_SEND_LIMIT = 5;
 
@@ -96,6 +97,18 @@ const SendFundSelect: React.FC = () => {
                     textAlign: "center",
                     paddingVertical: 16,
                 },
+                balanceLabel: {
+                    ...FONTS.Mulish_400Regular,
+                    fontSize: 12,
+                    color: colors.bodyTextColor,
+                    marginBottom: 4,
+                },
+                balanceValue: {
+                    ...FONTS.Mulish_700Bold,
+                    fontSize: 22,
+                    color: colors.mainDark,
+                    marginBottom: 16,
+                },
             }),
         [FONTS, colors]
     );
@@ -168,15 +181,19 @@ const SendFundSelect: React.FC = () => {
         [balances]
     );
 
-    const handleCardPress = useCallback(
-        (network: UsdtNetwork) => {
-            navigation.navigate("Withdraw", {
-                network,
-                returnScreen: "SendFundSelect",
-                lockNetwork: true,
-            });
-        },
-        [navigation]
+    const handleContinue = useCallback(() => {
+        void openTransferScreen(navigation, { returnScreen: "SendFundSelect" });
+    }, [navigation]);
+
+    const totalBalance = useMemo(
+        () =>
+            sumWalletBalances(
+                USDT_NETWORKS.map((network) => ({
+                    network,
+                    usdtBalance: balances[network] ?? 0,
+                }))
+            ),
+        [balances]
     );
 
     const renderRecentSend = (transfer: WalletTransfer) => {
@@ -211,8 +228,8 @@ const SendFundSelect: React.FC = () => {
                 >
                     <components.MerchantContent style={styles.content}>
                         <View style={styles.card}>
-                            <Text style={styles.title}>{t.withdraw.chooseBalanceCardTitle}</Text>
-                            <Text style={styles.subtitle}>{t.withdraw.chooseBalanceCardMessage}</Text>
+                            <Text style={styles.title}>{t.dashboard.sendMoney}</Text>
+                            <Text style={styles.subtitle}>{t.withdraw.sendAutoRouteHint}</Text>
                             {loading ? (
                                 <View style={styles.loadingWrap}>
                                     <LoadingSpinner size={40} />
@@ -220,13 +237,16 @@ const SendFundSelect: React.FC = () => {
                             ) : fundedNetworks.length === 0 ? (
                                 <Text style={styles.emptyText}>{t.withdraw.noFundedCards}</Text>
                             ) : (
-                                <DashboardWalletCards
-                                    balances={balances}
-                                    onCardPress={handleCardPress}
-                                    showSectionTitle={false}
-                                    variant="stack"
-                                    fundedOnly
-                                />
+                                <>
+                                    <Text style={styles.balanceLabel}>{t.balance.availableBalance}</Text>
+                                    <Text style={styles.balanceValue}>
+                                        ${formatUsdtAmount(totalBalance, dateLocale)}
+                                    </Text>
+                                    <components.Button
+                                        title={t.common.continue}
+                                        onPress={handleContinue}
+                                    />
+                                </>
                             )}
                         </View>
 

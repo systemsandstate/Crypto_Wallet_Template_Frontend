@@ -1,6 +1,14 @@
 import { DEFAULT_USDT_NETWORK, USDT_NETWORKS, UsdtNetwork } from "../constants/usdtNetworks";
 
+/** Prefer cheaper/more reliable rails first — hide this ranking from end users. */
 const SEND_NETWORK_PRIORITY: UsdtNetwork[] = ["BEP20", "TRC20", "ERC20"];
+
+/** Rough fee rank used when multiple funded routes exist (lower is better). */
+const FEE_RANK: Record<UsdtNetwork, number> = {
+    BEP20: 0,
+    TRC20: 1,
+    ERC20: 2,
+};
 
 export type SendRouteCandidate = {
     network: UsdtNetwork;
@@ -27,12 +35,17 @@ export function orderSendRouteCandidates(
         return balance != null && balance >= amount + feeUsdt;
     }).map((network) => byNetwork[network]!);
 
-    if (funded.length > 0) return funded;
+    if (funded.length > 0) {
+        return [...funded].sort(
+            (a, b) => (FEE_RANK[a.network] ?? 99) - (FEE_RANK[b.network] ?? 99)
+        );
+    }
 
     const ranked = [...routes].sort((a, b) => {
         const balA = balances[a.network] ?? 0;
         const balB = balances[b.network] ?? 0;
-        return balB - balA;
+        if (balB !== balA) return balB - balA;
+        return (FEE_RANK[a.network] ?? 99) - (FEE_RANK[b.network] ?? 99);
     });
 
     return ranked.length > 0 ? ranked : routes;

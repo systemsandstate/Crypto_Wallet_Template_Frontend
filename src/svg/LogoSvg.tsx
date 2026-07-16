@@ -13,7 +13,7 @@ const LogoSvg: React.FC<Props> = ({ width = 120, height = 48 }) => (
         source={LOGO}
         style={{ width, height }}
         resizeMode="contain"
-        accessibilityLabel="Kivo"
+        accessibilityLabel="Kivoo"
     />
 );
 

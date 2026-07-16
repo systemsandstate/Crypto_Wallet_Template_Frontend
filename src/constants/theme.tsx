@@ -85,9 +85,8 @@ const DARK_COLORS: AppColors = {
     pureWhite: "#FFFFFF",
 };
 
-/** Light banking-style UI — production default. */
-export function getColors(_isDark?: boolean): AppColors {
-    return LIGHT_COLORS;
+export function getColors(isDark?: boolean): AppColors {
+    return isDark ? DARK_COLORS : LIGHT_COLORS;
 }
 
 const COLORS = { ...LIGHT_COLORS };

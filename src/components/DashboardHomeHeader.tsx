@@ -7,8 +7,8 @@ import { useTheme } from "../hooks/useTheme";
 import { useTranslation } from "../hooks/useTranslation";
 import { DENSITY } from "../constants/density";
 import { MENU_ICON_SIZE } from "../constants/menuIcon";
-import ProfileAvatar from "./ProfileAvatar";
 import HeaderMenuButton from "./HeaderMenuButton";
+import KivooLogo from "./KivooLogo";
 
 type Props = {
     name: string;
@@ -27,33 +27,38 @@ const DashboardHomeHeader: React.FC<Props> = ({
     const styles = useMemo(
         () =>
             StyleSheet.create({
-                wrap: {
-                    paddingBottom: 4,
+                safe: {
+                    backgroundColor: colors.white,
+                },
+                bar: {
+                    backgroundColor: colors.white,
+                    borderBottomWidth: StyleSheet.hairlineWidth,
+                    borderBottomColor: colors.border,
+                    paddingLeft: 10,
+                    paddingRight: DENSITY.pagePaddingH,
+                    paddingVertical: 8,
                 },
                 row: {
                     flexDirection: "row",
                     alignItems: "center",
-                    justifyContent: "space-between",
+                    width: "100%",
                 },
-                left: {
-                    flexDirection: "row",
-                    alignItems: "center",
-                    flex: 1,
-                    minWidth: 0,
-                    gap: 10,
+                brand: {
+                    flexShrink: 0,
+                    marginRight: 8,
+                    alignItems: "flex-start",
+                    justifyContent: "center",
                 },
                 greeting: {
                     flex: 1,
                     minWidth: 0,
-                },
-                greetingHello: {
+                    marginRight: 8,
                     ...FONTS.Mulish_400Regular,
-                    fontSize: 14,
+                    fontSize: 15,
                     color: colors.bodyTextColor,
                 },
                 greetingName: {
                     ...FONTS.Mulish_700Bold,
-                    fontSize: 14,
                     color: colors.mainDark,
                 },
                 actions: {
@@ -63,18 +68,12 @@ const DashboardHomeHeader: React.FC<Props> = ({
                     flexShrink: 0,
                 },
                 iconBtn: {
-                    width: DENSITY.iconButton,
-                    height: DENSITY.iconButton,
-                    borderRadius: DENSITY.iconButton / 2,
-                    backgroundColor: colors.white,
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: colors.bgColor,
                     borderWidth: 1,
                     borderColor: colors.border,
-                    alignItems: "center",
-                    justifyContent: "center",
-                },
-                menuSlot: {
-                    width: DENSITY.iconButton,
-                    height: DENSITY.iconButton,
                     alignItems: "center",
                     justifyContent: "center",
                 },
@@ -83,45 +82,35 @@ const DashboardHomeHeader: React.FC<Props> = ({
     );
 
     return (
-        <SafeAreaView edges={["top"]}>
-            <View style={styles.wrap}>
+        <SafeAreaView edges={["top"]} style={styles.safe}>
+            <View style={styles.bar}>
                 <View style={styles.row}>
-                    <View style={styles.left}>
-                        <ProfileAvatar
-                            size={DENSITY.avatarHeader}
-                            showEdit={false}
-                            inline
-                            iconColor={colors.icon}
-                        />
-                        <Text style={styles.greeting} numberOfLines={1}>
-                            <Text style={styles.greetingHello}>{t.dashboard.hello} </Text>
-                            <Text style={styles.greetingName}>{name}</Text>
-                        </Text>
+                    <View style={styles.brand}>
+                        <KivooLogo size="header" />
                     </View>
+                    <Text style={styles.greeting} numberOfLines={1}>
+                        {t.dashboard.hello} <Text style={styles.greetingName}>{name}</Text>
+                    </Text>
                     <View style={styles.actions}>
-                        {onNotificationsPress ? (
-                            <TouchableOpacity
-                                style={styles.iconBtn}
-                                onPress={onNotificationsPress}
-                                accessibilityRole="button"
-                                accessibilityLabel={t.dashboard.notifications}
-                            >
-                                <svg.NotificationSvg color={colors.icon} size={MENU_ICON_SIZE} />
-                            </TouchableOpacity>
-                        ) : null}
-                        {onBalancePress ? (
-                            <TouchableOpacity
-                                style={styles.iconBtn}
-                                onPress={onBalancePress}
-                                accessibilityRole="button"
-                                accessibilityLabel={t.balance.viewBalanceDetails}
-                            >
-                                <svg.WalletSvg color={colors.accentBlue} size={MENU_ICON_SIZE} />
-                            </TouchableOpacity>
-                        ) : null}
-                        <View style={styles.menuSlot}>
-                            <HeaderMenuButton variant="default" triggerStyle="header" />
-                        </View>
+                        <TouchableOpacity
+                            style={styles.iconBtn}
+                            onPress={onNotificationsPress}
+                            disabled={!onNotificationsPress}
+                            accessibilityRole="button"
+                            accessibilityLabel={t.dashboard.notifications}
+                        >
+                            <svg.NotificationSvg color={colors.icon} size={MENU_ICON_SIZE} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.iconBtn}
+                            onPress={onBalancePress}
+                            disabled={!onBalancePress}
+                            accessibilityRole="button"
+                            accessibilityLabel={t.balance.viewBalanceDetails}
+                        >
+                            <svg.WalletSvg color={colors.accentBlue} size={MENU_ICON_SIZE} />
+                        </TouchableOpacity>
+                        <HeaderMenuButton variant="default" triggerStyle="header" />
                     </View>
                 </View>
             </View>

@@ -10,6 +10,7 @@ import {
     Modal,
     Animated,
     Easing,
+    Switch,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -91,11 +92,11 @@ const HeaderMenuButton: React.FC<HeaderMenuButtonProps> = ({
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
     const { t, locale, setLocale } = useTranslation();
-    const { colors, isDark } = useTheme();
+    const { colors, isDark, setDarkMode } = useTheme();
     const onHeader = variant === "onHeader";
     const compactHeaderTrigger = triggerStyle === "header";
-    const triggerSize = compactHeaderTrigger ? DENSITY.iconButton : 40;
-    const triggerIconSize = compactHeaderTrigger ? 22 : 22;
+    const triggerSize = compactHeaderTrigger ? 36 : 40;
+    const triggerIconSize = compactHeaderTrigger ? MENU_ICON_SIZE : 22;
 
     // Web: compact right drawer. Mobile: most of the screen, capped for tablets.
     const panelWidth = useMemo(() => {
@@ -274,7 +275,7 @@ const HeaderMenuButton: React.FC<HeaderMenuButtonProps> = ({
                     borderRadius: triggerSize / 2,
                     alignItems: "center",
                     justifyContent: "center",
-                    backgroundColor: compactHeaderTrigger ? colors.white : colors.surfaceMuted,
+                    backgroundColor: compactHeaderTrigger ? colors.bgColor : colors.surfaceMuted,
                     borderWidth: compactHeaderTrigger ? 1 : 0,
                     borderColor: compactHeaderTrigger ? colors.border : colors.transparent,
                     ...(Platform.OS === "web"
@@ -284,7 +285,7 @@ const HeaderMenuButton: React.FC<HeaderMenuButtonProps> = ({
                         : {}),
                 },
             }),
-        [colors.border, colors.surfaceMuted, colors.transparent, colors.white, compactHeaderTrigger, triggerSize]
+        [colors.bgColor, colors.border, colors.surfaceMuted, colors.transparent, compactHeaderTrigger, triggerSize]
     );
 
     const gearColor = colors.icon;
@@ -518,6 +519,24 @@ const HeaderMenuButton: React.FC<HeaderMenuButtonProps> = ({
                                 </View>
                             ) : null}
 
+                            <View style={panelStyles.divider} />
+                            <SettingsRow
+                                icon={<svg.MoonSvg color={panelIconColor} size={MENU_ICON_SIZE} />}
+                                title={t.common.darkMode}
+                                colors={colors}
+                                trailing={
+                                    <Switch
+                                        value={isDark}
+                                        onValueChange={setDarkMode}
+                                        trackColor={{
+                                            false: colors.border,
+                                            true: colors.accentBlue,
+                                        }}
+                                        thumbColor={colors.pureWhite}
+                                        accessibilityLabel={t.common.darkMode}
+                                    />
+                                }
+                            />
                             <View style={panelStyles.divider} />
                             <SettingsRow
                                 icon={<svg.AddressBookSvg color={panelIconColor} size={MENU_ICON_SIZE} />}

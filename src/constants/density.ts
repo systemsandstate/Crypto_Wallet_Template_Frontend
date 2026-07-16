@@ -20,7 +20,7 @@ export const DENSITY = {
     balanceFraction: 15,
     balanceHidden: 26,
     walletCardW: 156,
-    walletCardH: 88,
+    walletCardH: 108,
     transactionAvatar: 34,
     profileRowMinH: 46,
     buttonHeight: 42,

@@ -17,13 +17,10 @@ import { formatUsdtAmount } from "../utils/formatAmount";
 
 const CARD_ORDER: UsdtNetwork[] = ["BEP20", "TRC20", "ERC20"];
 
-const CARD_THEMES: Record<
-    UsdtNetwork,
-    { gradient: string; accent: string; titleKey: "bep20Card" | "trc20Card" | "erc20Card" }
-> = {
-    BEP20: { gradient: "#C9940A", accent: "#F0B90B", titleKey: "bep20Card" },
-    TRC20: { gradient: "#C4001D", accent: "#EF0027", titleKey: "trc20Card" },
-    ERC20: { gradient: "#3D4FBD", accent: "#627EEA", titleKey: "erc20Card" },
+const CARD_TITLE_KEYS: Record<UsdtNetwork, "bep20Card" | "trc20Card" | "erc20Card"> = {
+    BEP20: "bep20Card",
+    TRC20: "trc20Card",
+    ERC20: "erc20Card",
 };
 
 type Props = {
@@ -43,7 +40,7 @@ const DashboardWalletCards: React.FC<Props> = ({
     variant = "carousel",
     fundedOnly = false,
 }) => {
-    const { colors, FONTS } = useTheme();
+    const { colors, FONTS, isDark } = useTheme();
     const { t, dateLocale } = useTranslation();
 
     const visibleNetworks = useMemo(
@@ -57,122 +54,171 @@ const DashboardWalletCards: React.FC<Props> = ({
         [balances, fundedOnly]
     );
 
-    const styles = useMemo(
-        () =>
-            StyleSheet.create({
-                sectionTitle: {
-                    ...FONTS.Mulish_700Bold,
-                    fontSize: DENSITY.sectionTitle,
-                    color: colors.mainDark,
-                    marginBottom: 8,
-                },
-                scroll: {
-                    marginHorizontal: -DENSITY.pagePaddingH,
-                },
-                scrollContent: {
-                    paddingHorizontal: DENSITY.pagePaddingH,
-                    gap: 8,
-                },
-                card: {
-                    width: DENSITY.walletCardW,
-                    height: DENSITY.walletCardH,
-                    borderRadius: 12,
-                    padding: 12,
-                    justifyContent: "space-between",
-                    ...(Platform.OS === "web"
-                        ? ({ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" } as object)
-                        : { elevation: 2 }),
-                },
-                stackCardInner: {
-                    width: "100%",
-                    minHeight: 72,
-                    borderRadius: 12,
-                    paddingHorizontal: 14,
-                    paddingVertical: 12,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    ...(Platform.OS === "web"
-                        ? ({ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" } as object)
-                        : { elevation: 2 }),
-                },
-                stackLeft: {
-                    flexDirection: "row",
-                    alignItems: "center",
-                    flex: 1,
-                    minWidth: 0,
-                    gap: 12,
-                },
-                stackMeta: {
-                    flex: 1,
-                    minWidth: 0,
-                },
-                stackCardTitle: {
-                    ...FONTS.Mulish_700Bold,
-                    fontSize: 14,
-                    color: colors.pureWhite,
-                },
-                stackCardSub: {
-                    ...FONTS.Mulish_400Regular,
-                    fontSize: 11,
-                    color: "rgba(255,255,255,0.85)",
-                    marginTop: 2,
-                },
-                stackAmount: {
-                    ...FONTS.Mulish_700Bold,
-                    fontSize: 16,
-                    color: colors.pureWhite,
-                    flexShrink: 0,
-                    marginLeft: 10,
-                },
-                stackChevron: {
-                    ...FONTS.Mulish_600SemiBold,
-                    fontSize: 20,
-                    color: "rgba(255,255,255,0.7)",
-                    marginLeft: 6,
-                },
-                cardTop: {
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                },
-                cardTitle: {
-                    ...FONTS.Mulish_700Bold,
-                    fontSize: 12,
-                    color: colors.pureWhite,
-                },
-                balance: {
-                    ...FONTS.Mulish_700Bold,
-                    fontSize: 15,
-                    color: colors.pureWhite,
-                    marginTop: 2,
-                },
-                balanceSub: {
-                    ...FONTS.Mulish_400Regular,
-                    fontSize: 10,
-                    color: "rgba(255,255,255,0.85)",
-                    marginTop: 1,
-                },
-                chip: {
-                    width: 22,
-                    height: 16,
-                    borderRadius: 3,
-                    backgroundColor: "rgba(255,255,255,0.35)",
-                },
-                stackList: {
-                    gap: 10,
-                },
-                stackCard: {
-                    width: "100%",
-                },
-            }),
-        [FONTS, colors]
-    );
+    const styles = useMemo(() => {
+        // Cards stay white / black / blue — ignore flashy network brand colors and dark gold accents.
+        const accentBlue = isDark ? "#6B9FFF" : "#2563EB";
+        const logoBg = isDark ? "rgba(107, 159, 255, 0.12)" : "#EFF6FF";
+        const shadow =
+            Platform.OS === "web"
+                ? ({
+                      boxShadow: isDark
+                          ? "0 1px 8px rgba(0,0,0,0.24)"
+                          : "0 1px 6px rgba(15,23,42,0.06)",
+                  } as object)
+                : { elevation: 1 };
+
+        return StyleSheet.create({
+            sectionTitle: {
+                ...FONTS.Mulish_700Bold,
+                fontSize: DENSITY.sectionTitle,
+                color: colors.mainDark,
+                marginBottom: 8,
+            },
+            scroll: {
+                marginHorizontal: -DENSITY.pagePaddingH,
+                ...(Platform.OS === "web" ? ({ overflow: "visible" } as object) : {}),
+            },
+            scrollContent: {
+                paddingHorizontal: DENSITY.pagePaddingH,
+                paddingVertical: 4,
+                paddingBottom: 8,
+                gap: 10,
+                alignItems: "stretch",
+            },
+            card: {
+                width: DENSITY.walletCardW,
+                minHeight: DENSITY.walletCardH,
+                borderRadius: 12,
+                paddingHorizontal: 12,
+                paddingTop: 12,
+                paddingBottom: 12,
+                justifyContent: "space-between",
+                backgroundColor: colors.white,
+                borderWidth: 1,
+                borderColor: colors.border,
+                ...shadow,
+            },
+            cardBody: {
+                marginTop: 10,
+            },
+            cardTitle: {
+                ...FONTS.Mulish_600SemiBold,
+                fontSize: 12,
+                lineHeight: 16,
+                color: colors.bodyTextColor,
+            },
+            balance: {
+                ...FONTS.Mulish_700Bold,
+                fontSize: 16,
+                lineHeight: 20,
+                color: colors.mainDark,
+                marginTop: 2,
+                letterSpacing: -0.2,
+            },
+            balanceSub: {
+                ...FONTS.Mulish_400Regular,
+                fontSize: 10,
+                lineHeight: 14,
+                color: colors.bodyTextColor,
+                marginTop: 2,
+            },
+            stackList: {
+                gap: 10,
+            },
+            stackCard: {
+                width: "100%",
+            },
+            stackCardInner: {
+                width: "100%",
+                minHeight: 72,
+                borderRadius: 12,
+                paddingHorizontal: 14,
+                paddingVertical: 14,
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: colors.white,
+                borderWidth: 1,
+                borderColor: colors.border,
+                ...shadow,
+            },
+            stackLeft: {
+                flexDirection: "row",
+                alignItems: "center",
+                flex: 1,
+                minWidth: 0,
+                gap: 12,
+            },
+            logoWrap: {
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: logoBg,
+                borderWidth: 1,
+                borderColor: colors.border,
+            },
+            stackMeta: {
+                flex: 1,
+                minWidth: 0,
+            },
+            stackCardTitle: {
+                ...FONTS.Mulish_700Bold,
+                fontSize: 14,
+                color: colors.mainDark,
+            },
+            stackCardSub: {
+                ...FONTS.Mulish_400Regular,
+                fontSize: 11,
+                color: colors.bodyTextColor,
+                marginTop: 2,
+            },
+            stackRight: {
+                alignItems: "flex-end",
+                justifyContent: "center",
+                marginLeft: 12,
+                minWidth: 72,
+            },
+            stackAmount: {
+                ...FONTS.Mulish_700Bold,
+                fontSize: 16,
+                color: colors.mainDark,
+            },
+            stackChevron: {
+                ...FONTS.Mulish_600SemiBold,
+                fontSize: 18,
+                color: accentBlue,
+                marginTop: 2,
+                lineHeight: 18,
+            },
+            cardTop: {
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+            },
+            cardLogoWrap: {
+                width: 28,
+                height: 28,
+                borderRadius: 14,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: logoBg,
+                borderWidth: 1,
+                borderColor: colors.border,
+            },
+            cardAccent: {
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: accentBlue,
+            },
+        });
+    }, [FONTS, colors, isDark]);
 
     const resolvedTitle = sectionTitle ?? t.dashboard.yourCards;
 
     const renderCard = (network: UsdtNetwork) => {
-        const theme = CARD_THEMES[network];
+        const titleKey = CARD_TITLE_KEYS[network];
         const raw = balances[network];
         const amount = typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
         const formatted = formatUsdtAmount(amount, dateLocale);
@@ -180,34 +226,40 @@ const DashboardWalletCards: React.FC<Props> = ({
         return (
             <TouchableOpacity
                 key={network}
-                activeOpacity={0.85}
+                activeOpacity={0.82}
                 onPress={() => onCardPress(network)}
                 accessibilityRole="button"
-                accessibilityLabel={`${t.dashboard[theme.titleKey]} ${formatted} USDT`}
+                accessibilityLabel={`${t.dashboard[titleKey]} ${formatted} USDT`}
                 style={variant === "stack" ? styles.stackCard : undefined}
             >
                 {variant === "stack" ? (
-                    <View style={[styles.stackCardInner, { backgroundColor: theme.gradient }]}>
+                    <View style={styles.stackCardInner}>
                         <View style={styles.stackLeft}>
-                            <NetworkLogo network={network} size={28} />
+                            <View style={styles.logoWrap}>
+                                <NetworkLogo network={network} size={22} />
+                            </View>
                             <View style={styles.stackMeta}>
                                 <Text style={styles.stackCardTitle} numberOfLines={1}>
-                                    {t.dashboard[theme.titleKey]}
+                                    {t.dashboard[titleKey]}
                                 </Text>
                                 <Text style={styles.stackCardSub}>USDT</Text>
                             </View>
                         </View>
-                        <Text style={styles.stackAmount}>${formatted}</Text>
-                        <Text style={styles.stackChevron}>›</Text>
+                        <View style={styles.stackRight}>
+                            <Text style={styles.stackAmount}>${formatted}</Text>
+                            <Text style={styles.stackChevron}>›</Text>
+                        </View>
                     </View>
                 ) : (
-                    <View style={[styles.card, { backgroundColor: theme.gradient }]}>
+                    <View style={styles.card}>
                         <View style={styles.cardTop}>
-                            <NetworkLogo network={network} size={20} />
-                            <View style={styles.chip} />
+                            <View style={styles.cardLogoWrap}>
+                                <NetworkLogo network={network} size={16} />
+                            </View>
+                            <View style={styles.cardAccent} />
                         </View>
-                        <View>
-                            <Text style={styles.cardTitle}>{t.dashboard[theme.titleKey]}</Text>
+                        <View style={styles.cardBody}>
+                            <Text style={styles.cardTitle}>{t.dashboard[titleKey]}</Text>
                             <Text style={styles.balance}>${formatted}</Text>
                             <Text style={styles.balanceSub}>USDT</Text>
                         </View>

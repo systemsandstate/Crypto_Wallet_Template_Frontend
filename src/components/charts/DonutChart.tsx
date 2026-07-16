@@ -12,6 +12,7 @@ type Props = {
     segments: DonutSegment[];
     size?: number;
     strokeWidth?: number;
+    segmentGap?: number;
     centerLabel?: string;
     centerValue?: string;
     emptyLabel?: string;
@@ -24,6 +25,7 @@ const DonutChart: React.FC<Props> = ({
     segments,
     size = 220,
     strokeWidth = 24,
+    segmentGap = 4,
     centerLabel,
     centerValue,
     emptyLabel,
@@ -34,13 +36,18 @@ const DonutChart: React.FC<Props> = ({
     const radius = (size - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;
     const total = segments.reduce((sum, segment) => sum + segment.value, 0);
+    const activeSegments = segments.filter((segment) => segment.value > 0);
 
     const arcs = useMemo(() => {
-        if (total <= 0) return [];
-        let offset = 0;
-        return segments.map((segment) => {
+        if (total <= 0 || activeSegments.length === 0) return [];
+
+        const gapTotal = segmentGap * activeSegments.length;
+        const drawable = Math.max(circumference - gapTotal, 1);
+        let offset = segmentGap / 2;
+
+        return activeSegments.map((segment) => {
             const ratio = segment.value / total;
-            const length = circumference * ratio;
+            const length = Math.max(ratio * drawable, strokeWidth);
             const arc = {
                 color: segment.color,
                 length,
@@ -48,10 +55,10 @@ const DonutChart: React.FC<Props> = ({
                 label: segment.label,
                 value: segment.value,
             };
-            offset += length;
+            offset += length + segmentGap;
             return arc;
         });
-    }, [circumference, segments, total]);
+    }, [activeSegments, circumference, segmentGap, segments, strokeWidth, total]);
 
     return (
         <View style={[styles.wrap, { width: size, height: size }]}>
@@ -63,6 +70,7 @@ const DonutChart: React.FC<Props> = ({
                     stroke={trackColor}
                     strokeWidth={strokeWidth}
                     fill="none"
+                    opacity={0.55}
                 />
                 {total > 0
                     ? arcs.map((arc, index) => (
@@ -76,7 +84,7 @@ const DonutChart: React.FC<Props> = ({
                               fill="none"
                               strokeDasharray={`${arc.length} ${circumference - arc.length}`}
                               strokeDashoffset={-arc.offset}
-                              strokeLinecap="butt"
+                              strokeLinecap="round"
                               rotation={-90}
                               origin={`${size / 2}, ${size / 2}`}
                           />
@@ -109,17 +117,20 @@ const styles = StyleSheet.create({
         position: "absolute",
         alignItems: "center",
         justifyContent: "center",
-        paddingHorizontal: 28,
+        paddingHorizontal: 24,
     },
     centerValue: {
-        fontSize: 24,
+        fontSize: 22,
         fontWeight: "700",
         textAlign: "center",
+        letterSpacing: -0.3,
     },
     centerLabel: {
         marginTop: 4,
-        fontSize: 12,
+        fontSize: 11,
         textAlign: "center",
+        letterSpacing: 0.2,
+        textTransform: "uppercase",
     },
 });
 

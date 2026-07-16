@@ -24,9 +24,11 @@ type Props = {
     visible: boolean;
     onClose: () => void;
     onScan: (payload: ScannedWalletPayload) => void;
+    /** QR Pay: camera only. Paste fallback stays when camera is unavailable. */
+    scanOnly?: boolean;
 };
 
-const QrScanModal: React.FC<Props> = ({ visible, onClose, onScan }) => {
+const QrScanModal: React.FC<Props> = ({ visible, onClose, onScan, scanOnly = false }) => {
     const { t } = useTranslation();
     const { colors, FONTS } = useTheme();
     const insets = useSafeAreaInsets();
@@ -163,6 +165,7 @@ const QrScanModal: React.FC<Props> = ({ visible, onClose, onScan }) => {
     );
 
     const canUseCamera = permission?.granted;
+    const showPaste = !scanOnly || !canUseCamera;
 
     return (
         <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -183,7 +186,7 @@ const QrScanModal: React.FC<Props> = ({ visible, onClose, onScan }) => {
                 {canUseCamera ? (
                     <>
                         <Text style={styles.hint}>{t.withdraw.scanQrHint}</Text>
-                        <View style={styles.cameraWrap}>
+                        <View style={[styles.cameraWrap, !showPaste && { marginBottom: Math.max(insets.bottom, 24) }]}>
                             <CameraView
                                 style={styles.camera}
                                 facing="back"
@@ -214,24 +217,26 @@ const QrScanModal: React.FC<Props> = ({ visible, onClose, onScan }) => {
                     </View>
                 )}
 
-                <View style={styles.pasteCard}>
-                    <Text style={styles.pasteTitle}>{t.withdraw.scanQrPasteLabel}</Text>
-                    <TextInput
-                        style={styles.pasteInput}
-                        value={pasteValue}
-                        onChangeText={setPasteValue}
-                        placeholder={t.withdraw.scanQrPastePlaceholder}
-                        placeholderTextColor={colors.bodyTextColor}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        multiline
-                    />
-                    <Button
-                        title={t.withdraw.scanQrUseAddress}
-                        onPress={() => applyAddress(pasteValue)}
-                        disabled={!pasteValue.trim()}
-                    />
-                </View>
+                {showPaste ? (
+                    <View style={styles.pasteCard}>
+                        <Text style={styles.pasteTitle}>{t.withdraw.scanQrPasteLabel}</Text>
+                        <TextInput
+                            style={styles.pasteInput}
+                            value={pasteValue}
+                            onChangeText={setPasteValue}
+                            placeholder={t.withdraw.scanQrPastePlaceholder}
+                            placeholderTextColor={colors.bodyTextColor}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            multiline
+                        />
+                        <Button
+                            title={t.withdraw.scanQrUseAddress}
+                            onPress={() => applyAddress(pasteValue)}
+                            disabled={!pasteValue.trim()}
+                        />
+                    </View>
+                ) : null}
             </View>
         </Modal>
     );

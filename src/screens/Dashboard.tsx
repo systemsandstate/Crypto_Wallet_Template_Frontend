@@ -7,7 +7,7 @@ import { svg } from "../svg";
 import { components } from "../components";
 import DashboardHomeHeader from "../components/DashboardHomeHeader";
 import DashboardTransactionRow from "../components/DashboardTransactionRow";
-import DashboardWalletCards from "../components/DashboardWalletCards";
+import KivooLogo from "../components/KivooLogo";
 import { api, PaymentRequest, WalletTransfer, invalidateCachedGet } from "../services/api";
 import {
     filterBalancesForActiveWallet,
@@ -15,7 +15,6 @@ import {
     filterTransfersForDisplay,
     buildRecentActivityRows,
     sumWalletBalances,
-    resolveNetworkBalanceMap,
 } from "../utils/walletBalance";
 import { filterPaymentsForActivityFeed } from "../utils/walletActivityFeed";
 import { registerDashboardRefresh } from "../utils/dashboardRefresh";
@@ -30,7 +29,7 @@ import { createMerchantTabPageStyles } from "../styles/merchantTabPageChrome";
 import { useCounterpartyLabelsForTransfers } from "../hooks/useCounterpartyLabelsForTransfers";
 import PayByEmailModal from "../components/PayByEmailModal";
 import type { SendPlan } from "../utils/buildSendPlan";
-import { USDT_NETWORKS, UsdtNetwork } from "../constants/usdtNetworks";
+import { UsdtNetwork } from "../constants/usdtNetworks";
 import { openTransferScreen } from "../utils/openTransferScreen";
 import { asArray } from "../utils/asArray";
 import { formatUsdtAmount } from "../utils/formatAmount";
@@ -78,7 +77,6 @@ const Dashboard: React.FC = () => {
     const dashboardInFlightRef = useRef(false);
     const initialLoadDoneRef = useRef(false);
     const activeAddressesRef = useRef<Array<{ network: string; address: string }>>([]);
-    const [networkBalances, setNetworkBalances] = useState<Partial<Record<UsdtNetwork, number | null>>>({});
 
     const pageChromeStyles = useMemo(
         () =>
@@ -97,6 +95,7 @@ const Dashboard: React.FC = () => {
                     paddingHorizontal: DENSITY.listRowPaddingH,
                     paddingTop: 2,
                     paddingBottom: 4,
+                    minHeight: 320,
                 },
                 transactionsHeader: {
                     flexDirection: "row",
@@ -117,12 +116,43 @@ const Dashboard: React.FC = () => {
                     fontSize: 12,
                     color: colors.accentBlue,
                 },
+                emptyWrap: {
+                    flexGrow: 1,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    paddingVertical: 36,
+                    paddingHorizontal: 20,
+                    gap: 12,
+                },
+                emptyLogo: {
+                    opacity: 0.9,
+                    marginBottom: 4,
+                },
                 emptyText: {
                     ...FONTS.Mulish_400Regular,
-                    fontSize: 13,
+                    fontSize: 14,
+                    lineHeight: 20,
                     color: colors.bodyTextColor,
                     textAlign: "center",
-                    paddingVertical: 20,
+                },
+                emptyCta: {
+                    marginTop: 8,
+                    minWidth: 160,
+                },
+                brandFooter: {
+                    alignItems: "center",
+                    paddingTop: 8,
+                    paddingBottom: 4,
+                },
+                brandFooterText: {
+                    ...FONTS.Mulish_500Medium,
+                    fontSize: 12,
+                    color: colors.bodyTextColor,
+                    textAlign: "center",
+                },
+                brandFooterName: {
+                    ...FONTS.Mulish_700Bold,
+                    color: colors.accentBlue,
                 },
             }),
         [FONTS, colors]
@@ -131,11 +161,15 @@ const Dashboard: React.FC = () => {
     const actionIconColor = colors.accentBlue;
 
     const handleReceive = useCallback(() => {
-        navigation.navigate("ReceiveSelect");
+        navigation.navigate("CashierGetPaid");
+    }, [navigation]);
+
+    const handleSendMoney = useCallback(async () => {
+        await openTransferScreen(navigation, { returnScreen: "Home" });
     }, [navigation]);
 
     const handleScanToPay = useCallback(async () => {
-        await openTransferScreen(navigation, { returnScreen: "Home", openScan: true });
+        await openTransferScreen(navigation, { returnScreen: "Home", openScan: true, qrPay: true });
     }, [navigation]);
 
     const handlePayByEmailReady = useCallback(
@@ -155,29 +189,6 @@ const Dashboard: React.FC = () => {
     const handleViewHistory = useCallback(() => {
         navigation.getParent()?.navigate("History");
     }, [navigation]);
-
-    const handleOpenNetworkCard = useCallback(
-        (network: UsdtNetwork) => {
-            navigation.navigate("WalletReceive", { network });
-        },
-        [navigation]
-    );
-
-    const syncNetworkBalances = useCallback(
-        (
-            balances: Awaited<ReturnType<typeof api.getWalletBalances>>["data"]["balances"] | null | undefined,
-            activeAddresses: Array<{ network: string; address: string }>
-        ) => {
-            const map = resolveNetworkBalanceMap(balances ?? [], activeAddresses);
-            const next: Partial<Record<UsdtNetwork, number | null>> = {};
-            for (const network of USDT_NETWORKS) {
-                const value = map[network];
-                next[network] = typeof value === "number" ? value : null;
-            }
-            setNetworkBalances(next);
-        },
-        []
-    );
 
     const resolveReceivedStats = useCallback(
         (usdtBalance: number, deposits: WalletTransfer[]) => {
@@ -200,7 +211,7 @@ const Dashboard: React.FC = () => {
                 key: "send",
                 label: t.dashboard.sendMoney,
                 icon: <svg.SendSvg color={actionIconColor} size={DENSITY.quickActionIcon} />,
-                onPress: () => navigation.navigate("SendFundSelect"),
+                onPress: () => void handleSendMoney(),
             },
             {
                 key: "qr",
@@ -221,7 +232,14 @@ const Dashboard: React.FC = () => {
                 onPress: handleViewHistory,
             },
         ],
-        [actionIconColor, handleReceive, handleScanToPay, handleViewHistory, navigation, t]
+        [
+            actionIconColor,
+            handleReceive,
+            handleScanToPay,
+            handleSendMoney,
+            handleViewHistory,
+            t,
+        ]
     );
 
     const applyDashboardData = useCallback(
@@ -251,7 +269,7 @@ const Dashboard: React.FC = () => {
                 sortAt: new Date(deposit.timestamp).getTime(),
                 deposit,
             }));
-            const merged = buildRecentActivityRows(paymentRows, depositRows, 8);
+            const merged = buildRecentActivityRows(paymentRows, depositRows, 12);
 
             const walletBalance = computePortfolioUsd(safeBalances, prices);
             const usdtBalance = sumWalletBalances(safeBalances);
@@ -336,7 +354,6 @@ const Dashboard: React.FC = () => {
                 );
                 const balances = filterBalancesForActiveWallet(rawBalances, activeAddresses);
                 activeAddressesRef.current = activeAddresses;
-                syncNetworkBalances(balances, activeAddresses);
 
                 applyBalanceSnapshot(balances, prices);
                 if (!silent) setRefreshing(false);
@@ -364,7 +381,7 @@ const Dashboard: React.FC = () => {
                 if (!silent) setRefreshing(false);
             }
         },
-        [applyBalanceSnapshot, applyDashboardData, syncNetworkBalances]
+        [applyBalanceSnapshot, applyDashboardData]
     );
 
     const onRefresh = useCallback(async () => {
@@ -452,11 +469,6 @@ const Dashboard: React.FC = () => {
                             variant="banking"
                         />
 
-                        <DashboardWalletCards
-                            balances={networkBalances}
-                            onCardPress={handleOpenNetworkCard}
-                        />
-
                         <View style={pageChromeStyles.transactionsCard}>
                             <View style={pageChromeStyles.transactionsHeader}>
                                 <Text style={pageChromeStyles.transactionsTitle}>
@@ -471,9 +483,20 @@ const Dashboard: React.FC = () => {
                                 </TouchableOpacity>
                             </View>
                             {recentRows.length === 0 ? (
-                                <Text style={pageChromeStyles.emptyText}>
-                                    {t.dashboard.noRecentActivity}
-                                </Text>
+                                <View style={pageChromeStyles.emptyWrap}>
+                                    <View style={pageChromeStyles.emptyLogo}>
+                                        <KivooLogo size="md" />
+                                    </View>
+                                    <Text style={pageChromeStyles.emptyText}>
+                                        {t.dashboard.noRecentActivity}
+                                    </Text>
+                                    <components.Button
+                                        title={t.common.getPaid}
+                                        onPress={handleReceive}
+                                        size="compact"
+                                        containerStyle={pageChromeStyles.emptyCta}
+                                    />
+                                </View>
                             ) : (
                                 recentRows.map((row) => {
                                     if (row.kind === "payment") {
@@ -523,6 +546,13 @@ const Dashboard: React.FC = () => {
                                     );
                                 })
                             )}
+                        </View>
+
+                        <View style={pageChromeStyles.brandFooter}>
+                            <Text style={pageChromeStyles.brandFooterText}>
+                                {t.dashboard.brandFooterPrefix}{" "}
+                                <Text style={pageChromeStyles.brandFooterName}>Kivoo</Text>
+                            </Text>
                         </View>
                     </components.MerchantContent>
                 </components.ScreenScroll>

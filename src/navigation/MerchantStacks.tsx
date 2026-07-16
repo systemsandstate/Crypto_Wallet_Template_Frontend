@@ -5,6 +5,7 @@ import Dashboard from "../screens/Dashboard";
 import BalanceDetail from "../screens/BalanceDetail";
 import CreateInvoice from "../screens/CreateInvoice";
 import ReceiveSelect from "../screens/ReceiveSelect";
+import CashierGetPaid from "../screens/CashierGetPaid";
 import SendFundSelect from "../screens/SendFundSelect";
 import SendNetworkSelect from "../screens/SendNetworkSelect";
 import Withdraw from "../screens/Withdraw";
@@ -40,6 +41,7 @@ export const HomeStackNavigator: React.FC = () => (
         <HomeStack.Screen name="Home" component={Dashboard} />
         <HomeStack.Screen name="BalanceDetail" component={BalanceDetail} />
         <HomeStack.Screen name="CreateInvoice" component={CreateInvoice} />
+        <HomeStack.Screen name="CashierGetPaid" component={CashierGetPaid} />
         <HomeStack.Screen name="ReceiveSelect" component={ReceiveSelect} />
         <HomeStack.Screen name="SendSelect" component={SendFundSelect} />
         <HomeStack.Screen name="SendFundSelect" component={SendFundSelect} />

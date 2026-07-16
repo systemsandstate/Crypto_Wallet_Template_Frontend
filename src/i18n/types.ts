@@ -118,6 +118,7 @@ export type TranslationDict = {
         recentActivity: string;
         noPayments: string;
         noRecentActivity: string;
+        brandFooterPrefix: string;
         quickActions: string;
         yourCards: string;
         lastTransactions: string;
@@ -196,6 +197,7 @@ export type TranslationDict = {
         noDeposits: string;
         noSends: string;
         showAllHistory: string;
+        loadMore: string;
         walletDeposit: string;
         walletReceive: string;
         walletSend: string;
@@ -219,6 +221,7 @@ export type TranslationDict = {
         title: string;
         chooseBalanceCardTitle: string;
         chooseBalanceCardMessage: string;
+        sendAutoRouteHint: string;
         recentSends: string;
         noRecentSends: string;
         noFundedCards: string;
@@ -285,6 +288,7 @@ export type TranslationDict = {
         networkSendUnsupported: string;
         estimatingFee: string;
         networkFeeUsdt: string;
+        feeNone: string;
         usdtFeeExplainer: string;
         insufficientUsdtWithFee: string;
         insufficientAnyNetwork: string;
@@ -539,6 +543,14 @@ export type TranslationDict = {
         myQrCodeTitle: string;
         myQrCodeDescription: string;
         myQrCodeAmountHint: string;
+        cashierTitle: string;
+        cashierAmountLabel: string;
+        cashierAmountHint: string;
+        cashierInstruction: string;
+        cashierDone: string;
+        paymentMissingCta: string;
+        paymentMissingTitle: string;
+        paymentMissingMessage: string;
         tapForQr: string;
         onChainBalance: string;
         balanceUnavailable: string;

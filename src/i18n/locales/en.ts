@@ -115,7 +115,8 @@ const en: TranslationDict = {
         recentPayments: "Recent payments",
         recentActivity: "Recent activity",
         noPayments: "No payments yet. Tap Create payment to receive your first USDT.",
-        noRecentActivity: "No activity yet. Receive USDT to your wallet or create a payment request.",
+        noRecentActivity: "Nothing here yet. Tap Get paid to show your QR and start receiving.",
+        brandFooterPrefix: "Payments powered by",
         quickActions: "Quick Actions",
         yourCards: "Your Cards",
         lastTransactions: "Last Transactions",
@@ -129,9 +130,9 @@ const en: TranslationDict = {
         usdtWalletCardHint: "Receive payments",
         paymentCard: "Payment Request",
         paymentCardHint: "Create invoice QR",
-        bep20Card: "BEP20 Card",
-        trc20Card: "TRC20 Card",
-        erc20Card: "ERC20 Card",
+        bep20Card: "USDT",
+        trc20Card: "USDT",
+        erc20Card: "USDT",
         sendMoney: "Send Money",
         payBill: "Pay Bill",
         qrPay: "QR pay",
@@ -158,7 +159,7 @@ const en: TranslationDict = {
         createTitle: "Request payment",
         newPayment: "Payment request",
         createDescription:
-            "Set the amount your customer should pay. Share the QR — we confirm when they pay.",
+            "Set the amount your customer should pay. Share the QR. We confirm when they pay.",
         amountLabel: "Amount",
         referenceLabel: "Reference",
         amountPlaceholder: "Amount in USDT",
@@ -195,6 +196,7 @@ const en: TranslationDict = {
         noDeposits: "No results found",
         noSends: "No sends found",
         showAllHistory: "Show all",
+        loadMore: "Load more",
         walletDeposit: "Wallet deposit",
         walletReceive: "Receive",
         walletSend: "Send",
@@ -209,7 +211,7 @@ const en: TranslationDict = {
         qrPerNetworkHint:
             "Pick the network your customer will use. Each QR is smaller and easier to scan than one combined code.",
         qrAutoDetectNote:
-            "We watch BNB Chain, TRON, and Ethereum. payment is detected automatically once it arrives.",
+            "Payment is detected automatically once it arrives. Your customer does not need to pick a network.",
         qrTapToEnlarge: "Tap QR to enlarge",
         qrEnlargeTitle: "Payment QR",
         qrCopyAddress: "Copy account number",
@@ -221,9 +223,11 @@ const en: TranslationDict = {
         title: "Transfer money",
         chooseBalanceCardTitle: "Choose a card",
         chooseBalanceCardMessage: "Choose the balance card you want to send from.",
+        sendAutoRouteHint:
+            "Enter who you are paying and the amount. Kivoo picks the best route automatically so you do not need to choose a network.",
         recentSends: "Recent sends",
         noRecentSends: "No sends yet. Your last 5 will appear here.",
-        noFundedCards: "No cards with available balance.",
+        noFundedCards: "No balance available to send yet.",
         sendNativeTitle: "Send",
         description: "Send US dollars (USDT) to another account. like a bank transfer.",
         sendNativeDescription: "Send native coin (BNB, ETH, etc.) to another account number.",
@@ -288,25 +292,26 @@ const en: TranslationDict = {
         walletPinRequired: "Enter your wallet PIN to sign the transaction.",
         networkSendUnsupported:
             "Sending on this network is not supported yet. Use TRC20, BEP20, ERC20, or Polygon.",
-        estimatingFee: "Estimating fee…",
-        networkFeeUsdt: "Transfer fee (USDT)",
+        estimatingFee: "Checking transfer cost…",
+        networkFeeUsdt: "Transfer cost",
+        feeNone: "No fee",
         usdtFeeExplainer:
-            "The transfer fee is paid in USDT from your balance. no extra coins needed.",
+            "This small transfer cost is paid from your USDT balance. you do not need extra coins.",
         insufficientUsdtWithFee:
-            "Not enough USDT for this send plus the network fee paid in USDT.",
+            "Not enough USDT for this send plus the transfer cost.",
         insufficientAnyNetwork:
-            "Not enough USDT on any of your networks to complete this transfer.",
+            "Not enough USDT available to complete this transfer.",
         qrScanPreparing: "Preparing transfer…",
         qrScanMissingAmount: "QR code has no amount. Enter the amount and tap Continue.",
         confirmNetwork: "Network",
         confirmAvailableBalance: "Your balance",
-        confirmTotalDebit: "Total including fee",
-        feeEstimateFailed: "Could not estimate the USDT network fee. Try again.",
+        confirmTotalDebit: "Total to pay",
+        feeEstimateFailed: "Could not check the transfer cost. Try again.",
         usdtGasNotConfigured:
             "USDT network fees are not configured on this build. Add GasFree keys for TRC20 and/or EXPO_PUBLIC_CANDIDE_API_KEY for EVM networks.",
         sendSearchPlaceholder: "Search",
         scanToPayBanner: "Scan QR to pay",
-        scanToPaySubtext: "Point your camera at a payment QR. amount and recipient are filled in automatically.",
+        scanToPaySubtext: "Point your camera at a payment QR. Amount and recipient are filled in automatically.",
         latestTransferLogs: "Latest transfers",
         latestTransferLogsHint: "Tap one to fill recipient info.",
         repeatPayment: "Repeat",
@@ -353,7 +358,7 @@ const en: TranslationDict = {
         transferRequest: "Transfer request",
         transferMessage:
             "Send USDT from your wallet using your crypto wallet app.\n\nAmount: {amount} USDT\nNetwork: {network}\nTo: {address}{note}",
-        networkFeeVaries: "Network fee varies",
+        networkFeeVaries: "Shown before you confirm",
         notePrefix: "Note:",
     },
     network: {
@@ -460,7 +465,7 @@ const en: TranslationDict = {
         legendPending: "Pending",
     },
     splash: {
-        title: "Kivo",
+        title: "Kivoo",
         subtitle: "Accept USDT on TRON, Ethereum, BNB, Solana & Polygon",
     },
     wallet: {
@@ -527,14 +532,14 @@ const en: TranslationDict = {
         sendToAddress: "Send USDT to this account number:",
         copyAddress: "Copy account number",
         accountNumberLabel: "Account number",
-        accountNumberCopied: "{network} account number copied",
+        accountNumberCopied: "Account number copied",
         receiveTitle: "Get paid",
         receiveSubtitle: "Share your payment details to receive US dollars (USDT).",
         selectReceiveNetwork: "Select network",
         selectReceiveNetworkDescription:
-            "Choose what you want to receive. USDT or the network coin (TRX, BNB, ETH, etc.). Each network has its own account number.",
+            "Set up your wallet to start receiving US dollars (USDT).",
         receiveWarning:
-            "Only send Tether USD ({network}) assets to this account number. Other assets will be lost forever.",
+            "Only send USDT to this account. Other assets sent here may be lost forever.",
         receiveNativeWarning:
             "Only send {symbol} on {network} to this account number. Sending other coins or using the wrong network may result in permanent loss.",
         receiveInfoTitle: "Account number",
@@ -560,10 +565,19 @@ const en: TranslationDict = {
         shareFailed: "Could not share. Try Copy instead.",
         shareCopiedFallback: "Share text copied to clipboard.",
         myQrCode: "My QR code",
-        myQrCodeTitle: "All-network QR",
+        myQrCodeTitle: "Payment QR",
         myQrCodeDescription:
-            "One QR with your BEP20, TRC20, and ERC20 account numbers. When scanned in this app, the payer picks a funded network automatically.",
-        myQrCodeAmountHint: "Optional. The amount is embedded in the QR and pre-fills Scan to pay.",
+            "Show this QR to get paid. The payer only needs to scan and confirm.",
+        myQrCodeAmountHint: "Optional. The amount is included in the QR so the payer sees what to send.",
+        cashierTitle: "Get paid",
+        cashierAmountLabel: "Amount to charge",
+        cashierAmountHint: "Optional. Leave empty if the customer will enter the amount.",
+        cashierInstruction: "Show this code to your customer. They only need to scan and confirm.",
+        cashierDone: "Done",
+        paymentMissingCta: "Payment didn’t arrive?",
+        paymentMissingTitle: "Payment didn’t arrive",
+        paymentMissingMessage:
+            "Ask your customer for the time, the amount, and a screenshot of their confirmation. Then open Help and contact support with those details.",
         tapForQr: "Tap to show QR code",
         onChainBalance: "On-chain balance",
         balanceUnavailable: "Unavailable",
@@ -572,70 +586,70 @@ const en: TranslationDict = {
             "Live USDT on this network. Home totals only count completed payment requests.",
         networkNotSetupTitle: "Account number not set up",
         networkNotSetupMessage: "Set up your wallet for this network first.",
-        helpTitle: "Help & payments guide",
+        helpTitle: "Help",
         helpIntro:
-            "Simple answers about your business payment account. receiving US dollars (USDT), transferring to other merchants, and choosing the right payment network.",
-        helpMenuSubtitle: "How payments and transfers work",
+            "Short answers for everyday payments. No technical setup required.",
+        helpMenuSubtitle: "Getting paid, sending money, and common questions",
         helpItems: [
-            {
-                question: "What is this account?",
-                answer:
-                    "This is your business payment account on your phone. You control the funds. we never hold your money. The app gives you account numbers on BNB Chain (recommended), TRON, and Ethereum so customers and other merchants can pay you in US dollars (USDT).",
-            },
-            {
-                question: "Who holds my money?",
-                answer:
-                    "Only you. We never hold merchant or customer funds. USDT goes directly from the sender's wallet to your account on the blockchain. Our servers store your public account numbers and payment records. never your private keys or recovery phrase.",
-            },
-            {
-                question: "What is a recovery phrase?",
-                answer:
-                    "When you set up your account, you receive 12 secret words (a recovery phrase). Anyone with these words can access your funds. Write them on paper and store them safely offline. We cannot recover them for you if they are lost.",
-            },
-            {
-                question: "What is the wallet PIN?",
-                answer:
-                    "The PIN unlocks your encrypted wallet on this device only. It is not the same as your login password. If you forget your PIN, restore the wallet using your recovery phrase.",
-            },
             {
                 question: "How do I get paid?",
                 answer:
-                    "Tap Get paid on the home screen to show your payment QR code and account number. You can optionally set an amount on the QR so the payer sees exactly what to send. Share the QR or account number with your customer. they send USDT from their own wallet, like a bank transfer.",
+                    "On Home, tap Get paid. Optionally enter the amount, then show the QR to your customer. They scan and confirm. That’s it. You do not need to explain anything technical.",
             },
             {
-                question: "How do I transfer money to someone?",
+                question: "How do I pay with QR?",
                 answer:
-                    "Tap Transfer on the home screen to open the transfer form directly. we pick the best payment route for you. Tap a recent transfer in the list to fill recipient details. You can also scan a QR or use Pay by email from the home screen.",
+                    "On Home, tap QR pay. Point your camera at the merchant’s QR, review the amount and name, then confirm. Kivoo fills everything in for you.",
+            },
+            {
+                question: "How do I transfer money?",
+                answer:
+                    "On Home, tap Transfer. Enter who you are paying (email or account number) and the amount, then continue. You can also pay by email or pick a saved contact.",
+            },
+            {
+                question: "A customer paid but I don’t see the money",
+                answer:
+                    "Open History and pull down to refresh. Most payments show up within a few minutes. If nothing appears, ask the customer for the time, the amount, and a screenshot of their confirmation. Share those with support.",
             },
             {
                 question: "How do I know a payment arrived?",
                 answer:
-                    "Open Activity on the home screen or the History tab to see recent payments and transfers. When you create a payment request, we watch all networks in the QR (BNB Chain, TRON, and Ethereum) and mark the invoice Paid as soon as the correct amount arrives on any of them. Your available balance updates when you open the app or tap the refresh button on the balance card.",
+                    "Check History or Activity on Home. Paid items appear when the correct amount arrives. Pull to refresh if you just received a payment. Your balance updates when you open the app or tap refresh.",
             },
             {
-                question: "What is USDT?",
+                question: "What fees will I see?",
                 answer:
-                    "USDT (Tether) is a digital dollar. a token designed to stay close to $1 USD. When you receive 10 USDT, you received about $10 in value. The app displays USDT amounts as dollars for easy reading.",
+                    "Receiving money is usually free for you. When you send, you may see a small transfer cost before you confirm. Always check the confirm screen. The total is shown clearly before you approve.",
             },
             {
-                question: "USDT on BNB Chain, TRON & Ethereum",
+                question: "What is the money in my account?",
                 answer:
-                    "USDT exists on several blockchains. Each type uses a different network and is not interchangeable:\n\n• BEP20. USDT on BNB Chain. Our recommended default: low fees, fast confirmations, and widely supported by exchanges and wallets.\n• TRC20. USDT on TRON. Good when your payer already uses TRON; sending from this app may include a small USDT network fee on TRON.\n• ERC20. USDT on Ethereum. Use when the sender can only pay from an Ethereum wallet; network fees can be higher at busy times.\n\nPayment request QRs include all of your account numbers. Your customer picks the network their wallet supports. we match the payment automatically. Sending USDT on the wrong network (not listed in the QR) can result in permanent loss.",
+                    "Amounts are in US dollars (USDT). One USDT is designed to equal about one US dollar, so 10 USDT is about $10. The app shows amounts as dollars so they are easy to read.",
             },
             {
-                question: "Which network should I use? (We recommend BEP20)",
+                question: "Who holds my money?",
                 answer:
-                    "For most merchants, BEP20 on BNB Chain is the best default:\n\n• Low, predictable network fees\n• Fast confirmations\n• Supported by most major exchanges and wallets\n\nWhen you create a payment request, the QR includes BNB Chain, TRON, and Ethereum account numbers. Your customer can pay on whichever network their wallet supports. you do not need to ask them to pick one. We still recommend BEP20 when you are choosing for yourself (for example when you send money).",
+                    "You do. Kivoo never holds your funds. Money goes straight to your account. Keep your recovery words and PIN private. we cannot move money for you.",
             },
             {
-                question: "What are network fees?",
+                question: "What are the 12 recovery words?",
                 answer:
-                    "Network fees pay the blockchain to process a transfer. They are not charged by this app.\n\n• Receiving USDT into your account is usually free for you.\n• When you send USDT, the sender-side network fee applies. On TRON (TRC20), the fee may be deducted in USDT from your balance. On BNB Chain (BEP20) and Ethereum (ERC20), a small amount of BNB or ETH is needed for gas when sending.\n\nThe confirm screen always shows the amount going to the recipient separately from any network fee, so you can review before approving.",
+                    "When you set up your account, you get 12 secret words. Anyone with those words can access your money. Write them on paper and store them somewhere safe offline. If you lose them, we cannot restore your account.",
+            },
+            {
+                question: "What is the wallet PIN?",
+                answer:
+                    "Your PIN unlocks payments on this phone. It is not the same as your login password. If you forget the PIN, restore the account with your 12 recovery words.",
+            },
+            {
+                question: "What if the QR won’t scan?",
+                answer:
+                    "Raise screen brightness, hold the phone steady, and try again a little closer or farther. If it still fails, ask the merchant to refresh Get paid and show the QR again.",
             },
             {
                 question: "What if I change or lose my phone?",
                 answer:
-                    "Install the app on a new device, sign in, and choose Import wallet. Enter your 12-word recovery phrase to restore the same account numbers. Without the phrase, funds on the old wallet cannot be recovered.",
+                    "Install Kivoo on the new phone, sign in, and choose Import wallet. Enter your 12 recovery words to restore the same account. Without those words, the money on the old phone cannot be recovered.",
             },
         ],
     },
@@ -644,7 +658,7 @@ const en: TranslationDict = {
         privacySections: [
             {
                 title: "1. Overview",
-                body: 'Kivo ("the App") helps merchants receive USDT payments directly to their own wallet. We do not hold customer or merchant funds. Your wallet keys stay on your device.',
+                body: 'Kivoo ("the App") helps merchants receive USDT payments directly to their own wallet. We do not hold customer or merchant funds. Your wallet keys stay on your device.',
             },
             {
                 title: "2. Data we collect",
@@ -664,14 +678,14 @@ const en: TranslationDict = {
             },
             {
                 title: "6. Contact",
-                body: "For privacy questions regarding Kivo, contact the merchant account owner or platform administrator listed in your onboarding materials.",
+                body: "For privacy questions regarding Kivoo, contact the merchant account owner or platform administrator listed in your onboarding materials.",
             },
         ],
         faqTitle: "Terms of service",
         faqItems: [
             {
                 question: "Service description",
-                answer: "Kivo is a non-custodial merchant tool. Customers pay USDT directly to your account on BNB Chain (BEP20), TRON (TRC20), or Ethereum (ERC20). We monitor all networks in payment QRs to confirm invoices. we never hold your funds.",
+                answer: "Kivoo is a non-custodial merchant tool. Customers pay USDT directly to your account on BNB Chain (BEP20), TRON (TRC20), or Ethereum (ERC20). We monitor all networks in payment QRs to confirm invoices. we never hold your funds.",
             },
             {
                 question: "Merchant responsibilities",

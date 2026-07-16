@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Kivo",
+    "name": "Kivoo",
     "slug": "merchant-payments",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -39,9 +39,10 @@
       ],
       "expo-secure-store"
     ],
+    "runtimeVersion": "1.0.0",
     "updates": {
-      "enabled": false,
-      "checkAutomatically": "NEVER",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0
     },
     "assetBundlePatterns": [
@@ -66,7 +67,7 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "name": "Kivo",
+      "name": "Kivoo",
       "shortName": "Payments",
       "description": "USDT QR payments for merchants",
       "themeColor": "#2563EB",

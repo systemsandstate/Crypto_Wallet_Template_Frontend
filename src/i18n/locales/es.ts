@@ -116,7 +116,8 @@ const es: TranslationDict = {
         recentPayments: "Pagos recientes",
         recentActivity: "Actividad reciente",
         noPayments: "Aún no hay pagos. Pulsa Crear pago para recibir tu primer USDT.",
-        noRecentActivity: "Sin actividad aún. Recibe USDT en tu billetera o crea una solicitud de pago.",
+        noRecentActivity: "Aún no hay nada aquí. Toca Cobrar para mostrar tu QR y empezar a recibir.",
+        brandFooterPrefix: "Pagos con",
         quickActions: "Acciones rápidas",
         yourCards: "Tus tarjetas",
         lastTransactions: "Últimas transacciones",
@@ -130,9 +131,9 @@ const es: TranslationDict = {
         usdtWalletCardHint: "Recibir pagos",
         paymentCard: "Solicitud de pago",
         paymentCardHint: "Crear QR de factura",
-        bep20Card: "Tarjeta BEP20",
-        trc20Card: "Tarjeta TRC20",
-        erc20Card: "Tarjeta ERC20",
+        bep20Card: "USDT",
+        trc20Card: "USDT",
+        erc20Card: "USDT",
         sendMoney: "Enviar dinero",
         payBill: "Pagar factura",
         qrPay: "Pagar QR",
@@ -159,7 +160,7 @@ const es: TranslationDict = {
         createTitle: "Solicitar pago",
         newPayment: "Solicitud de pago",
         createDescription:
-            "Indica el importe que debe pagar tu cliente. Comparte el QR — confirmamos cuando pague.",
+            "Indica el importe que debe pagar tu cliente. Comparte el QR. Confirmamos cuando pague.",
         amountLabel: "Importe",
         referenceLabel: "Referencia",
         amountPlaceholder: "Importe en USDT",
@@ -196,6 +197,7 @@ const es: TranslationDict = {
         noDeposits: "No se encontraron resultados",
         noSends: "No se encontraron envíos",
         showAllHistory: "Ver todo",
+        loadMore: "Cargar más",
         walletDeposit: "Depósito en billetera",
         walletReceive: "Recibir",
         walletSend: "Envío",
@@ -210,7 +212,7 @@ const es: TranslationDict = {
         qrPerNetworkHint:
             "Elige la red que usará tu cliente. Cada QR es más pequeño y fácil de escanear que un código combinado.",
         qrAutoDetectNote:
-            "Vigilamos BNB Chain, TRON y Ethereum. el pago se detecta automáticamente al llegar.",
+            "El pago se detecta automáticamente al llegar. Tu cliente no necesita elegir una red.",
         qrTapToEnlarge: "Toca el QR para ampliar",
         qrEnlargeTitle: "QR de pago",
         qrCopyAddress: "Copiar número de cuenta",
@@ -222,9 +224,11 @@ const es: TranslationDict = {
         title: "Enviar USDT",
         chooseBalanceCardTitle: "Elige una tarjeta",
         chooseBalanceCardMessage: "Elige la tarjeta de saldo desde la que quieres enviar.",
+        sendAutoRouteHint:
+            "Indica a quién pagas y el monto. Kivoo elige automáticamente la mejor ruta para que no tengas que elegir una red.",
         recentSends: "Envíos recientes",
         noRecentSends: "Aún no hay envíos. Tus últimos 5 aparecerán aquí.",
-        noFundedCards: "No hay tarjetas con saldo disponible.",
+        noFundedCards: "Aún no tienes saldo disponible para enviar.",
         sendNativeTitle: "Enviar",
         description: "Envía dinero a otra cartera. como una transferencia bancaria, pero en USDT.",
         sendNativeDescription: "Envía moneda nativa (BNB, ETH, etc.) a otro número de cuenta.",
@@ -290,26 +294,27 @@ const es: TranslationDict = {
         walletPinRequired: "Introduce el PIN de tu cartera para firmar la transacción.",
         networkSendUnsupported:
             "El envío en esta red aún no está disponible. Usa TRC20, BEP20, ERC20 o Polygon.",
-        estimatingFee: "Estimando comisión…",
-        networkFeeUsdt: "Comisión de red (USDT)",
+        estimatingFee: "Calculando costo del envío…",
+        networkFeeUsdt: "Costo del envío",
+        feeNone: "Sin costo",
         usdtFeeExplainer:
-            "La comisión de red se paga en USDT. no necesitas TRX, ETH, BNB ni POL. La comisión se resta de tu saldo USDT además del importe enviado.",
+            "Este pequeño costo se paga con tu saldo USDT. no necesitas monedas adicionales.",
         insufficientUsdtWithFee:
-            "No tienes suficiente USDT para este envío más la comisión de red en USDT.",
+            "No tienes suficiente USDT para este envío más el costo del envío.",
         insufficientAnyNetwork:
-            "No hay USDT suficiente en ninguna red para completar esta transferencia.",
+            "No tienes USDT suficiente para completar esta transferencia.",
         qrScanPreparing: "Preparando transferencia…",
         qrScanMissingAmount: "El QR no incluye importe. Introduce el importe y pulsa Continuar.",
         confirmNetwork: "Red",
         confirmAvailableBalance: "Tu saldo",
-        confirmTotalDebit: "Total con comisión",
-        feeEstimateFailed: "No se pudo estimar la comisión USDT de red. Inténtalo de nuevo.",
+        confirmTotalDebit: "Total a pagar",
+        feeEstimateFailed: "No se pudo calcular el costo del envío. Inténtalo de nuevo.",
         usdtGasNotConfigured:
             "Las comisiones en USDT no están configuradas en esta versión. Añade claves GasFree para TRC20 y/o EXPO_PUBLIC_CANDIDE_API_KEY para redes EVM.",
         sendSearchPlaceholder: "Buscar",
         scanToPayBanner: "Escanear QR para pagar",
         scanToPaySubtext:
-            "Apunta la cámara a un QR de pago. el importe y el destinatario se rellenan solos.",
+            "Apunta la cámara a un QR de pago. El importe y el destinatario se rellenan solos.",
         latestTransferLogs: "Últimas transferencias",
         latestTransferLogsHint: "Toca una para rellenar los datos del destinatario.",
         repeatPayment: "Repetir",
@@ -356,7 +361,7 @@ const es: TranslationDict = {
         transferRequest: "Solicitud de transferencia",
         transferMessage:
             "Envía USDT desde tu cartera con tu app de criptomonedas.\n\nImporte: {amount} USDT\nRed: {network}\nDestino: {address}{note}",
-        networkFeeVaries: "La comisión de red varía",
+        networkFeeVaries: "Se muestra antes de confirmar",
         notePrefix: "Nota:",
     },
     network: {
@@ -463,7 +468,7 @@ const es: TranslationDict = {
         legendPending: "Pendiente",
     },
     splash: {
-        title: "Kivo",
+        title: "Kivoo",
         subtitle: "Acepta USDT en TRON, Ethereum, BNB, Solana y Polygon",
     },
     wallet: {
@@ -530,14 +535,14 @@ const es: TranslationDict = {
         sendToAddress: "Envía USDT a este número de cuenta:",
         copyAddress: "Copiar número de cuenta",
         accountNumberLabel: "Número de cuenta",
-        accountNumberCopied: "Número de cuenta {network} copiado",
+        accountNumberCopied: "Número de cuenta copiado",
         receiveTitle: "Cobrar",
         receiveSubtitle: "Comparte tus datos de pago para recibir dólares (USDT).",
         selectReceiveNetwork: "Seleccionar red",
         selectReceiveNetworkDescription:
-            "Elige qué quieres recibir. USDT o la moneda de la red (TRX, BNB, ETH, etc.). Cada red tiene su propio número de cuenta.",
+            "Configura tu cartera para empezar a cobrar en dólares (USDT).",
         receiveWarning:
-            "Envía solo activos Tether USD ({network}) a este número de cuenta. Otros activos se perderán para siempre.",
+            "Envía solo USDT a esta cuenta. Otros activos enviados aquí pueden perderse para siempre.",
         receiveNativeWarning:
             "Envía solo {symbol} en {network} a este número de cuenta. Otras monedas o redes incorrectas pueden causar pérdida permanente.",
         receiveInfoTitle: "Número de cuenta",
@@ -565,10 +570,19 @@ const es: TranslationDict = {
         shareFailed: "No se pudo compartir. Prueba Copiar.",
         shareCopiedFallback: "Texto copiado al portapapeles.",
         myQrCode: "Mi código QR",
-        myQrCodeTitle: "QR multired",
+        myQrCodeTitle: "QR de cobro",
         myQrCodeDescription:
-            "Un QR con tus números de cuenta BEP20, TRC20 y ERC20. Al escanearlo en esta app, el pagador elige la red disponible automáticamente.",
-        myQrCodeAmountHint: "Opcional. El importe se incluye en el QR y rellena Escanear para pagar.",
+            "Muestra este QR para cobrar. El pagador solo necesita escanear y confirmar.",
+        myQrCodeAmountHint: "Opcional. El importe se incluye en el QR para que el pagador sepa qué enviar.",
+        cashierTitle: "Cobrar",
+        cashierAmountLabel: "Monto a cobrar",
+        cashierAmountHint: "Opcional. Déjalo vacío si el cliente ingresará el monto.",
+        cashierInstruction: "Muestra este código a tu cliente. Solo necesita escanear y confirmar.",
+        cashierDone: "Listo",
+        paymentMissingCta: "¿No llegó el pago?",
+        paymentMissingTitle: "No llegó el pago",
+        paymentMissingMessage:
+            "Pide a tu cliente la hora, el monto y una captura de su confirmación. Luego abre Ayuda y contacta a soporte con esos datos.",
         tapForQr: "Toca para ver el código QR",
         onChainBalance: "Saldo en cadena",
         balanceUnavailable: "No disponible",
@@ -577,70 +591,70 @@ const es: TranslationDict = {
             "USDT en vivo en esta red. El inicio solo suma solicitudes de pago completadas.",
         networkNotSetupTitle: "Número de cuenta sin configurar",
         networkNotSetupMessage: "Configura tu cartera para esta red primero.",
-        helpTitle: "Ayuda y guía de pagos",
+        helpTitle: "Ayuda",
         helpIntro:
-            "Respuestas sencillas sobre tu cuenta de pagos comercial: recibir dólares (USDT), transferir a otros comercios y elegir la red de pago adecuada.",
-        helpMenuSubtitle: "Cómo funcionan los pagos y las transferencias",
+            "Respuestas cortas para pagos del día a día. No necesitas conocimientos técnicos.",
+        helpMenuSubtitle: "Cobrar, enviar dinero y preguntas frecuentes",
         helpItems: [
             {
-                question: "¿Qué es esta cuenta?",
+                question: "¿Cómo cobro?",
                 answer:
-                    "Es tu cuenta de pagos comercial en el teléfono. Tú controlas los fondos. nosotros nunca guardamos tu dinero. La app te da números de cuenta en BNB Chain (recomendado), TRON y Ethereum para que clientes y otros comercios te paguen en dólares digitales (USDT).",
+                    "En Inicio, toca Cobrar. Si quieres, escribe el monto y muestra el QR a tu cliente. Él escanea y confirma. Listo. No necesitas explicar nada técnico.",
             },
             {
-                question: "¿Quién guarda mi dinero?",
+                question: "¿Cómo pago con QR?",
                 answer:
-                    "Solo tú. Nunca custodiamos fondos de comercios ni clientes. El USDT va directamente de la cartera del remitente a tu cuenta en la blockchain. Nuestros servidores guardan tus números de cuenta públicos y registros de pago. nunca tus claves privadas ni tu frase de recuperación.",
+                    "En Inicio, toca Pagar QR. Apunta la cámara al QR del comercio, revisa el monto y el nombre, y confirma. Kivoo completa todo por ti.",
             },
             {
-                question: "¿Qué es la frase de recuperación?",
+                question: "¿Cómo transfiero dinero?",
                 answer:
-                    "Al configurar tu cuenta recibes 12 palabras secretas (frase de recuperación). Cualquiera con esas palabras puede acceder a tus fondos. Escríbelas en papel y guárdalas offline de forma segura. No podemos recuperarlas si se pierden.",
+                    "En Inicio, toca Transferir. Indica a quién pagas (correo o número de cuenta) y el monto, luego continúa. También puedes pagar por correo o elegir un contacto guardado.",
             },
             {
-                question: "¿Qué es el PIN de la cartera?",
+                question: "Un cliente pagó y no veo el dinero",
                 answer:
-                    "El PIN desbloquea tu cartera cifrada solo en este dispositivo. No es la misma contraseña de inicio de sesión. Si olvidas el PIN, restaura la cartera con tu frase de recuperación.",
-            },
-            {
-                question: "¿Cómo cobro un pago?",
-                answer:
-                    "Toca Cobrar en la pantalla de inicio para mostrar tu código QR y número de cuenta. Puedes fijar un importe en el QR para que el pagador sepa exactamente qué enviar. Comparte el QR o el número de cuenta. el cliente envía USDT desde su propia cartera, como una transferencia bancaria.",
-            },
-            {
-                question: "¿Cómo transfiero dinero a alguien?",
-                answer:
-                    "Toca Transferir en inicio para abrir el formulario directamente. elegimos la mejor ruta de pago por ti. Toca una transferencia reciente en la lista para rellenar los datos del destinatario. También puedes escanear un QR o usar Pagar por correo desde inicio.",
+                    "Abre Historial y desliza hacia abajo para actualizar. La mayoría de los pagos aparecen en unos minutos. Si no aparece nada, pide al cliente la hora, el monto y una captura de su confirmación. Comparte eso con soporte.",
             },
             {
                 question: "¿Cómo sé que llegó un pago?",
                 answer:
-                    "Abre Actividad en inicio o la pestaña Historial para ver pagos y transferencias recientes. Al crear una solicitud de pago, vigilamos todas las redes del QR (BNB Chain, TRON y Ethereum) y marcamos la factura como Pagada en cuanto llega el importe correcto en cualquiera de ellas. Tu saldo disponible se actualiza al abrir la app o al pulsar actualizar en la tarjeta de saldo.",
+                    "Revisa Historial o Actividad en Inicio. Los pagos aparecen cuando llega el monto correcto. Desliza para actualizar si acabas de cobrar. Tu saldo se actualiza al abrir la app o al tocar actualizar.",
             },
             {
-                question: "¿Qué es USDT?",
+                question: "¿Qué comisiones veré?",
                 answer:
-                    "USDT (Tether) es un dólar digital. un token diseñado para mantenerse cerca de 1 USD. Si recibes 10 USDT, recibiste aproximadamente 10 dólares de valor. La app muestra los importes en USDT como dólares para facilitar la lectura.",
+                    "Recibir dinero suele ser gratis para ti. Al enviar, puede aparecer un pequeño costo de transferencia antes de confirmar. Revisa siempre la pantalla de confirmación. El total se muestra con claridad antes de aprobar.",
             },
             {
-                question: "USDT en BNB Chain, TRON y Ethereum",
+                question: "¿Qué dinero hay en mi cuenta?",
                 answer:
-                    "USDT existe en varias blockchains. Cada tipo usa una red distinta y no son intercambiables:\n\n• BEP20. USDT en BNB Chain. Nuestra opción recomendada: comisiones bajas, confirmaciones rápidas y amplio soporte en exchanges y carteras.\n• TRC20. USDT en TRON. Buena opción si tu pagador ya usa TRON; enviar desde esta app puede incluir una pequeña comisión de red en USDT en TRON.\n• ERC20. USDT en Ethereum. Úsala cuando el remitente solo pueda pagar desde Ethereum; las comisiones pueden ser más altas en momentos de congestión.\n\nLos QR de solicitud de pago incluyen todas tus direcciones de cobro. Tu cliente elige la red que soporte su cartera. nosotros emparejamos el pago automáticamente. Enviar USDT por una red incorrecta (no incluida en el QR) puede causar pérdida permanente.",
+                    "Los montos están en dólares (USDT). Un USDT está pensado para valer cerca de un dólar, así que 10 USDT son unos $10. La app muestra los montos como dólares para que sean fáciles de leer.",
             },
             {
-                question: "¿Qué red debo usar? (Recomendamos BEP20)",
+                question: "¿Quién guarda mi dinero?",
                 answer:
-                    "Para la mayoría de comercios, BEP20 en BNB Chain es la mejor opción por defecto:\n\n• Comisiones de red bajas y predecibles\n• Confirmaciones rápidas\n• Compatible con la mayoría de exchanges y carteras\n\nAl crear una solicitud de pago, el QR incluye direcciones de BNB Chain, TRON y Ethereum. Tu cliente puede pagar en la red que soporte su cartera. no necesitas pedirle que elija una. Seguimos recomendando BEP20 cuando tú eliges (por ejemplo al enviar dinero).",
+                    "Tú. Kivoo nunca custodia tus fondos. El dinero va directo a tu cuenta. Guarda en privado tus palabras de recuperación y tu PIN. Nosotros no podemos mover dinero por ti.",
             },
             {
-                question: "¿Qué son las comisiones de red?",
+                question: "¿Qué son las 12 palabras de recuperación?",
                 answer:
-                    "Las comisiones de red pagan a la blockchain por procesar una transferencia. No las cobra esta app.\n\n• Recibir USDT en tu cuenta suele ser gratis para ti.\n• Al enviar USDT, aplica la comisión del lado del remitente. En TRON (TRC20), la comisión puede descontarse en USDT de tu saldo. En BNB Chain (BEP20) y Ethereum (ERC20), se necesita una pequeña cantidad de BNB o ETH para gas al enviar.\n\nLa pantalla de confirmación siempre muestra el importe para el destinatario por separado de cualquier comisión de red, para que puedas revisar antes de aprobar.",
+                    "Al crear tu cuenta recibes 12 palabras secretas. Quien las tenga puede acceder a tu dinero. Escríbelas en papel y guárdalas en un lugar seguro fuera del teléfono. Si las pierdes, no podemos restaurar tu cuenta.",
+            },
+            {
+                question: "¿Qué es el PIN de la cartera?",
+                answer:
+                    "El PIN desbloquea los pagos en este teléfono. No es la misma contraseña de inicio de sesión. Si olvidas el PIN, restaura la cuenta con tus 12 palabras de recuperación.",
+            },
+            {
+                question: "¿Qué hago si el QR no se escanea?",
+                answer:
+                    "Sube el brillo de la pantalla, mantén el teléfono firme e inténtalo de nuevo un poco más cerca o más lejos. Si sigue fallando, pide al comercio que actualice Cobrar y muestre el QR otra vez.",
             },
             {
                 question: "¿Qué pasa si cambio o pierdo el teléfono?",
                 answer:
-                    "Instala la app en un dispositivo nuevo, inicia sesión y elige Importar cartera. Introduce tu frase de 12 palabras para restaurar los mismos números de cuenta. Sin la frase, los fondos de la cartera anterior no se pueden recuperar.",
+                    "Instala Kivoo en el teléfono nuevo, inicia sesión y elige Importar cartera. Introduce tus 12 palabras de recuperación para restaurar la misma cuenta. Sin esas palabras, el dinero del teléfono anterior no se puede recuperar.",
             },
         ],
     },
@@ -649,7 +663,7 @@ const es: TranslationDict = {
         privacySections: [
             {
                 title: "1. Resumen",
-                body: "Kivo («la App») ayuda a los comercios a recibir pagos USDT directamente en su propia cartera. No custodiamos fondos de clientes ni comercios. Tus claves permanecen en tu dispositivo.",
+                body: "Kivoo («la App») ayuda a los comercios a recibir pagos USDT directamente en su propia cartera. No custodiamos fondos de clientes ni comercios. Tus claves permanecen en tu dispositivo.",
             },
             {
                 title: "2. Datos que recopilamos",
@@ -669,14 +683,14 @@ const es: TranslationDict = {
             },
             {
                 title: "6. Contacto",
-                body: "Para preguntas de privacidad sobre Kivo, contacta con el propietario de la cuenta de comercio o el administrador de la plataforma indicado en tus materiales de incorporación.",
+                body: "Para preguntas de privacidad sobre Kivoo, contacta con el propietario de la cuenta de comercio o el administrador de la plataforma indicado en tus materiales de incorporación.",
             },
         ],
         faqTitle: "Términos del servicio",
         faqItems: [
             {
                 question: "Descripción del servicio",
-                answer: "Kivo es una herramienta de comercio no custodial. Los clientes pagan USDT directamente a tu cuenta en BNB Chain (BEP20), TRON (TRC20) o Ethereum (ERC20). Monitorizamos todas las redes incluidas en los QR de pago para confirmar facturas. nunca custodiamos tus fondos.",
+                answer: "Kivoo es una herramienta de comercio no custodial. Los clientes pagan USDT directamente a tu cuenta en BNB Chain (BEP20), TRON (TRC20) o Ethereum (ERC20). Monitorizamos todas las redes incluidas en los QR de pago para confirmar facturas. nunca custodiamos tus fondos.",
             },
             {
                 question: "Responsabilidades del comercio",

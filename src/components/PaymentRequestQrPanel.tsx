@@ -17,16 +17,12 @@ import { useAppSelector } from "../hooks/useAppSelector";
 import { RootState } from "../store/store";
 import {
     DEFAULT_USDT_NETWORK,
-    NETWORK_SHORT,
     USDT_NETWORKS,
     UsdtNetwork,
 } from "../constants/usdtNetworks";
-import { buildWalletQrPayload, splitAddressLines } from "../utils/walletQrPayload";
+import { buildReceiveQrPayload, splitAddressLines } from "../utils/walletQrPayload";
 import { copyToClipboard } from "../utils/copyToClipboard";
 import { showToast } from "../utils/toast";
-import { formatMessage } from "../i18n";
-import { getLocalizedNetworkLabel } from "../i18n/network";
-import NetworkLogo from "./NetworkLogo";
 import { svg } from "../svg";
 
 const USDT_LOGO = require("../assets/usdt-logo.png");
@@ -100,12 +96,33 @@ const PaymentRequestQrPanel: React.FC<Props> = ({ payment }) => {
         }
     }, [availableNetworks, selectedNetwork]);
 
-    const selectedAddress = addressByNetwork.get(selectedNetwork) ?? "";
+    const addresses = useMemo(() => {
+        const map: Partial<Record<UsdtNetwork, string>> = {};
+        for (const network of availableNetworks) {
+            const address = addressByNetwork.get(network);
+            if (address) map[network] = address;
+        }
+        return map;
+    }, [addressByNetwork, availableNetworks]);
+
+    const selectedAddress =
+        addressByNetwork.get(selectedNetwork) ??
+        addresses.BEP20 ??
+        addresses.TRC20 ??
+        addresses.ERC20 ??
+        "";
 
     const qrValue = useMemo(() => {
         if (!selectedAddress) return "";
-        return buildWalletQrPayload(selectedNetwork, selectedAddress, amount, "USDT");
-    }, [amount, selectedAddress, selectedNetwork]);
+        return buildReceiveQrPayload({
+            addresses,
+            amount,
+            asset: "USDT",
+            network: selectedNetwork,
+            fallbackAddress: selectedAddress,
+            businessName: merchantName || undefined,
+        });
+    }, [addresses, amount, merchantName, selectedAddress, selectedNetwork]);
 
     const enlargedSize = Math.min(QR_ENLARGE_MAX, Math.floor(windowWidth * 0.78));
 
@@ -113,12 +130,10 @@ const PaymentRequestQrPanel: React.FC<Props> = ({ payment }) => {
         if (!selectedAddress) return;
         const copied = await copyToClipboard(selectedAddress);
         showToast(
-            copied
-                ? formatMessage(t.wallet.accountNumberCopied, { network: selectedNetwork })
-                : t.transaction.couldNotCopy,
+            copied ? t.wallet.accountNumberCopied : t.transaction.couldNotCopy,
             copied ? "success" : "error"
         );
-    }, [selectedAddress, selectedNetwork, t.transaction.couldNotCopy, t.wallet.accountNumberCopied]);
+    }, [selectedAddress, t.transaction.couldNotCopy, t.wallet.accountNumberCopied]);
 
     const styles = useMemo(
         () =>
@@ -274,7 +289,6 @@ const PaymentRequestQrPanel: React.FC<Props> = ({ payment }) => {
     }
 
     const addressLines = splitAddressLines(selectedAddress);
-    const networkLabel = getLocalizedNetworkLabel(selectedNetwork, t);
 
     const renderQr = (size: number) => (
         <QRCode
@@ -291,8 +305,6 @@ const PaymentRequestQrPanel: React.FC<Props> = ({ payment }) => {
     return (
         <View style={styles.wrap}>
             <Text style={styles.hint}>{t.payment.qrAnyNetworkHint}</Text>
-
-            <Text style={styles.networkLabel}>{t.payment.qrNetworkReceive}</Text>
 
             <Pressable
                 style={styles.qrTouchable}

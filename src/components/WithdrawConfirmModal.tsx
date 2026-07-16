@@ -93,9 +93,11 @@ const WithdrawConfirmModal: React.FC<Props> = ({
     const feeValueLabel =
         feeLoading
             ? t.withdraw.estimatingFee
-            : feeUsdt != null
-              ? `${formatUsdtAmount(feeUsdt, dateLocale)} USDT`
-              : t.ux.networkFeeVaries;
+            : feeUsdt == null
+              ? t.ux.networkFeeVaries
+              : feeUsdt <= 0
+                ? t.withdraw.feeNone
+                : `${formatUsdtAmount(feeUsdt, dateLocale)} USDT`;
 
     const handleConfirm = () => {
         if (submitting || feeLoading) return;
